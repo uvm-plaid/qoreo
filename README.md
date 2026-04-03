@@ -9,5 +9,5 @@ I recommend installing Rocq via opam: https://rocq-prover.org/docs/using-opam
 Qoreo uses the QuantumLib library for formalizing quantum computing (https://github.com/inQWIRE/QuantumLib) but the version compatible with Rocq 9.x is currently in a fork here: https://github.com/jpaykin/QuantumLib/tree/jpaykin/v9.1. You can install it via:
 
 ```
-    opam pin coq-quantumlib git@github.com:jpaykin/QuantumLib.git#v9.1
+    opam pin coq-quantumlib https://github.com/jpaykin/QuantumLib.git#jpaykin/v9.1
 ```

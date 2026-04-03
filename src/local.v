@@ -167,7 +167,6 @@ Module Config.
       qstate := rho'
     |}).
 
-
   Definition apply_matrix (cfg : t) (U : Matrix (2 ^ dim cfg) (2 ^ dim cfg)) : t :=
   {|
     dim := dim cfg;
@@ -338,149 +337,148 @@ match U with
 | _ => QUBIT
 end.
 
-(* Typing judgment: Γ; Δ; δ ⊢ t : τ 
- * Here, δ is a set of qubit references that are currently in scope
+(* Typing judgment: Gamma; Delta; Delta ⊢ t : tau 
+ * Here, Delta is a set of qubit references that are currently in scope
  *)
 Inductive WellTyped {n : nat} : Var.Map.t typ -> Var.Map.t typ -> expr -> typ -> Prop :=
 
-| WTQVar : forall Γ Δ x τ,
-  Var.Singleton x τ Δ ->
-  WellTyped Γ Δ (Var x) τ
+| WTQVar : forall Gamma Delta x tau,
+  Var.Singleton x tau Delta ->
+  WellTyped Gamma Delta (Var x) tau
 
-| WTCVar : forall Γ Δ x τ,
-  Var.Map.Empty Δ ->
-  Var.Map.MapsTo x τ Γ ->
-  WellTyped Γ Δ (Var x) τ
+| WTCVar : forall Gamma Delta x tau,
+  Var.Map.Empty Delta ->
+  Var.Map.MapsTo x tau Gamma ->
+  WellTyped Gamma Delta (Var x) tau
 
-| WTLetIn : forall τ Δ1 Δ2 Γ Δ x e1 e2 τ',
-  WellTyped Γ Δ1 e1 τ ->
+| WTLetIn : forall tau Delta1 Delta2 Gamma Delta x e1 e2 tau',
+  WellTyped Gamma Delta1 e1 tau ->
 
-  WellTyped Γ (Var.Map.add x τ Δ2) e2 τ' ->
+  WellTyped Gamma (Var.Map.add x tau Delta2) e2 tau' ->
   
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  ~ Var.Map.In x Δ2 ->
+  Var.MapFacts.Partition Delta Delta1 Delta2 ->
+  ~ Var.Map.In x Delta2 ->
 
-  WellTyped Γ Δ (LetIn x e1 e2) τ'
+  WellTyped Gamma Delta (LetIn x e1 e2) tau'
 
-| WTBang : forall Γ Δ e τ,
-  Var.Map.Empty Δ ->
-  WellTyped Γ Δ e τ ->
-  WellTyped Γ Δ (Bang e) (BANG τ)
+| WTBang : forall Gamma Delta e tau,
+  Var.Map.Empty Delta ->
+  WellTyped Gamma Delta e tau ->
+  WellTyped Gamma Delta (Bang e) (BANG tau)
 
-| WTLetBang : forall τ Δ1 Δ2 Γ Δ x e1 e2 τ',
-  WellTyped Γ Δ1 e1 (BANG τ) ->
-  WellTyped (Var.Map.add x τ Γ) Δ2 e2 τ' ->
+| WTLetBang : forall tau Delta1 Delta2 Gamma Delta x e1 e2 tau',
+  WellTyped Gamma Delta1 e1 (BANG tau) ->
+  WellTyped (Var.Map.add x tau Gamma) Delta2 e2 tau' ->
 
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
+  Var.MapFacts.Partition Delta Delta1 Delta2 ->
 
-  WellTyped Γ Δ (LetBang x e1 e2) τ'
+  WellTyped Gamma Delta (LetBang x e1 e2) tau'
 
-| WTBit : forall Γ Δ b,
-  Var.Map.Empty Δ ->
-  WellTyped Γ Δ (Bit b) BIT
+| WTBit : forall Gamma Delta b,
+  Var.Map.Empty Delta ->
+  WellTyped Gamma Delta (Bit b) BIT
 
-| WTIf : forall Δ' Δ'' Γ Δ e e1 e2 τ,
+| WTIf : forall Delta' Delta'' Gamma Delta e e1 e2 tau,
 
-  WellTyped Γ Δ' e BIT ->
-  WellTyped Γ Δ'' e1 τ ->
-  WellTyped Γ Δ'' e2 τ ->
+  WellTyped Gamma Delta' e BIT ->
+  WellTyped Gamma Delta'' e1 tau ->
+  WellTyped Gamma Delta'' e2 tau ->
 
-  Var.MapFacts.Partition Δ Δ' Δ'' ->
+  Var.MapFacts.Partition Delta Delta' Delta'' ->
 
-  WellTyped Γ Δ (If e e1 e2) τ
+  WellTyped Gamma Delta (If e e1 e2) tau
 
-| WTPair : forall Δ1 Δ2 Γ Δ e1 e2 τ1 τ2,
-  WellTyped Γ Δ1 e1 τ1 ->
-  WellTyped Γ Δ2 e2 τ2 ->
+| WTPair : forall Delta1 Delta2 Gamma Delta e1 e2 tau1 tau2,
+  WellTyped Gamma Delta1 e1 tau1 ->
+  WellTyped Gamma Delta2 e2 tau2 ->
 
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
+  Var.MapFacts.Partition Delta Delta1 Delta2 ->
 
-  WellTyped Γ Δ (Pair e1 e2) (Tensor τ1 τ2)
+  WellTyped Gamma Delta (Pair e1 e2) (Tensor tau1 tau2)
 
-| WTLetPair : forall τ1 τ2 Δ1 Δ2 Γ Δ x1 x2 e e' τ',
+| WTLetPair : forall tau1 tau2 Delta1 Delta2 Gamma Delta x1 x2 e e' tau',
 
-  WellTyped Γ Δ1 e (Tensor τ1 τ2) ->
-  WellTyped Γ (Var.Map.add x1 τ1 (Var.Map.add x2 τ2 Δ2)) e' τ' ->
+  WellTyped Gamma Delta1 e (Tensor tau1 tau2) ->
+  WellTyped Gamma (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 Delta2)) e' tau' ->
   
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  ~ Var.Map.In x1 Δ2 ->
-  ~ Var.Map.In x2 Δ2 ->
+  Var.MapFacts.Partition Delta Delta1 Delta2 ->
+  ~ Var.Map.In x1 Delta2 ->
+  ~ Var.Map.In x2 Delta2 ->
 
-  WellTyped Γ Δ (LetPair x1 x2 e e') τ'
+  WellTyped Gamma Delta (LetPair x1 x2 e e') tau'
 
-| WTMeas : forall Γ Δ e,
-  WellTyped Γ Δ e QUBIT ->
-  WellTyped Γ Δ (Meas e) (BANG BIT)
+| WTMeas : forall Gamma Delta e,
+  WellTyped Gamma Delta e QUBIT ->
+  WellTyped Gamma Delta (Meas e) (BANG BIT)
 
-| WTQRef : forall Γ Δ q,
+| WTQRef : forall Gamma Delta q,
   (q < n)%nat ->
-  Var.Map.Empty Δ ->
-  WellTyped Γ Δ (QRef q) QUBIT
+  Var.Map.Empty Delta ->
+  WellTyped Gamma Delta (QRef q) QUBIT
 
-| WTNew : forall Γ Δ e,
-  WellTyped Γ Δ e BIT ->
-  WellTyped Γ Δ (New e) QUBIT
+| WTNew : forall Gamma Delta e,
+  WellTyped Gamma Delta e BIT ->
+  WellTyped Gamma Delta (New e) QUBIT
 
-| WTUnitary : forall Γ Δ U e τ,
-  type_of_unitary U = τ ->
-  WellTyped Γ Δ e τ ->
-  WellTyped Γ Δ (Unitary U e) τ
+| WTUnitary : forall Gamma Delta U e tau,
+  type_of_unitary U = tau ->
+  WellTyped Gamma Delta e tau ->
+  WellTyped Gamma Delta (Unitary U e) tau
 
-| WTLambda : forall Γ Δ x e τ1 τ2,
-  ~ Var.Map.In x Δ ->
-  WellTyped Γ (Var.Map.add x τ1 Δ) e τ2 ->
-  WellTyped Γ Δ (Lambda x e) (Lolli τ1 τ2)
+| WTLambda : forall Gamma Delta x e tau1 tau2,
+  ~ Var.Map.In x Delta ->
+  WellTyped Gamma (Var.Map.add x tau1 Delta) e tau2 ->
+  WellTyped Gamma Delta (Lambda x e) (Lolli tau1 tau2)
 
-| WTFix : forall Γ Δ f x e τ1 τ2,
+| WTFix : forall Gamma Delta f x e tau1 tau2,
 
-  Var.Map.Empty Δ ->
+  Var.Map.Empty Delta ->
   ~ Var.V.eq f x ->
-  WellTyped (Var.Map.add f (Lolli τ1 τ2) (Var.Map.add x τ1 Γ)) Δ e τ2 ->
+  WellTyped (Var.Map.add f (Lolli tau1 tau2) (Var.Map.add x tau1 Gamma)) Delta e tau2 ->
 
-  WellTyped Γ Δ (Fix f x e) (Lolli (BANG τ1) τ2)
+  WellTyped Gamma Delta (Fix f x e) (Lolli (BANG tau1) tau2)
 .
 Arguments WellTyped : clear implicits.
 
 Hint Constructors WellTyped : qoreo_db.
-
 (* TODO: The stronger statement would be 
 to define alpha equivalence for expressions
 and then to prove this with respect to
     Var.Map.Equiv alpha_equiv
 *)
 Lemma WellTyped_context_equal :
-  forall n Γ Δ e τ,
-    WellTyped n Γ Δ e τ ->
-  forall Γ' Δ',
-    Var.Map.Equal Γ Γ' ->
-    Var.Map.Equal Δ Δ' ->
-    WellTyped n Γ' Δ' e τ.
+  forall n Gamma Delta e tau,
+    WellTyped n Gamma Delta e tau ->
+  forall Gamma' Delta',
+    Var.Map.Equal Gamma Gamma' ->
+    Var.Map.Equal Delta Delta' ->
+    WellTyped n Gamma' Delta' e tau.
 Proof.
-  intros n Γ Δ e τ He.
-  induction He; intros Gamma' Delta' HΓ HΔ;
+  intros n Gamma Delta e tau He.
+  induction He; intros Gamma' Delta' HGamma HDelta;
     try (econstructor; eauto;
       try apply IHHe;
       try apply IHHe1;
       try apply IHHe2;
       try apply IHHe3;
-      try rewrite <- HΔ;
-      try rewrite <- HΓ;
+      try rewrite <- HDelta;
+      try rewrite <- HGamma;
       try reflexivity;
       auto; fail).
   * apply WTQVar.
     unfold Var.Singleton in *.
-    rewrite <- HΔ; auto.
+    rewrite <- HDelta; auto.
 Qed.
     
 
 Global Instance WellTypedProper : Proper ((@eq nat) ==> Var.Map.Equal ==> Var.Map.Equal ==> eq ==> eq ==> iff) WellTyped.
 Proof.
-  intros n1 n2 Hn Γ1 Γ2 HΓ
-    Δ1 Δ2 HΔ e1 e2 He
-    τ1 τ2 Hτ; subst.
+  intros n1 n2 Hn Gamma1 Gamma2 HGamma
+    Delta1 Delta2 HDelta e1 e2 He
+    tau1 tau2 Htau; subst.
   split; intros; eapply WellTyped_context_equal; eauto.
-  * rewrite HΓ; reflexivity.
-  * rewrite HΔ; reflexivity. 
+  * rewrite HGamma; reflexivity.
+  * rewrite HDelta; reflexivity. 
 Qed.
 
 
@@ -488,31 +486,31 @@ Qed.
 (* Type safety *)
 (***************)
 
-Lemma weakening : forall n Γ Δ e τ,
-  WellTyped n (Var.Map.empty _) Δ e τ ->
-  WellTyped n Γ Δ e τ.
+Lemma weakening : forall n Gamma Delta e tau,
+  WellTyped n (Var.Map.empty _) Delta e tau ->
+  WellTyped n Gamma Delta e tau.
 Proof.
 Admitted.
 
-Lemma dim_weakening : forall n n' Γ Δ e τ,
-  WellTyped n Γ Δ e τ ->
+Lemma dim_weakening : forall n n' Gamma Delta e tau,
+  WellTyped n Gamma Delta e tau ->
   (n <= n')%nat ->
-  WellTyped n' Γ Δ e τ.
+  WellTyped n' Gamma Delta e tau.
 Admitted.
 
-Lemma wt_subst : forall τ n Γ Δ x v e τ',
-  WellTyped n Γ Δ e τ' ->
+Lemma wt_subst : forall tau n Gamma Delta x v e tau',
+  WellTyped n Gamma Delta e tau' ->
   Val v ->
-  WellTyped n (Var.Map.empty _) (Var.Map.empty _) v τ ->
-  Var.Map.MapsTo x τ Δ ->
-  WellTyped n Γ (Var.Map.remove x Δ) (subst x v e) τ'.
+  WellTyped n (Var.Map.empty _) (Var.Map.empty _) v tau ->
+  Var.Map.MapsTo x tau Delta ->
+  WellTyped n Gamma (Var.Map.remove x Delta) (subst x v e) tau'.
 Proof.
-    intros τ n Γ Δ x v e τ' HWT.
-    revert τ x v.
-    induction HWT; intros τ0 x0 v0 Hvalv0 HWTv0 Hindom;
+    intros tau n Gamma Delta x v e tau' HWT.
+    revert tau x v.
+    induction HWT; intros tau0 x0 v0 Hvalv0 HWTv0 Hindom;
       simpl.
     * unfold Var.Singleton in H0.
-      assert (Heq : x = x0 /\ τ = τ0).
+      assert (Heq : x = x0 /\ tau = tau0).
       { rewrite H0 in Hindom.
           apply Var.MapFacts.F.add_mapsto_iff in Hindom.
           destruct Hindom as [ | [_ Hcontra]]; auto.
@@ -521,11 +519,11 @@ Proof.
       destruct Heq; subst.
       destruct (Var.V.eq_dec x0 x0) as [Heq | Hneq].
       2:{ contradict Hneq. reflexivity. }
-      setoid_replace (Var.Map.remove x0 Δ) with (Var.Map.empty typ).
+      setoid_replace (Var.Map.remove x0 Delta) with (Var.Map.empty typ).
       2:{
         rewrite H0.
         apply Var.MapFacts.F.Equal_mapsto_iff;
-          intros x τ.
+          intros x tau.
         rewrite Var.MapFacts.F.remove_mapsto_iff.
         rewrite Var.MapFacts.F.add_mapsto_iff.
         split; [intros [? [[? ?] | [? ?]]] | inversion 1];
@@ -535,15 +533,15 @@ Proof.
       apply weakening; auto.
 
     * contradict Hindom.
-        apply (Var.MapFacts.elements_Empty Δ) in H0.
+        apply (Var.MapFacts.elements_Empty Delta) in H0.
         intros HMapsTo.
         apply Var.Map.elements_1 in HMapsTo.
         rewrite H0 in HMapsTo. 
         inversion HMapsTo.
 
-    * apply (WTLetIn τ (Var.Map.remove x0 Δ1) (Var.Map.remove x0 Δ2)); auto.
+    * apply (WTLetIn tau (Var.Map.remove x0 Delta1) (Var.Map.remove x0 Delta2)); auto.
       + eapply IHHWT1; eauto.
-        admit (* If Δ(x0)=τ0 and Δ==Delt1,Δ2 and x ∉ Δ2 then Δ1(x0)=τ0 *).
+        admit (* If Delta(x0)=tau0 and Delta==Delt1,Delta2 and x ∉ Delta2 then Delta1(x0)=tau0 *).
       + admit.
       + admit (* partition wrt remove function *).
       + Search Var.Map.In Var.Map.remove. 
@@ -567,19 +565,19 @@ Admitted.
 
 Theorem preservation : forall e cfg e' cfg',
   (e, cfg) ~> (e',cfg') ->
-  forall τ,
-  WellTyped (Config.dim cfg) (Var.Map.empty _) (Var.Map.empty _) e τ ->
-  WellTyped (Config.dim cfg') (Var.Map.empty _) (Var.Map.empty _) e' τ.
+  forall tau,
+  WellTyped (Config.dim cfg) (Var.Map.empty _) (Var.Map.empty _) e tau ->
+  WellTyped (Config.dim cfg') (Var.Map.empty _) (Var.Map.empty _) e' tau.
 Proof.
   intros e cfg e' cfg' step.
   remember (e,cfg) as CFG eqn:HCFG.
   remember (e',cfg') as CFG' eqn:HCFG'.
   revert e cfg e' cfg' HCFG HCFG'.
-  induction step; intros ? ? ? ? HCFG HCFG' τ Hwt;   
+  induction step; intros ? ? ? ? HCFG HCFG' tau Hwt;   
     inversion HCFG; inversion HCFG'; subst;
     clear HCFG; clear HCFG'.
   * inversion Hwt; subst; clear Hwt.
-    (* Δ1 = Var.Map.empty and Δ2 = Var.Map.empty *)
+    (* Delta1 = Var.Map.empty and Delta2 = Var.Map.empty *)
     admit.
   * (*apply wt_subst. *) admit.
   *
@@ -587,8 +585,8 @@ Admitted.
 
 
 
-Theorem progress : forall n e τ cfg,
-  WellTyped n (Var.Map.empty _) (Var.Map.empty _) e τ ->
+Theorem progress : forall n e tau cfg,
+  WellTyped n (Var.Map.empty _) (Var.Map.empty _) e tau ->
   Config.dim cfg = n ->
   Val e \/ exists e' cfg', (e, cfg) ~> (e', cfg').
 Admitted.
