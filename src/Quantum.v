@@ -547,7 +547,12 @@ Lemma dim_weakening : forall n n' Γ Δ e τ,
   WellTyped n Γ Δ e τ ->
   (n <= n')%nat ->
   WellTyped n' Γ Δ e τ.
-Admitted.
+Proof.
+  intros n n' Γ Δ e τ HWT Hle.
+  induction HWT; try solve [econstructor; eauto].
+  apply WTQRef; auto.
+  lia.
+Qed.
 
 Lemma wt_subst : forall τ n Γ Δ x v e τ',
   WellTyped n Γ Δ e τ' ->
