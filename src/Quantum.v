@@ -1,5 +1,5 @@
 From Stdlib Require Import FSets.FMapList FSets.FSetList FSets.FMapFacts OrderedType OrderedTypeEx.
-From QuantumLib Require Import Matrix Pad.
+From QuantumLib Require Import Matrix Pad Quantum.
 
 Declare Scope qoreo.
 Module Var.
@@ -174,6 +174,18 @@ Module Config.
     qstate := super U (qstate cfg)
   |}.
   
+
+  Definition epr (cfg : t) : qref * qref * t :=
+    let q1 := dim cfg in
+    let q2 := (1 + q1)%nat in
+    let bell00 := Quantum.EPRpair † × Quantum.EPRpair in
+    let rho' := kron (qstate cfg) bell00 in
+    (q1, q2, {|
+      dim := 2 + dim cfg;
+      qstate := rho'
+    |}).
+
+
   Definition gate_to_matrix (n : nat) (U : unitary) (qs : list qref) : Matrix (2^n) (2^n) :=
   match U, qs with
   | H, [q] => @pad 1 q n Quantum.hadamard
@@ -190,7 +202,7 @@ Module Config.
   Definition apply_gate (U : unitary) (qs : list qref) (cfg : t) : t :=
     apply_matrix cfg (gate_to_matrix _ U qs).
 
-  
+    
   Lemma test1 : gate_to_matrix 2 CNOT [0;1]%nat = cnot.
   Proof.
     assert (H : WF_Matrix (gate_to_matrix 2 CNOT [0%nat; 1%nat])).
