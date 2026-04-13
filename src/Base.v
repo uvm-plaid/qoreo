@@ -3,6 +3,10 @@ From Stdlib Require Import  FSets.FMapList FSets.FSetList FSets.FMapFacts
 From QuantumLib Require Import Matrix Pad Quantum.
 From Stdlib Require Import String.
 
+From Stdlib Require Lists.List.
+Export List.ListNotations.
+Open Scope list_scope.
+
 Declare Scope qoreo.
 
 Module Var.
