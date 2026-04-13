@@ -467,7 +467,24 @@ Qed.
 Lemma partition_remove : forall {A} x0 (Δ Δ1 Δ2 : Var.Map.t A),
   Var.MapFacts.Partition Δ Δ1 Δ2 ->
   Var.MapFacts.Partition (Var.Map.remove x0 Δ) (Var.Map.remove x0 Δ1) (Var.Map.remove x0 Δ2).
-Admitted.
+Proof.
+  intros A x0 Δ Δ1 Δ2 [Hdisj Hiff].
+  split.
+  - (* Disjoint (remove x0 Δ1) (remove x0 Δ2) *)
+    intros k [Hin1 Hin2].
+    apply Var.MapFacts.F.remove_in_iff in Hin1.
+    apply Var.MapFacts.F.remove_in_iff in Hin2.
+    destruct Hin1 as [_ Hin1].
+    destruct Hin2 as [_ Hin2].
+    apply (Hdisj k); split; auto.
+  - (* forall k e, MapsTo k e (remove x0 Δ) <-> MapsTo k e (remove x0 Δ1) \/ MapsTo k e (remove x0 Δ2) *)
+    intros k e.
+    rewrite Var.MapFacts.F.remove_mapsto_iff.
+    rewrite Var.MapFacts.F.remove_mapsto_iff.
+    rewrite Var.MapFacts.F.remove_mapsto_iff.
+    firstorder.
+Qed.
+
 
 Lemma wt_subst : forall τ n Γ Δ x v e τ',
   WellTyped n Γ Δ e τ' ->
@@ -488,30 +505,17 @@ Proof.
           apply Var.MapFacts.F.empty_mapsto_iff in Hcontra; contradiction.
       }
       destruct Heq; subst.
-      destruct (Var.eq_dec x0 x0) as [Heq | Hneq].
-      2:{ contradict Hneq. reflexivity. }
-      setoid_replace (Var.Map.remove x0 Δ) with (Var.Map.empty typ).
-      2:{
-        rewrite H.
-        apply Var.MapFacts.F.Equal_mapsto_iff;
-          intros x τ.
-        rewrite Var.MapFacts.F.remove_mapsto_iff.
-        rewrite Var.MapFacts.F.add_mapsto_iff.
-        split; [intros [? [[? ?] | [? ?]]] | inversion 1];
-          auto;
-          try contradiction.
-      }
+      rewrite Var.eq_dec_refl.
+      rewrite H.
+      rewrite Var.remove_add_eq.
+      rewrite Var.remove_empty.
       apply weakening; auto.
 
-    * contradict Hindom.
-        apply (Var.MapFacts.elements_Empty Δ) in H.
-        intros HMapsTo.
-        apply Var.Map.elements_1 in HMapsTo.
-        rewrite H in HMapsTo. 
-        inversion HMapsTo.
+    * contradict Hindom; apply H.
 
-    * 
-
+    *
+      rewrite (Var.partition_concat _ Δ Δ1 Δ2); auto.
+      
       assert (Hmapsto :
               (Var.Map.MapsTo x0 τ0 Δ1 /\ ~ Var.Map.In x0 Δ2)
             \/ (Var.Map.MapsTo x0 τ0 Δ2 /\ ~ Var.Map.In x0 Δ1)).
@@ -560,11 +564,12 @@ Proof.
     * simpl; econstructor; eauto.
       admit (* lemma *).
     * (*let!*) admit.
-    * contradict Hindom. admit.
+    * contradict Hindom.
+      apply H.
     * (* if *)  admit.
     * (* Pair *)  admit.
     * (* LetPair *) admit.
-    * (* Bang *) contradict Hindom. admit.
+    * (* Measure *) admit.
     * (* QRef *) (* Maybe our typing judgment should also have a list of qubit Var.tiables in scope... *) admit.
     * (* new *) econstructor; eauto.
     * (* Unitary *) econstructor; eauto.
