@@ -116,3 +116,36 @@ Module Network.
     .
     
 End Network.
+
+Definition epp_insn (p : Actor.t) (c : Choreography.Insn.t): option Insn.t :=
+  match c with
+  | Choreography.Insn.Send A1 e A2 x =>
+      if Actor.eq_dec A1 p then
+        Some (Insn.Send e A2)
+      else if Actor.eq_dec A2 p then
+             Some (Insn.Receive x A1)
+           else
+             None
+  | Choreography.Insn.EPR A1 x1 A2 x2 =>
+      if Actor.eq_dec A1 p then
+        Some (Insn.EPR x1 A2)
+      else if Actor.eq_dec A2 p then
+             Some (Insn.EPR x2 A1)
+           else
+             None
+  | _ => None
+end.
+
+Fixpoint map_option {A B : Type} (f : A -> option B) (xs : list A)
+  : option (list B) :=
+  match xs with
+  | [] => Some []
+  | x :: xs' =>
+      match f x, map_option f xs' with
+      | Some y, Some ys => Some (y :: ys)
+      | _, _ => None
+      end
+  end.
+
+Definition epp (p : Actor.t) (c : Choreography.Choreography.t): option Process.t :=
+  map_option (epp_insn p) c.

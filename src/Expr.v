@@ -377,6 +377,51 @@ Proof.
   * rewrite HΔ; reflexivity. 
 Qed.
 
+Lemma weakening_gen : forall n Γ Δ e τ,
+  WellTyped n Γ Δ e τ ->
+  forall Γ',
+  (forall x τ, Var.Map.MapsTo x τ Γ -> Var.Map.MapsTo x τ Γ') ->
+  WellTyped n Γ' Δ e τ.
+Proof.
+  intros n Γ Δ e τ HWT.
+  induction HWT; intros Γ' Hsub.
+  * apply WTQVar; auto.
+  * apply WTCVar; auto.
+  * eapply WTLetIn; eauto.
+  * eapply WTBang; eauto.
+  * eapply WTLetBang; eauto.
+    apply IHHWT2.
+    intros y σ Hy.
+    apply Var.MapFacts.F.add_mapsto_iff.
+    apply Var.MapFacts.F.add_mapsto_iff in Hy.
+    destruct Hy as [[Heq Hmaps] | [Hneq Hmaps]].
+    + left; auto.
+    + right; split; auto.
+
+  * eapply WTBit; eauto.
+  * eapply WTIf; eauto.
+  * eapply WTPair; eauto.
+  * eapply WTLetPair; eauto.
+  * eapply WTMeas; eauto.
+  * eapply WTQRef; eauto.
+  * eapply WTNew; eauto.
+  * eapply WTUnitary; eauto.
+  * eapply WTLambda; eauto.
+  * eapply WTFix; eauto.
+    apply IHHWT.
+    intros y τ Hy.
+    apply Var.MapFacts.F.add_mapsto_iff.
+    apply Var.MapFacts.F.add_mapsto_iff in Hy.
+    destruct Hy as [[Heqf Hmaps] | [Hneqf Hy]].
+    + left; auto.
+    + right; split; auto.
+      apply Var.MapFacts.F.add_mapsto_iff.
+      apply Var.MapFacts.F.add_mapsto_iff in Hy.
+      destruct Hy as [[Heqx Hmaps] | [Hneqx Hmaps]].
+      - left; auto.
+      - right; split; auto.
+Qed.
+
 
 (***************)
 (* Type safety *)
@@ -386,13 +431,24 @@ Lemma weakening : forall n Γ Δ e τ,
   WellTyped n (Var.Map.empty _) Δ e τ ->
   WellTyped n Γ Δ e τ.
 Proof.
-Admitted.
+  intros n Γ Δ e τ HWT.
+  eapply weakening_gen; eauto.
+  intros x τ' Hmaps.
+  exfalso.
+  apply Var.MapFacts.F.empty_mapsto_iff in Hmaps.
+  exact Hmaps.
+Qed.
 
 Lemma dim_weakening : forall n n' Γ Δ e τ,
   WellTyped n Γ Δ e τ ->
   (n <= n')%nat ->
   WellTyped n' Γ Δ e τ.
-Admitted.
+Proof.
+  intros n n' Γ Δ e τ HWT Hle.
+  induction HWT; try solve [econstructor; eauto].
+  apply WTQRef; auto.
+  lia.
+Qed.
 
 (* If Δ(x0)=τ0 and Δ==Δ1,Δ2 and x ∉ Δ2 then Δ1(x0)=τ0 *)
 Lemma partition_not_in_r : forall Δ Δ2 Δ1 x (τ : typ),
