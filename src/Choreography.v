@@ -1,9 +1,6 @@
 From Qoreo Require Import Base.
 From Qoreo Require Expr.
 
-From Stdlib Require Lists.List.
-Import List.ListNotations.
-Open Scope list_scope.
 From Stdlib Require Import Structures.Equalities.
 
 Module Insn.
