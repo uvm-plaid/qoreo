@@ -553,7 +553,34 @@ Proof.
           split; auto. eexists; eauto.
         }
       }
-      admit.
+      admit. (*
+      destruct (Var.eq_dec x0 x) eqn:Heq.
+      ** subst.
+        apply (WTLetIn τ (Var.Map.remove x Δ1) (Var.Map.remove x Δ2)); auto.
+        + eapply IHHWT1; eauto.
+          eapply partition_not_in_r; eauto.
+        + setoid_replace (Var.Map.add x τ (Var.Map.remove x Δ2)) with (Var.Map.add x τ Δ2); auto.
+          { admit (* add x0 τ (remove x0 Δ2) = add x0 τ Δ2 *). }
+        + apply partition_remove; auto.
+        + apply Var.Map.remove_1; auto.
+      **
+        destruct H0 as [Hdisj Hiff].
+        apply Hiff in Hindom.
+      
+    apply (WTLetIn τ (Var.Map.remove x0 Δ1) (Var.Map.remove x0 Δ2)); auto.
+        + admit (*?*).
+          (* eapply IHHWT1; eauto.
+          eapply partition_not_in_r; eauto.*)
+        + setoid_replace (Var.Map.add x τ (Var.Map.remove x0 Δ2)) with (Var.Map.remove x0 (Var.Map.add x τ Δ2)).
+          2:{ admit. }
+          eapply IHHWT2; eauto.
+          admit (*?*)
+        +
+        +
+
+         *)
+        
+
     * simpl; econstructor; eauto.
       admit (* lemma *).
     * (*let!*) admit.
