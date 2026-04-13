@@ -467,7 +467,31 @@ Qed.
 Lemma partition_remove : forall {A} x0 (Δ Δ1 Δ2 : Var.Map.t A),
   Var.MapFacts.Partition Δ Δ1 Δ2 ->
   Var.MapFacts.Partition (Var.Map.remove x0 Δ) (Var.Map.remove x0 Δ1) (Var.Map.remove x0 Δ2).
-Admitted.
+Proof.
+  intros A x0 Δ Δ1 Δ2 [Hdisj Hiff].
+  split.
+  - intros k [Hin1 Hin2].
+    apply Var.MapFacts.F.remove_in_iff in Hin1.
+    apply Var.MapFacts.F.remove_in_iff in Hin2.
+    destruct Hin1 as [Hneq1 HinΔ1].
+    destruct Hin2 as [_ HinΔ2].
+    apply (Hdisj k). auto.
+  - intros k e. split.
+    + intros Hmap.
+      apply Var.MapFacts.F.remove_mapsto_iff in Hmap.
+      destruct Hmap as [Hneq Hmap].
+      apply Hiff in Hmap.
+      destruct Hmap as [Hmap | Hmap];
+        [left | right];
+        apply Var.MapFacts.F.remove_mapsto_iff; auto.
+    + intros [Hmap | Hmap];
+        apply Var.MapFacts.F.remove_mapsto_iff in Hmap;
+        destruct Hmap as [Hneq Hmap];
+        apply Var.MapFacts.F.remove_mapsto_iff;
+        split; auto;
+        apply Hiff;
+        auto.
+Qed.
 
 Lemma wt_subst : forall τ n Γ Δ x v e τ',
   WellTyped n Γ Δ e τ' ->
