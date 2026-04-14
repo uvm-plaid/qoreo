@@ -14,7 +14,7 @@ Inductive t :=
 | Pair : t -> t -> t
 | LetPair : Var.t -> Var.t -> t -> t -> t
 | Meas : t -> t
-| QRef : qref -> t
+(*| QRef : QRef.t -> t*)
 | New : t -> t
 | Unitary : unitary -> t -> t
 | Lambda : Var.t -> t -> t
@@ -22,7 +22,7 @@ Inductive t :=
 | App : t -> t -> t
 .
 Inductive Val : t -> Prop :=
-| QRefVal : forall q, Val (QRef q)
+(*| QRefVal : forall q, Val (QRef q)*)
 | BangVal : forall e, Val (Bang e)
 | BitVal  : forall b, Val (Bit b)
 | PairVal : forall v1 v2, Val v1 -> Val v2 -> Val (Pair v1 v2)
@@ -233,21 +233,22 @@ match U with
 | _ => QUBIT
 end.
 
-(* Typing judgment: n; Γ; Δ ⊢ t : τ 
- * Here, n is maximum number of qubit references currently in scope
+(* Typing judgment: Γ; Δ ; Ω ⊢ t : τ 
+ *  Γ : a finite map of non-linear variables to types
+ *  Δ : a finite map of linear variables to types
  *)
-Inductive WellTyped {n : nat} : Var.Map.t typ -> Var.Map.t typ -> Expr.t -> typ -> Prop :=
+Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Expr.t -> typ -> Prop :=
 
-| WTQVar : forall Γ Δ x τ,
+| WTQVar : forall Γ Δ Ω x τ,
   Var.Singleton x τ Δ ->
-  WellTyped Γ Δ (Var x) τ
+  WellTyped Γ Δ Ω (Var x) τ
 
-| WTCVar : forall Γ Δ x τ,
+| WTCVar : forall Γ Δ Ω x τ,
   Var.Map.Empty Δ ->
   Var.Map.MapsTo x τ Γ ->
-  WellTyped Γ Δ (Var x) τ
+  WellTyped Γ Δ Ω (Var x) τ
 
-| WTLetIn : forall τ Δ1 Δ2 Γ Δ x e1 e2 τ',
+| WTLetIn : forall τ Ω Δ1 Δ2 Γ Δ x e1 e2 τ',
   WellTyped Γ Δ1 e1 τ ->
 
   WellTyped Γ (Var.Map.add x τ Δ2) e2 τ' ->

@@ -151,7 +151,7 @@ Module Var.
 
 End Var.
 
-Definition qref := nat.
+Module QRef := Var.
 
 Inductive unitary :=
 | H | X | Y | Z | CNOT | SGATE | Sdag | TGATE | Tdag.
@@ -174,14 +174,14 @@ Module Config.
 
   (* Project onto the state where qubit q is in the classical state |b> *)
   (*Definition proj q dim (b : bool) := pad_u dim q (bool_to_matrix b).*)
-  Definition measure (b : bool) (q : qref) (cfg : t) : t :=
+  Definition measure (b : bool) (q : nat) (cfg : t) : t :=
     let rho' := super (pad_u q (dim cfg) (bool_to_matrix b)) (qstate cfg) in
     {|
       dim := dim cfg;
       qstate := rho'
     |}.
     
-  Definition new (b : bool) (cfg : t) : qref * t :=
+  Definition new (b : bool) (cfg : t) : nat * t :=
     let q := dim cfg in
     let rho' := kron (qstate cfg) (bool_to_ket b) in
     (q, {|
@@ -196,7 +196,7 @@ Module Config.
   |}.
   
 
-  Definition epr (cfg : t) : qref * qref * t :=
+  Definition epr (cfg : t) : nat * nat * t :=
     let q1 := dim cfg in
     let q2 := (1 + q1)%nat in
     let bell00 := Quantum.EPRpair † × Quantum.EPRpair in
@@ -207,7 +207,7 @@ Module Config.
     |}).
 
 
-  Definition gate_to_matrix (n : nat) (U : unitary) (qs : list qref) : Matrix (2^n) (2^n) :=
+  Definition gate_to_matrix (n : nat) (U : unitary) (qs : list nat) : Matrix (2^n) (2^n) :=
   match U, qs with
   | H, [q] => @pad 1 q n Quantum.hadamard
   | X, [q] => @pad 1 q n Quantum.σx
@@ -220,7 +220,7 @@ Module Config.
   | Tdag, [q]  => @pad 1 q n Quantum.Tgate†
   | _, _ => Zero
   end.
-  Definition apply_gate (U : unitary) (qs : list qref) (cfg : t) : t :=
+  Definition apply_gate (U : unitary) (qs : list nat) (cfg : t) : t :=
     apply_matrix cfg (gate_to_matrix _ U qs).
 
     
