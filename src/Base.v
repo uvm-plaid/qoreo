@@ -26,6 +26,10 @@ Module Var.
     let f := fun x _ s => FSet.add x s in
     Map.fold f m FSet.empty.
 
+  Definition fresh {A} (m : Map.t A) :=
+    let f := fun x _ z_fresh => if Nat.leb z_fresh x then (x+1)%nat else z_fresh in
+    Map.fold f m 0%nat.
+
   Definition Singleton {A} x a (m : Map.t A) : Prop :=
     Map.Equal m (Map.add x a (Map.empty _)).
 
@@ -160,6 +164,7 @@ Inductive unitary :=
 Module Config.
   Record t := {
     dim : nat;
+    qrefs : Var.Map.t nat;
     qstate : Matrix dim dim
   }.
   (* Definition add x (v : expr) (cfg : t) : t :=
@@ -171,38 +176,55 @@ Module Config.
   (* Definition find x (cfg : t) : option expr :=
     Var.Map.find x (state cfg). *)
 
+    Definition find (x : Var.t) (cfg : t) : nat :=
+      match Var.Map.find x (qrefs cfg) with
+      | Some q => q
+      | None   => 0%nat
+      end.
+
 
   (* Project onto the state where qubit q is in the classical state |b> *)
   (*Definition proj q dim (b : bool) := pad_u dim q (bool_to_matrix b).*)
-  Definition measure (b : bool) (q : nat) (cfg : t) : t :=
+  Definition measure (b : bool) (x : Var.t) (cfg : t) : t :=
+    let q := find x cfg in
     let rho' := super (pad_u q (dim cfg) (bool_to_matrix b)) (qstate cfg) in
     {|
       dim := dim cfg;
+      qrefs := qrefs cfg;
       qstate := rho'
     |}.
     
-  Definition new (b : bool) (cfg : t) : nat * t :=
+  Definition new (b : bool) (cfg : t) : Var.t * t :=
+    let x := Var.fresh (qrefs cfg) in
     let q := dim cfg in
     let rho' := kron (qstate cfg) (bool_to_ket b) in
-    (q, {|
+    (x, {|
       dim := 1 + dim cfg;
+      qrefs := Var.Map.add x q (qrefs cfg);
       qstate := rho'
     |}).
 
   Definition apply_matrix (cfg : t) (U : Matrix (2 ^ dim cfg) (2 ^ dim cfg)) : t :=
   {|
     dim := dim cfg;
+    qrefs := qrefs cfg;
     qstate := super U (qstate cfg)
   |}.
   
 
-  Definition epr (cfg : t) : nat * nat * t :=
-    let q1 := dim cfg in
-    let q2 := (1 + q1)%nat in
+  Definition epr (cfg : t) : Var.t * Var.t * t :=
+    let d := dim cfg in
+    let refs := qrefs cfg in
+    let x1 := Var.fresh refs in
+    let refs' := Var.Map.add x1 d refs in
+    let x2 := Var.fresh refs' in
+    let refs'' := Var.Map.add x2 (d+1)%nat refs in
+
     let bell00 := Quantum.EPRpair † × Quantum.EPRpair in
     let rho' := kron (qstate cfg) bell00 in
-    (q1, q2, {|
+    (x1, x2, {|
       dim := 2 + dim cfg;
+      qrefs := refs'';
       qstate := rho'
     |}).
 
@@ -220,7 +242,9 @@ Module Config.
   | Tdag, [q]  => @pad 1 q n Quantum.Tgate†
   | _, _ => Zero
   end.
-  Definition apply_gate (U : unitary) (qs : list nat) (cfg : t) : t :=
+
+  Definition apply_gate (U : unitary) (xs : list Var.t) (cfg : t) : t :=
+    let qs := List.map (fun x => find x cfg) xs in
     apply_matrix cfg (gate_to_matrix _ U qs).
 
     

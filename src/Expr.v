@@ -23,6 +23,7 @@ Inductive t :=
 .
 Inductive Val : t -> Prop :=
 (*| QRefVal : forall q, Val (QRef q)*)
+| VarVal : forall x, Val x
 | BangVal : forall e, Val (Bang e)
 | BitVal  : forall b, Val (Bit b)
 | PairVal : forall v1 v2, Val v1 -> Val v2 -> Val (Pair v1 v2)
@@ -62,7 +63,7 @@ Inductive Fresh x : Expr.t -> Prop :=
   Fresh x e2 ->
   Fresh x (LetPair y1 y2 e1 e2)
 | FMeas : forall e, Fresh x e -> Fresh x (Meas e)
-| FQRef : forall q, Fresh x (QRef q)
+(*| FQRef : forall q, Fresh x (QRef q)*)
 | FNew : forall e, Fresh x e -> Fresh x (New e)
 | FUnitary : forall u e, Fresh x e -> Fresh x (Unitary u e)
 | FLambda : forall y e,
@@ -97,7 +98,7 @@ Fixpoint subst x v e :=
        else if Var.eq_dec x y2 then e2
        else subst x v e2)
   | Meas e => Meas (subst x v e)
-  | QRef q => QRef q
+  (*| QRef q => QRef q*)
   | New e => New (subst x v e)
   | Unitary u e => Unitary u (subst x v e)
   | Lambda y e =>
@@ -168,7 +169,6 @@ Inductive step : Expr.t * Config.t -> Expr.t * Config.t -> Prop :=
   cfg' = cfg ->
   (LetPair x1 x2 (Pair v1 v2) e', cfg) ~> (e'', cfg')
 
-
 | AppC1 : forall e1 e2 cfg e1' e2' cfg',
   (e1, cfg) ~> (e1', cfg') ->
   e2' = e2 ->
@@ -192,17 +192,17 @@ Inductive step : Expr.t * Config.t -> Expr.t * Config.t -> Prop :=
 | NewC : forall e cfg e' cfg',
   (e, cfg) ~> (e', cfg') ->
   (New e, cfg) ~> (New e', cfg')
-| New0 : forall b cfg i cfg',
-  (i, cfg') = Config.new b cfg ->
-  (New (Bit b), cfg) ~> (QRef i, cfg')
+| New0 : forall b cfg x cfg',
+  (x, cfg') = Config.new b cfg ->
+  (New (Bit b), cfg) ~> (Var x, cfg')
 
 (* Meas *)
 | MeasC : forall e cfg e' cfg',
   (e, cfg) ~> (e',cfg') ->
   (Meas e, cfg) ~> (Meas e', cfg')
-| MeasB : forall b q cfg cfg',
-  cfg' = Config.measure b q cfg ->
-  (Meas (QRef q), cfg) ~> (Bit b, cfg')
+| MeasB : forall b x cfg cfg',
+  cfg' = Config.measure b x cfg ->
+  (Meas (Var x), cfg) ~> (Bit b, cfg')
 
 (* Unitary *)
 | UnitaryC : forall u e cfg e' cfg',
@@ -210,10 +210,10 @@ Inductive step : Expr.t * Config.t -> Expr.t * Config.t -> Prop :=
   (Unitary u e, cfg) ~> (Unitary u e', cfg')
 | UnitaryB1 : forall g q cfg cfg',
   cfg' = Config.apply_gate g [q] cfg ->
-  (Unitary g (QRef q), cfg) ~> (QRef q, cfg')
+  (Unitary g (Var q), cfg) ~> (Var q, cfg')
 | UnitaryB2 : forall g q1 q2 cfg cfg',
   cfg' = Config.apply_gate g [q1;q2] cfg ->
-  (Unitary g (Pair (QRef q1) (QRef q2)), cfg) ~> (Pair (QRef q1) (QRef q2), cfg')
+  (Unitary g (Pair (Var q1) (Var q2)), cfg) ~> (Pair (Var q1) (Var q2), cfg')
 
 where "cfg1 '~>' cfg2" :=  (step cfg1 cfg2) : qoreo.
 
@@ -233,22 +233,22 @@ match U with
 | _ => QUBIT
 end.
 
-(* Typing judgment: Γ; Δ ; Ω ⊢ t : τ 
+(* Typing judgment: Γ; Δ ⊢ t : τ 
  *  Γ : a finite map of non-linear variables to types
  *  Δ : a finite map of linear variables to types
  *)
 Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Expr.t -> typ -> Prop :=
 
-| WTQVar : forall Γ Δ Ω x τ,
+| WTQVar : forall Γ Δ x τ,
   Var.Singleton x τ Δ ->
-  WellTyped Γ Δ Ω (Var x) τ
+  WellTyped Γ Δ (Var x) τ
 
-| WTCVar : forall Γ Δ Ω x τ,
+| WTCVar : forall Γ Δ x τ,
   Var.Map.Empty Δ ->
   Var.Map.MapsTo x τ Γ ->
-  WellTyped Γ Δ Ω (Var x) τ
+  WellTyped Γ Δ (Var x) τ
 
-| WTLetIn : forall τ Ω Δ1 Δ2 Γ Δ x e1 e2 τ',
+| WTLetIn : forall τ Δ1 Δ2 Γ Δ x e1 e2 τ',
   WellTyped Γ Δ1 e1 τ ->
 
   WellTyped Γ (Var.Map.add x τ Δ2) e2 τ' ->
@@ -308,10 +308,12 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Expr.t -> typ -> Prop :=
   WellTyped Γ Δ e QUBIT ->
   WellTyped Γ Δ (Meas e) (BANG BIT)
 
+  (*
 | WTQRef : forall Γ Δ q,
   (q < n)%nat ->
   Var.Map.Empty Δ ->
   WellTyped Γ Δ (QRef q) QUBIT
+  *)
 
 | WTNew : forall Γ Δ e,
   WellTyped Γ Δ e BIT ->
@@ -335,7 +337,6 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Expr.t -> typ -> Prop :=
 
   WellTyped Γ Δ (Fix f x e) (Lolli (BANG τ1) τ2)
 .
-Arguments WellTyped : clear implicits.
 
 Hint Constructors WellTyped : qoreo_db.
 (* TODO: The stronger statement would be 
@@ -344,14 +345,14 @@ and then to prove this with respect to
     Var.Map.Equiv alpha_equiv
 *)
 Lemma WellTyped_context_equal :
-  forall n Γ Δ e τ,
-    WellTyped n Γ Δ e τ ->
+  forall Γ Δ e τ,
+    WellTyped Γ Δ e τ ->
   forall Γ' Δ',
     Var.Map.Equal Γ Γ' ->
     Var.Map.Equal Δ Δ' ->
-    WellTyped n Γ' Δ' e τ.
+    WellTyped Γ' Δ' e τ.
 Proof.
-  intros n Γ Δ e τ He.
+  intros Γ Δ e τ He.
   induction He; intros Γ' Δ0 HΓ HΔ;
     try (econstructor; eauto;
       try apply IHHe;
@@ -368,9 +369,9 @@ Proof.
 Qed.
     
 
-Global Instance WellTypedProper : Proper ((@eq nat) ==> Var.Map.Equal ==> Var.Map.Equal ==> eq ==> eq ==> iff) WellTyped.
+Global Instance WellTypedProper : Proper (Var.Map.Equal ==> Var.Map.Equal ==> eq ==> eq ==> iff) WellTyped.
 Proof.
-  intros n1 n2 Hn Γ1 Γ2 HΓ
+  intros Γ1 Γ2 HΓ
     Δ1 Δ2 HΔ e1 e2 He
     τ1 τ2 Hτ; subst.
   split; intros; eapply WellTyped_context_equal; eauto.
@@ -378,13 +379,13 @@ Proof.
   * rewrite HΔ; reflexivity. 
 Qed.
 
-Lemma weakening_gen : forall n Γ Δ e τ,
-  WellTyped n Γ Δ e τ ->
+Lemma weakening_gen : forall Γ Δ e τ,
+  WellTyped Γ Δ e τ ->
   forall Γ',
   (forall x τ, Var.Map.MapsTo x τ Γ -> Var.Map.MapsTo x τ Γ') ->
-  WellTyped n Γ' Δ e τ.
+  WellTyped Γ' Δ e τ.
 Proof.
-  intros n Γ Δ e τ HWT.
+  intros Γ Δ e τ HWT.
   induction HWT; intros Γ' Hsub.
   * apply WTQVar; auto.
   * apply WTCVar; auto.
@@ -404,7 +405,6 @@ Proof.
   * eapply WTPair; eauto.
   * eapply WTLetPair; eauto.
   * eapply WTMeas; eauto.
-  * eapply WTQRef; eauto.
   * eapply WTNew; eauto.
   * eapply WTUnitary; eauto.
   * eapply WTLambda; eauto.
@@ -428,11 +428,11 @@ Qed.
 (* Type safety *)
 (***************)
 
-Lemma weakening : forall n Γ Δ e τ,
-  WellTyped n (Var.Map.empty _) Δ e τ ->
-  WellTyped n Γ Δ e τ.
+Lemma weakening : forall Γ Δ e τ,
+  WellTyped (Var.Map.empty _) Δ e τ ->
+  WellTyped Γ Δ e τ.
 Proof.
-  intros n Γ Δ e τ HWT.
+  intros Γ Δ e τ HWT.
   eapply weakening_gen; eauto.
   intros x τ' Hmaps.
   exfalso.
@@ -440,16 +440,6 @@ Proof.
   exact Hmaps.
 Qed.
 
-Lemma dim_weakening : forall n n' Γ Δ e τ,
-  WellTyped n Γ Δ e τ ->
-  (n <= n')%nat ->
-  WellTyped n' Γ Δ e τ.
-Proof.
-  intros n n' Γ Δ e τ HWT Hle.
-  induction HWT; try solve [econstructor; eauto].
-  apply WTQRef; auto.
-  lia.
-Qed.
 
 (* If Δ(x0)=τ0 and Δ==Δ1,Δ2 and x ∉ Δ2 then Δ1(x0)=τ0 *)
 Lemma partition_not_in_r : forall Δ Δ2 Δ1 x (τ : typ),
@@ -487,14 +477,14 @@ Proof.
 Qed.
 
 
-Lemma wt_subst : forall τ n Γ Δ x v e τ',
-  WellTyped n Γ Δ e τ' ->
+Lemma wt_subst : forall τ Γ Δ x v e τ',
+  WellTyped Γ Δ e τ' ->
   Val v ->
-  WellTyped n (Var.Map.empty _) (Var.Map.empty _) v τ ->
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) v τ ->
   Var.Map.MapsTo x τ Δ ->
-  WellTyped n Γ (Var.Map.remove x Δ) (subst x v e) τ'.
+  WellTyped Γ (Var.Map.remove x Δ) (subst x v e) τ'.
 Proof.
-    intros τ n Γ Δ x v e τ' HWT.
+    intros τ Γ Δ x v e τ' HWT.
     revert τ x v.
     induction HWT; intros τ0 x0 v0 Hvalv0 HWTv0 Hindom;
       simpl.
@@ -571,24 +561,30 @@ Proof.
     * (* Pair *)  admit.
     * (* LetPair *) admit.
     * (* Measure *) admit.
-    * (* QRef *) (* Maybe our typing judgment should also have a list of qubit Var.tiables in scope... *) admit.
     * (* new *) econstructor; eauto.
     * (* Unitary *) econstructor; eauto.
     * (* Lambda *) admit.
     * (* Fix *) admit.
 Admitted. 
 
+
+Definition cfg_to_ctx (cfg : Config.t) :=
+  Var.Map.map (fun _ => QUBIT) (Config.qrefs cfg).
+
+
 Theorem preservation : forall e cfg e' cfg',
   (e, cfg) ~> (e',cfg') ->
-  forall τ,
-  WellTyped (Config.dim cfg) (Var.Map.empty _) (Var.Map.empty _) e τ ->
-  WellTyped (Config.dim cfg') (Var.Map.empty _) (Var.Map.empty _) e' τ.
+  forall τ Δ Δ',
+  Δ = cfg_to_ctx cfg ->
+  Δ' = cfg_to_ctx cfg' ->
+  WellTyped (Var.Map.empty _) Δ e τ ->
+  WellTyped (Var.Map.empty _) Δ' e' τ.
 Proof.
   intros e cfg e' cfg' step.
   remember (e,cfg) as CFG eqn:HCFG.
   remember (e',cfg') as CFG' eqn:HCFG'.
   revert e cfg e' cfg' HCFG HCFG'.
-  induction step; intros ? ? ? ? HCFG HCFG' τ Hwt;   
+  induction step; intros ? ? ? ? HCFG HCFG' τ Δ Δ' HΔ HΔ' Hwt;   
     inversion HCFG; inversion HCFG'; subst;
     clear HCFG; clear HCFG'.
   * inversion Hwt; subst; clear Hwt.
@@ -600,8 +596,8 @@ Admitted.
 
 
 
-Theorem progress : forall n e τ cfg,
-  WellTyped n (Var.Map.empty _) (Var.Map.empty _) e τ ->
-  Config.dim cfg = n ->
+Theorem progress : forall e τ cfg Δ,
+  cfg_to_ctx cfg = Δ ->
+  WellTyped (Var.Map.empty _) Δ e τ ->
   Val e \/ exists e' cfg', (e, cfg) ~> (e', cfg').
 Admitted.

@@ -86,7 +86,7 @@ Inductive step : Choreography.t * Config.t -> Label.t -> Choreography.t * Config
 
 | EPRB : forall q1 q2 A x B y C cfg C' cfg',
     Config.epr cfg = (q1,q2,cfg') ->
-    C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
+    C' = Choreography.subst A x (Expr.Var q1) (Choreography.subst B y (Expr.Var q2) C) ->
     step (Insn.EPR A x B y :: C, cfg) (Label.EPR A B) (C', cfg')
 
 | LetC : forall A x e C cfg e' cfg',
