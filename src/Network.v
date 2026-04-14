@@ -117,35 +117,38 @@ Module Network.
     
 End Network.
 
-Definition epp_insn (p : Actor.t) (c : Choreography.Insn.t): option Insn.t :=
-  match c with
-  | Choreography.Insn.Send A1 e A2 x =>
-      if Actor.eq_dec A1 p then
-        Some (Insn.Send e A2)
-      else if Actor.eq_dec A2 p then
-             Some (Insn.Receive x A1)
-           else
-             None
-  | Choreography.Insn.EPR A1 x1 A2 x2 =>
-      if Actor.eq_dec A1 p then
-        Some (Insn.EPR x1 A2)
-      else if Actor.eq_dec A2 p then
-             Some (Insn.EPR x2 A1)
-           else
-             None
-  | _ => None
-end.
-
-Fixpoint map_option {A B : Type} (f : A -> option B) (xs : list A)
-  : option (list B) :=
-  match xs with
-  | [] => Some []
-  | x :: xs' =>
-      match f x, map_option f xs' with
-      | Some y, Some ys => Some (y :: ys)
-      | _, _ => None
-      end
+Definition conso {A : Type} (x : A) (xso : option (list A)) : option (list A) :=
+  match xso with
+  | None => None
+  | Some xs => Some (x :: xs)
   end.
 
-Definition epp (p : Actor.t) (c : Choreography.Choreography.t): option Process.t :=
-  map_option (epp_insn p) c.
+Fixpoint epp (p : Actor.t) (c : Choreography.Choreography.t): option Process.t :=
+  match c with
+  | [] => Some []
+  | Choreography.Insn.Send A1 e A2 x :: C =>
+      match (Actor.eq_dec A1 p, Actor.eq_dec A2 p) with
+      | (left _, right _) => conso (Insn.Send e A2) (epp p C)
+      | (right _, left _) => conso (Insn.Receive x A1) (epp p C)
+      | _ => epp p C
+      end
+  | Choreography.Insn.EPR A1 x1 A2 x2 :: C =>
+      match (Actor.eq_dec A1 p, Actor.eq_dec A2 p) with
+      | (left _, right _) => conso (Insn.EPR x1 A2) (epp p C)
+      | (right _, left _) => conso (Insn.EPR x2 A1) (epp p C)
+      | _ => epp p C
+      end
+  | Choreography.Insn.Let A1 x e :: C =>
+      if Actor.eq_dec A1 p
+      then conso (Insn.Let x e) (epp p C)
+      else epp p C
+  | Choreography.Insn.LetBang A1 x e :: C =>
+      if Actor.eq_dec A1 p
+      then conso (Insn.LetBang x e) (epp p C)
+      else epp p C
+  | Choreography.Insn.LetPair A1 x1 x2 e :: C =>
+      if Actor.eq_dec A1 p
+      then conso (Insn.LetPair x1 x2 e) (epp p C)
+      else epp p C
+  (* | _ => None *)
+end.

@@ -596,8 +596,238 @@ Admitted.
 
 
 
+Lemma empty_map_equal : forall {A} (m : Var.Map.t A),
+  Var.Map.Empty m -> Var.Map.Equal m (Var.Map.empty A).
+Proof.
+  intros A m Hempty k.
+  destruct (Var.Map.find k m) eqn:Hfind.
+  - apply Var.Map.find_2 in Hfind. exfalso. eapply Hempty; eauto.
+  - destruct (Var.Map.find k (Var.Map.empty A)) eqn:Hfind'.
+    + apply Var.Map.find_2 in Hfind'.
+      apply Var.MapFacts.F.empty_mapsto_iff in Hfind'. contradiction.
+    + reflexivity.
+Qed.
+
+Lemma partition_of_empty : forall {A} (Δ1 Δ2 : Var.Map.t A),
+  Var.MapFacts.Partition (Var.Map.empty A) Δ1 Δ2 ->
+  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
+Proof.
+  intros A Δ1 Δ2 [Hdisj Hiff].
+  split; intros k v Hmap.
+  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
+    { apply Hiff. left; auto. }
+    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
+  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
+    { apply Hiff. right; auto. }
+    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
+Qed.
+
+Lemma empty_partition_empty : forall {A} (Δ Δ1 Δ2 : Var.Map.t A),
+  Var.Map.Empty Δ ->
+  Var.MapFacts.Partition Δ Δ1 Δ2 ->
+  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
+Proof.
+  intros A Δ Δ1 Δ2 Hempty Hpart.
+  apply empty_map_equal in Hempty.
+  rewrite Hempty in Hpart.
+  apply partition_of_empty. auto.
+Qed.
+
+(*
+Lemma canonical_bit : forall Γ Δ e,
+  Val e -> WellTyped Γ Δ e BIT -> exists b, e = Bit b.
+Proof.
+  intros Γ Δ e Hval Hwt.
+  inversion Hval.
+  inversion Hval; subst; inversion Hwt; subst; try discriminate.
+  exists b. reflexivity.
+Qed.
+
+Lemma canonical_bang : forall n Γ Δ e τ,
+  Val e -> WellTyped n Γ Δ e (BANG τ) -> exists e', e = Bang e'.
+Proof.
+  intros n Γ Δ e τ Hval Hwt.
+  inversion Hval; subst; inversion Hwt; subst; try discriminate.
+  exists e0. reflexivity.
+Qed.
+
+Lemma canonical_qubit : forall n Γ Δ e,
+  Val e -> WellTyped n Γ Δ e QUBIT -> exists q, e = QRef q.
+Proof.
+  intros n Γ Δ e Hval Hwt.
+  inversion Hval; subst; inversion Hwt; subst; try discriminate.
+  exists q. reflexivity.
+Qed.
+
+Lemma canonical_tensor : forall n Γ Δ e τ1 τ2,
+  Val e -> WellTyped n Γ Δ e (Tensor τ1 τ2) ->
+  exists v1 v2, e = Pair v1 v2 /\ Val v1 /\ Val v2.
+Proof.
+  intros n Γ Δ e τ1 τ2 Hval Hwt.
+  inversion Hval; subst; inversion Hwt; subst; try discriminate.
+  exists v1, v2. auto.
+Qed.
+
+Lemma canonical_tensor_qubit : forall n Γ Δ e,
+  Val e -> WellTyped n Γ Δ e (Tensor QUBIT QUBIT) ->
+  exists q1 q2, e = Pair (QRef q1) (QRef q2).
+Proof.
+  intros n Γ Δ e Hval Hwt.
+  destruct (canonical_tensor _ _ _ _ _ _ Hval Hwt) as [v1 [v2 [Heq [Hv1 Hv2]]]].
+  subst.
+  inversion Hwt; subst.
+  match goal with
+  | [ Hwt1 : WellTyped _ _ _ v1 QUBIT,
+      Hwt2 : WellTyped _ _ _ v2 QUBIT |- _ ] =>
+    destruct (canonical_qubit _ _ _ _ Hv1 Hwt1) as [q1 Hq1];
+    destruct (canonical_qubit _ _ _ _ Hv2 Hwt2) as [q2 Hq2];
+    subst; exists q1, q2; reflexivity
+  end.
+Qed.
+
+Lemma progress_gen : forall n Γ Δ e τ,
+  WellTyped n Γ Δ e τ ->
+  Var.Map.Empty Γ ->
+  Var.Map.Empty Δ ->
+  forall cfg, Config.dim cfg = n ->
+  Val e \/ exists e' cfg', (e, cfg) ~> (e', cfg').
+Proof.
+  intros n Γ Δ e τ Hwt.
+  induction Hwt; intros HempΓ HempΔ cfg Hdim.
+
+  - (* WTQVar *)
+    exfalso.
+    unfold Var.Singleton in H.
+    assert (Hm : Var.Map.MapsTo x τ (Var.Map.add x τ (Var.Map.empty typ))).
+    { apply Var.Map.add_1. reflexivity. }
+    rewrite <- H in Hm.
+    eapply HempΔ; eauto.
+
+  - (* WTCVar *)
+    exfalso. eapply HempΓ; eauto.
+
+  - (* WTLetIn *)
+    right.
+    destruct (empty_partition_empty _ _ _ HempΔ H) as [HΔ1 HΔ2].
+    specialize (IHHwt1 HempΓ HΔ1 cfg Hdim).
+    destruct IHHwt1 as [Hval | [e1' [cfg' Hstep]]].
+    + exists (subst x e1 e2), cfg.
+      apply LetB; auto.
+    + exists (LetIn x e1' e2), cfg'.
+      eapply LetC; eauto.
+
+  - (* WTBang *)
+    left. constructor.
+
+  - (* WTLetBang *)
+    right.
+    destruct (empty_partition_empty _ _ _ HempΔ H) as [HΔ1 HΔ2].
+    specialize (IHHwt1 HempΓ HΔ1 cfg Hdim).
+    destruct IHHwt1 as [Hval | [e1' [cfg' Hstep]]].
+    + destruct (canonical_bang _ _ _ _ _ Hval Hwt1) as [e' He']. subst.
+      exists (subst x (Bang e') e2), cfg.
+      apply LetBangB. reflexivity.
+    + exists (LetBang x e1' e2), cfg'.
+      apply LetBangC. auto.
+
+  - (* WTBit *)
+    left. constructor.
+
+  - (* WTIf *)
+    right.
+    destruct (empty_partition_empty _ _ _ HempΔ H) as [HΔ' HΔ''].
+    specialize (IHHwt1 HempΓ HΔ' cfg Hdim).
+    destruct IHHwt1 as [Hval | [e' [cfg' Hstep]]].
+    + destruct (canonical_bit _ _ _ _ Hval Hwt1) as [b Hb]. subst.
+      destruct b.
+      * exists e1, cfg. apply IfB; auto.
+      * exists e2, cfg. apply IfB; auto.
+    + exists (If e' e1 e2), cfg'.
+      eapply IfC; eauto.
+
+  - (* WTPair *)
+    destruct (empty_partition_empty _ _ _ HempΔ H) as [HΔ1 HΔ2].
+    specialize (IHHwt1 HempΓ HΔ1 cfg Hdim).
+    specialize (IHHwt2 HempΓ HΔ2 cfg Hdim).
+    destruct IHHwt1 as [Hval1 | [e1' [cfg' Hstep1]]].
+    + destruct IHHwt2 as [Hval2 | [e2' [cfg' Hstep2]]].
+      * left. constructor; auto.
+      * right. exists (Pair e1 e2'), cfg'.
+        eapply PairC2; eauto.
+    + right. exists (Pair e1' e2), cfg'.
+      eapply PairC1; eauto.
+
+  - (* WTLetPair *)
+    right.
+    destruct (empty_partition_empty _ _ _ HempΔ H) as [HΔ1 HΔ2].
+    specialize (IHHwt1 HempΓ HΔ1 cfg Hdim).
+    destruct IHHwt1 as [Hval | [e'' [cfg' Hstep]]].
+    + destruct (canonical_tensor _ _ _ _ _ _ Hval Hwt1) as [v1 [v2 [Heq [Hv1 Hv2]]]]. subst.
+      exists (subst x1 v1 (subst x2 v2 e')), cfg.
+      apply LetPairB; auto.
+    + exists (LetPair x1 x2 e'' e'), cfg'.
+      eapply LetPairC; eauto.
+
+  - (* WTMeas *)
+    right.
+    specialize (IHHwt HempΓ HempΔ cfg Hdim).
+    destruct IHHwt as [Hval | [e' [cfg' Hstep]]].
+    + destruct (canonical_qubit _ _ _ _ Hval Hwt) as [q Hq]. subst.
+      exists (Bit true), (Config.measure true q cfg).
+      apply MeasB. reflexivity.
+    + exists (Meas e'), cfg'.
+      apply MeasC. auto.
+
+  - (* WTQRef *)
+    left. constructor.
+
+  - (* WTNew *)
+    right.
+    specialize (IHHwt HempΓ HempΔ cfg Hdim).
+    destruct IHHwt as [Hval | [e' [cfg' Hstep]]].
+    + destruct (canonical_bit _ _ _ _ Hval Hwt) as [b Hb]. subst.
+      destruct (Config.new b cfg) as [i cfg'] eqn:Hnew.
+      exists (QRef i), cfg'.
+      apply New0. rewrite Hnew. reflexivity.
+    + exists (New e'), cfg'.
+      apply NewC. auto.
+
+  - (* WTUnitary *)
+    right.
+    specialize (IHHwt HempΓ HempΔ cfg Hdim).
+    destruct IHHwt as [Hval | [e' [cfg' Hstep]]].
+    + destruct U; simpl in H; subst.
+      1-4,6-9: (
+        destruct (canonical_qubit _ _ _ _ Hval Hwt) as [q Hq]; subst;
+        eexists; eexists;
+        apply UnitaryB1; reflexivity
+      ).
+      (* CNOT *)
+      destruct (canonical_tensor_qubit _ _ _ _ Hval Hwt) as [q1 [q2 Hq]]. subst.
+      eexists; eexists.
+      apply UnitaryB2. reflexivity.
+    + exists (Unitary U e'), cfg'.
+      apply UnitaryC. auto.
+
+  - (* WTLambda *)
+    left. constructor.
+
+  - (* WTFix *)
+    left. constructor.
+Qed.
+
 Theorem progress : forall e τ cfg Δ,
   cfg_to_ctx cfg = Δ ->
   WellTyped (Var.Map.empty _) Δ e τ ->
+Theorem progress : forall n e τ cfg,
+  WellTyped n (Var.Map.empty _) (Var.Map.empty _) e τ ->
+  Config.dim cfg = n ->
   Val e \/ exists e' cfg', (e, cfg) ~> (e', cfg').
-Admitted.
+Proof.
+  intros n e τ cfg Hwt Hdim.
+  eapply progress_gen; eauto;
+    intros k v Hmap;
+    apply Var.MapFacts.F.empty_mapsto_iff in Hmap;
+    exact Hmap.
+Qed.
+*)
