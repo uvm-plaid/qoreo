@@ -137,7 +137,7 @@ End ChorTEnv.
 
 Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
   
-| Empty : forall G D, 
+| Nil : forall G D, 
     Actor.Map.Empty D ->
     WellTyped G D nil
                                 
@@ -162,7 +162,7 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
 
     WellTyped G D ((Insn.LetBang A x e)::C)
 
-| Let : forall DeltaA1 DeltaA2 G D A x e tau C,
+| LetIn : forall DeltaA1 DeltaA2 G D A x e tau C,
 
     Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e tau ->
     WellTyped G (Actor.Map.add A (Var.Map.add x tau DeltaA2) D) C ->
