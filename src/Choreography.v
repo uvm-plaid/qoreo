@@ -118,3 +118,17 @@ Inductive step : Choreography.t * Config.t -> Label.t -> Choreography.t * Config
     Actor.FSet.Empty (Actor.FSet.inter (Label.actors l) (Insn.actors I)) ->
     step (I::C, cfg) l (I::C', cfg')
 .
+
+Inductive WellTyped :
+  Actor.Map.t (Var.Map.t Expr.typ) -> Actor.Map.t (Var.Map.t Expr.typ) -> Choreography.t -> Prop :=
+  
+| Empty : forall G D, WellTyped G D nil
+
+| EPR : forall G D A x B y C DeltaA,
+  Actor.Map.MapsTo A DeltaA D ->
+  Actor.Map.MapsTo B DeltaB D ->
+  WellTyped G (Actor.Map.add B (Var.Map.add y Expr.QUBIT DeltaB)
+                 (Actor.Map.add A (Var.Map.add x Expr.QUBIT DeltaA) D)) C ->
+  WellTyped G D ((Insn.EPR A x B y)::C) 
+.
+
