@@ -133,7 +133,6 @@ Inductive WellTyped :
 
 (* NOTE: This case is missing the disjointness check *)
 | Send : forall G D A e tau B y C DeltaA GammaA GammaB,
-    Actor.Map.MapsTo A DeltaA D ->
     Actor.Map.MapsTo A GammaA G ->
     Actor.Map.MapsTo B GammaB G ->
     Expr.WellTyped GammaA DeltaA e (Expr.BANG tau) ->
