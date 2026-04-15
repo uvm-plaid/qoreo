@@ -123,12 +123,21 @@ Inductive WellTyped :
   Actor.Map.t (Var.Map.t Expr.typ) -> Actor.Map.t (Var.Map.t Expr.typ) -> Choreography.t -> Prop :=
   
 | Empty : forall G D, WellTyped G D nil
+                                
+| EPR : forall G D A x B y C DeltaA DeltaB,
+    Actor.Map.MapsTo A DeltaA D ->
+    Actor.Map.MapsTo B DeltaB D ->
+    WellTyped G (Actor.Map.add B (Var.Map.add y Expr.QUBIT DeltaB)
+                   (Actor.Map.add A (Var.Map.add x Expr.QUBIT DeltaA) D)) C ->
+    WellTyped G D ((Insn.EPR A x B y)::C)
 
-| EPR : forall G D A x B y C DeltaA,
-  Actor.Map.MapsTo A DeltaA D ->
-  Actor.Map.MapsTo B DeltaB D ->
-  WellTyped G (Actor.Map.add B (Var.Map.add y Expr.QUBIT DeltaB)
-                 (Actor.Map.add A (Var.Map.add x Expr.QUBIT DeltaA) D)) C ->
-  WellTyped G D ((Insn.EPR A x B y)::C) 
+(* NOTE: This case is missing the disjointness check *)
+| Send : forall G D A e tau B y C DeltaA GammaA GammaB,
+    Actor.Map.MapsTo A DeltaA D ->
+    Actor.Map.MapsTo A GammaA G ->
+    Actor.Map.MapsTo B GammaB G ->
+    Expr.WellTyped GammaA DeltaA e (Expr.BANG tau) ->
+    WellTyped (Actor.Map.add B (Var.Map.add y tau GammaB) G) D C ->
+    WellTyped G D ((Insn.Send A e B y)::C)
 .
 
