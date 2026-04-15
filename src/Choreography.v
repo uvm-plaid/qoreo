@@ -119,49 +119,65 @@ Inductive step : Choreography.t * Config.t -> Label.t -> Choreography.t * Config
     step (I::C, cfg) l (I::C', cfg')
 .
 
-Definition ChorTEnv := Actor.Map.t (Var.Map.t Expr.typ).
+Module ChorTEnv.
+    Definition t := Actor.Map.t (Var.Map.t Expr.typ).
+    (* equivalence of ChorTEnv.t *)
+    Definition Equal (G1 G2 : t) : Prop := Actor.Map.Equiv (Var.Map.Equal) G1 G2.
+    Definition find (A : Actor.t) (G : t) : Var.Map.t Expr.typ :=
+        match Actor.Map.find A G with
+        | Some D => D
+        | None => Var.Map.empty _
+        end.
 
-Inductive WellTyped : ChorTEnv -> ChorTEnv -> Choreography.t -> Prop :=
+    Definition add (A : Actor.t) (x : Var.t) (tau : Expr.typ) (G : t) : t :=
+        let D := find A G in
+        Actor.Map.add A (Var.Map.add x tau D) G.
+End ChorTEnv.
+
+
+Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
   
-| Empty : forall G D, WellTyped G D nil
+| Empty : forall G D, 
+    Actor.Map.Empty D ->
+    WellTyped G D nil
                                 
-| EPR : forall G D A x B y C DeltaA DeltaB,
-    Actor.Map.MapsTo A DeltaA D ->
-    Actor.Map.MapsTo B DeltaB D ->
-    WellTyped G (Actor.Map.add B (Var.Map.add y Expr.QUBIT DeltaB)
-                   (Actor.Map.add A (Var.Map.add x Expr.QUBIT DeltaA) D)) C ->
+| EPR : forall G D A x B y C,
+    A <> B ->
+    WellTyped G (ChorTEnv.add B y Expr.QUBIT (ChorTEnv.add A x Expr.QUBIT D)) C ->
     WellTyped G D ((Insn.EPR A x B y)::C)
 
-| Send : forall G D A e tau B y C DeltaA1 DeltaA2 DeltaA3 GammaA GammaB,
-    Actor.Map.MapsTo A GammaA G ->
-    Actor.Map.MapsTo B GammaB G ->
-    Expr.WellTyped GammaA DeltaA2 e (Expr.BANG tau) ->
-    WellTyped (Actor.Map.add B (Var.Map.add y tau GammaB) G) (Actor.Map.add A DeltaA3 D) C ->
-    Var.MapFacts.Partition DeltaA1 DeltaA2 DeltaA3 -> 
-    WellTyped G (Actor.Map.add A DeltaA1 D) ((Insn.Send A e B y)::C)
+| Send : forall DeltaA1 DeltaA2 G D A e tau B y C,
+    A <> B ->
+    Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e (Expr.BANG tau) ->
+    WellTyped (ChorTEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) C ->
+    Var.MapFacts.Partition (ChorTEnv.find A D) DeltaA1 DeltaA2 ->
 
-| LetBang : forall G D A x e tau C Gamma Delta1 Delta2 Delta3,
-    Actor.Map.MapsTo A Gamma G ->
-    Expr.WellTyped Gamma Delta2 e (Expr.BANG tau) ->
-    WellTyped (Actor.Map.add A (Var.Map.add x tau Gamma) G) (Actor.Map.add A Delta3 D) C ->
-    Var.MapFacts.Partition Delta1 Delta2 Delta3 -> 
-    WellTyped G (Actor.Map.add A Delta1 D) ((Insn.LetBang A x e)::C)
+    WellTyped G D ((Insn.Send A e B y)::C)
 
-| Let : forall G D A x e tau C Gamma Delta1 Delta2 Delta3,
-    Actor.Map.MapsTo A Gamma G ->
-    Expr.WellTyped Gamma Delta2 e tau ->
-    WellTyped G (Actor.Map.add A (Var.Map.add x tau Delta3) D) C ->
-    Var.MapFacts.Partition Delta1 Delta2 Delta3 ->
-    ~ Var.Map.In x Delta3 -> 
-    WellTyped G (Actor.Map.add A Delta1 D) ((Insn.Let A x e)::C)
+| LetBang : forall DeltaA1 DeltaA2 G D A x e tau C,
 
-| LetPair: forall G D A x1 x2 tau1 tau2 e C Gamma Delta1 Delta2 Delta3,
-    Actor.Map.MapsTo A Gamma G ->
-    Expr.WellTyped Gamma Delta2 e (Expr.Tensor tau1 tau2) -> 
-    WellTyped G (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 Delta3)) D) C ->
-    Var.MapFacts.Partition Delta1 Delta2 Delta3 ->
-    ~ Var.Map.In x1 Delta3 -> 
-    ~ Var.Map.In x2 Delta3 ->
-    WellTyped G (Actor.Map.add A Delta1 D) ((Insn.LetPair A x1 x2 e)::C)
+    Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e (Expr.BANG tau) ->
+    WellTyped (ChorTEnv.add A x tau G) (Actor.Map.add A DeltaA2 D) C ->
+    Var.MapFacts.Partition (ChorTEnv.find A D) DeltaA1 DeltaA2 ->
+
+    WellTyped G D ((Insn.LetBang A x e)::C)
+
+| Let : forall DeltaA1 DeltaA2 G D A x e tau C,
+
+    Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e tau ->
+    WellTyped G (Actor.Map.add A (Var.Map.add x tau DeltaA2) D) C ->
+    Var.MapFacts.Partition (ChorTEnv.find A D) DeltaA1 DeltaA2 ->
+    ~ Var.Map.In x DeltaA2 ->
+
+    WellTyped G D ((Insn.Let A x e)::C)
+
+| LetPair: forall DeltaA1 DeltaA2 G D A x1 x2 tau1 tau2 e C,
+
+    Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e (Expr.Tensor tau1 tau2) ->
+    WellTyped G (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D) C ->
+
+    ~ Var.Map.In x1 DeltaA2 -> 
+    ~ Var.Map.In x2 DeltaA2 ->
+    WellTyped G D ((Insn.LetPair A x1 x2 e)::C)
 .
 
