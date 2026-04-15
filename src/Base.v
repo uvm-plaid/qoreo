@@ -167,14 +167,13 @@ Module Config.
     qrefs : Var.Map.t nat;
     qstate : Matrix dim dim
   }.
-  (* Definition add x (v : expr) (cfg : t) : t :=
-  {|
-    state := Var.Map.add x v (state cfg);
-    dim := dim cfg;
-    qstate := qstate cfg
-  |}. *)
-  (* Definition find x (cfg : t) : option expr :=
-    Var.Map.find x (state cfg). *)
+
+  Record WellScoped (cfg : t) := {
+    wf_qstate : Matrix.WF_Matrix (qstate cfg);
+    wf_qrefs : List.Forall
+              (fun x => snd x < dim cfg)%nat
+              (Var.Map.elements (qrefs cfg))
+  }.
 
     Definition find (x : Var.t) (cfg : t) : nat :=
       match Var.Map.find x (qrefs cfg) with

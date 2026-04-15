@@ -815,14 +815,15 @@ Proof.
   - (* WTFix *)
     left. constructor.
 Qed.
+*)
 
-Theorem progress : forall e τ cfg Δ,
-  cfg_to_ctx cfg = Δ ->
-  WellTyped (Var.Map.empty _) Δ e τ ->
-Theorem progress : forall n e τ cfg,
-  WellTyped n (Var.Map.empty _) (Var.Map.empty _) e τ ->
-  Config.dim cfg = n ->
+Theorem progress : forall e τ cfg Γ Δ,
+  Config.WellScoped cfg ->
+  Var.Map.Equal Δ (cfg_to_ctx cfg) ->
+  Var.Map.Empty Γ ->
+  WellTyped Γ Δ e τ ->
   Val e \/ exists e' cfg', (e, cfg) ~> (e', cfg').
+(*
 Proof.
   intros n e τ cfg Hwt Hdim.
   eapply progress_gen; eauto;
@@ -831,3 +832,4 @@ Proof.
     exact Hmap.
 Qed.
 *)
+Abort.
