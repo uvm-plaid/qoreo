@@ -140,19 +140,28 @@ Inductive WellTyped : ChorTEnv -> ChorTEnv -> Choreography.t -> Prop :=
     Var.MapFacts.Partition DeltaA1 DeltaA2 DeltaA3 -> 
     WellTyped G (Actor.Map.add A DeltaA1 D) ((Insn.Send A e B y)::C)
 
-| LetBang : forall G D A x e tau C GammaA DeltaA1 DeltaA2 DeltaA3,
-    Actor.Map.MapsTo A GammaA G ->
-    Expr.WellTyped GammaA DeltaA2 e (Expr.BANG tau) ->
-    WellTyped (Actor.Map.add A (Var.Map.add x tau GammaA) G) (Actor.Map.add A DeltaA3 D) C ->
-    Var.MapFacts.Partition DeltaA1 DeltaA2 DeltaA3 -> 
-    WellTyped G (Actor.Map.add A DeltaA1 D) ((Insn.LetBang A x e)::C)
+| LetBang : forall G D A x e tau C Gamma Delta1 Delta2 Delta3,
+    Actor.Map.MapsTo A Gamma G ->
+    Expr.WellTyped Gamma Delta2 e (Expr.BANG tau) ->
+    WellTyped (Actor.Map.add A (Var.Map.add x tau Gamma) G) (Actor.Map.add A Delta3 D) C ->
+    Var.MapFacts.Partition Delta1 Delta2 Delta3 -> 
+    WellTyped G (Actor.Map.add A Delta1 D) ((Insn.LetBang A x e)::C)
 
-| Let : forall G D A x e tau C GammaA DeltaA1 DeltaA2 DeltaA3,
-    Actor.Map.MapsTo A GammaA G ->
-    Expr.WellTyped GammaA DeltaA2 e tau ->
-    WellTyped G (Actor.Map.add A (Var.Map.add x tau DeltaA3) D) C ->
-    Var.MapFacts.Partition DeltaA1 DeltaA2 DeltaA3 ->
-    ~ Var.Map.In x DeltaA3 -> 
-    WellTyped G (Actor.Map.add A DeltaA1 D) ((Insn.Let A x e)::C)
+| Let : forall G D A x e tau C Gamma Delta1 Delta2 Delta3,
+    Actor.Map.MapsTo A Gamma G ->
+    Expr.WellTyped Gamma Delta2 e tau ->
+    WellTyped G (Actor.Map.add A (Var.Map.add x tau Delta3) D) C ->
+    Var.MapFacts.Partition Delta1 Delta2 Delta3 ->
+    ~ Var.Map.In x Delta3 -> 
+    WellTyped G (Actor.Map.add A Delta1 D) ((Insn.Let A x e)::C)
+
+| LetPair: forall G D A x1 x2 tau1 tau2 e C Gamma Delta1 Delta2 Delta3,
+    Actor.Map.MapsTo A Gamma G ->
+    Expr.WellTyped Gamma Delta2 e (Expr.Tensor tau1 tau2) -> 
+    WellTyped G (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 Delta3)) D) C ->
+    Var.MapFacts.Partition Delta1 Delta2 Delta3 ->
+    ~ Var.Map.In x1 Delta3 -> 
+    ~ Var.Map.In x2 Delta3 ->
+    WellTyped G (Actor.Map.add A Delta1 D) ((Insn.LetPair A x1 x2 e)::C)
 .
 
