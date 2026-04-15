@@ -144,12 +144,17 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
 | EPR : forall G D A x B y C,
     A <> B ->
     WellTyped G (ChorTEnv.add B y Expr.QUBIT (ChorTEnv.add A x Expr.QUBIT D)) C ->
+
+    ~ Var.Map.In x (ChorTEnv.find A D) ->
+    ~ Var.Map.In y (ChorTEnv.find A D) ->
+
     WellTyped G D ((Insn.EPR A x B y)::C)
 
 | Send : forall DeltaA1 DeltaA2 G D A e tau B y C,
     A <> B ->
     Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e (Expr.BANG tau) ->
     WellTyped (ChorTEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) C ->
+
     Var.MapFacts.Partition (ChorTEnv.find A D) DeltaA1 DeltaA2 ->
 
     WellTyped G D ((Insn.Send A e B y)::C)
@@ -158,6 +163,7 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
 
     Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e (Expr.BANG tau) ->
     WellTyped (ChorTEnv.add A x tau G) (Actor.Map.add A DeltaA2 D) C ->
+
     Var.MapFacts.Partition (ChorTEnv.find A D) DeltaA1 DeltaA2 ->
 
     WellTyped G D ((Insn.LetBang A x e)::C)
@@ -166,6 +172,7 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
 
     Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e tau ->
     WellTyped G (Actor.Map.add A (Var.Map.add x tau DeltaA2) D) C ->
+
     Var.MapFacts.Partition (ChorTEnv.find A D) DeltaA1 DeltaA2 ->
     ~ Var.Map.In x DeltaA2 ->
 
@@ -176,8 +183,10 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
     Expr.WellTyped (ChorTEnv.find A G) DeltaA1 e (Expr.Tensor tau1 tau2) ->
     WellTyped G (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D) C ->
 
+    Var.MapFacts.Partition (ChorTEnv.find A D) DeltaA1 DeltaA2 ->
     ~ Var.Map.In x1 DeltaA2 -> 
     ~ Var.Map.In x2 DeltaA2 ->
+
     WellTyped G D ((Insn.LetPair A x1 x2 e)::C)
 .
 
