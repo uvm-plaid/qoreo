@@ -139,5 +139,12 @@ Inductive WellTyped : ChorTEnv -> ChorTEnv -> Choreography.t -> Prop :=
     WellTyped (Actor.Map.add B (Var.Map.add y tau GammaB) G) (Actor.Map.add A DeltaA3 D) C ->
     Var.MapFacts.Partition DeltaA1 DeltaA2 DeltaA3 -> 
     WellTyped G (Actor.Map.add A DeltaA1 D) ((Insn.Send A e B y)::C)
+
+| LetBang : forall G D A x e tau C GammaA DeltaA1 DeltaA2 DeltaA3,
+    Actor.Map.MapsTo A GammaA G ->
+    Expr.WellTyped GammaA DeltaA2 e (Expr.BANG tau) ->
+    WellTyped (Actor.Map.add A (Var.Map.add x tau GammaA) G) (Actor.Map.add A DeltaA3 D) C ->
+    Var.MapFacts.Partition DeltaA1 DeltaA2 DeltaA3 -> 
+    WellTyped G (Actor.Map.add A DeltaA1 D) ((Insn.LetBang A x e)::C)
 .
 
