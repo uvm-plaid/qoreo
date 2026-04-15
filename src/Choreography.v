@@ -123,7 +123,7 @@ Definition ChorTEnv := Actor.Map.t (Var.Map.t Expr.typ).
 
 Inductive WellTyped : ChorTEnv -> ChorTEnv -> Choreography.t -> Prop :=
   
-| Empty : forall G D, WellTyped G D nil
+| Nil : forall G D, WellTyped G D nil
                                 
 | EPR : forall G D A x B y C DeltaA DeltaB,
     Actor.Map.MapsTo A DeltaA D ->
