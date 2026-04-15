@@ -119,8 +119,17 @@ Inductive step : Choreography.t * Config.t -> Label.t -> Choreography.t * Config
     step (I::C, cfg) l (I::C', cfg')
 .
 
-Inductive WellTyped :
-  Actor.Map.t (Var.Map.t Expr.typ) -> Actor.Map.t (Var.Map.t Expr.typ) -> Choreography.t -> Prop :=
+Definition ChorTEnv := Actor.Map.t (Var.Map.t Expr.typ).
+
+(*
+  This is currently wrong. It should check whether dom(D1(A)) and
+   dom(D2(A)) are disjoint and D1(B) = D2(B) for all B != A.
+*)
+Inductive DisjointOn : Actor.t -> ChorTEnv -> ChorTEnv -> Prop :=
+| Foo : forall A D1 D2, DisjointOn A D1 D2
+.
+             
+Inductive WellTyped : ChorTEnv -> ChorTEnv -> Choreography.t -> Prop :=
   
 | Empty : forall G D, WellTyped G D nil
                                 
@@ -131,12 +140,13 @@ Inductive WellTyped :
                    (Actor.Map.add A (Var.Map.add x Expr.QUBIT DeltaA) D)) C ->
     WellTyped G D ((Insn.EPR A x B y)::C)
 
-(* NOTE: This case is missing the disjointness check *)
-| Send : forall G D A e tau B y C DeltaA GammaA GammaB,
+| Send : forall G D D' A e tau B y C DeltaA GammaA GammaB,
+    Actor.Map.MapsTo A DeltaA D ->
     Actor.Map.MapsTo A GammaA G ->
     Actor.Map.MapsTo B GammaB G ->
     Expr.WellTyped GammaA DeltaA e (Expr.BANG tau) ->
-    WellTyped (Actor.Map.add B (Var.Map.add y tau GammaB) G) D C ->
+    WellTyped (Actor.Map.add B (Var.Map.add y tau GammaB) G) D' C ->
+    DisjointOn A D D' -> 
     WellTyped G D ((Insn.Send A e B y)::C)
 .
 
