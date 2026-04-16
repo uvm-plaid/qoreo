@@ -196,7 +196,10 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
 Lemma weakening_gen : forall G D A C,
     WellTyped G D C ->
     forall G',
-      (forall x tau, Var.Map.MapsTo x tau (ChorTEnv.find A G)) -> Var.Map.MapsTo x tau (ChorTEnv.find A G))
+      (forall x tau, ChorTEnv.MapsTo A x tau G -> ChorTEnv.MapsTo A x tau G) ->
+      WellTyped G' D C.
+Proof.
+  Admitted.
         
 Lemma wt_subst_bang : forall tau G D A x v C,
     WellTyped G D C ->
@@ -213,7 +216,7 @@ Lemma wt_subst_lin : forall tau G D A x v C,
     Expr.Val v ->
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) v tau ->
     ChorTEnv.MapsTo A x tau D ->
-    WellTyped G D (Choreography.subst A x v C).
+    WellTyped G (Actor.Map.add A (Var.Map.remove x (ChorTEnv.find A D)) D) (Choreography.subst A x v C).
 Proof.
   Admitted.
   
