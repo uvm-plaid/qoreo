@@ -132,6 +132,9 @@ Module ChorTEnv.
     Definition add (A : Actor.t) (x : Var.t) (tau : Expr.typ) (G : t) : t :=
         let D := find A G in
         Actor.Map.add A (Var.Map.add x tau D) G.
+
+    Definition MapsTo (A : Actor.t) (x : Var.t) (tau : Expr.typ) (G : t) : Prop :=
+      Var.Map.MapsTo x tau (find A G).
 End ChorTEnv.
 
 
@@ -190,6 +193,31 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
     WellTyped G D ((Insn.LetPair A x1 x2 e)::C)
 .
 
+Lemma weakening_gen : forall G D A C,
+    WellTyped G D C ->
+    forall G',
+      (forall x tau, Var.Map.MapsTo x tau (ChorTEnv.find A G)) -> Var.Map.MapsTo x tau (ChorTEnv.find A G))
+        
+Lemma wt_subst_bang : forall tau G D A x v C,
+    WellTyped G D C ->
+    Expr.Val v ->
+    Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) v (Expr.BANG tau) ->
+    ChorTEnv.MapsTo A x tau G ->
+    WellTyped G D (Choreography.subst A x v C).
+Proof.
+Admitted.
+
+(* This needs correction wrt removing x from D *)
+Lemma wt_subst_lin : forall tau G D A x v C,
+    WellTyped G D C ->
+    Expr.Val v ->
+    Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) v tau ->
+    ChorTEnv.MapsTo A x tau D ->
+    WellTyped G D (Choreography.subst A x v C).
+Proof.
+  Admitted.
+  
+                            
 (* placeholder for well-formedness definition *)
 Inductive WellFormed : Config.t -> ChorTEnv.t -> Prop :=
 | Foo : forall cfg D, WellFormed cfg D
