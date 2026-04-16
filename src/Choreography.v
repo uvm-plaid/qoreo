@@ -190,3 +190,17 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
     WellTyped G D ((Insn.LetPair A x1 x2 e)::C)
 .
 
+(* placeholder for well-formedness definition *)
+Inductive WellFormed : Config.t -> ChorTEnv.t -> Prop :=
+| Foo : forall cfg D, WellFormed cfg D
+.
+
+Theorem preservation : forall C1 cfg1 l C2 cfg2,
+  step (C1, cfg1) l (C2,cfg2) ->
+  forall D1,
+  WellFormed cfg1 D1 ->
+  WellTyped (Actor.Map.empty _) D1 C1 ->
+  exists D2,
+  WellFormed cfg2 D2 /\ WellTyped (Actor.Map.empty _) D2 C2.
+Proof.
+Admitted.
