@@ -220,11 +220,8 @@ Lemma wt_subst_lin : forall tau G D A x v C,
 Proof.
   Admitted.
   
-                            
 (* placeholder for well-formedness definition *)
-Inductive WellFormed : Config.t -> ChorTEnv.t -> Prop :=
-| Foo : forall cfg D, WellFormed cfg D
-.
+Definition  WellFormed (cfg : Config.t) (C : ChorTEnv.t) : Prop := True.
 
 Theorem preservation : forall C1 cfg1 l C2 cfg2,
   step (C1, cfg1) l (C2,cfg2) ->
