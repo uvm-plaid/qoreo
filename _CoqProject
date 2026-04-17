@@ -1,5 +1,9 @@
 -Q src Qoreo
+-Q examples QoreoExamples
 src/Base.v
 src/Expr.v
 src/Choreography.v
 src/Network.v
+src/NetQasm.v
+examples/Notation.v
+examples/Teleportation.v

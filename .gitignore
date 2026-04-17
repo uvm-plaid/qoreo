@@ -4,3 +4,7 @@
 *.glob
 CoqMakefile
 CoqMakefile.conf
+extracted/
+generated/
+ocaml/*.cmi
+ocaml/*.cmo

@@ -24,3 +24,17 @@ Qoreo uses the OCaml/Rocq concept of modules to define data structures. The vari
 * `src/Expr.v` - The definition of the local quantum language language.
 * `src/Choreography.v` - The definition of the choreographic language.
 * `src/Network.v` - The definition of the network language.
+
+# Compiling to NetQASM
+
+The file `examples/Teleportation.v` contains a simple example choreography. To run endpoint projection on this choreography and compile the resulting processes to Python files using the NetQASM API, run:
+
+```
+make generate-teleportation-py
+```
+
+The results are stored in the `generated` directory. The compilation pipeline relies on:
+
+* `src/NetQasm.v` - Renders a `Process` into a string in a NetQASM-like IR
+* `ocaml/write_apps.ml` - An OCaml driver to run the renderer and save the results to .py files
+* `python/qoreo_netqasm_runtime.py` - A Python runtime that wraps the NetQASM API to make it more similar to the Qoreo expression language
