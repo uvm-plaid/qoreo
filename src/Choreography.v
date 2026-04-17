@@ -202,32 +202,58 @@ Proof.
   auto.
 Qed.
 
-Lemma weakening_gen : forall G D C,
-    WellTyped G D C ->
-    forall G', 
-      (forall A x tau, ChorTEnv.MapsTo A x tau G -> ChorTEnv.MapsTo A x tau G') ->
-      WellTyped G' D C.
+Lemma map_upd : forall A x tau1 B y tau2 G,
+    A <> B ->
+    ChorTEnv.MapsTo A x tau1 G <-> ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G).
 Proof.
-  intros G D C HWT.
+  intros A x tau1 B y tau2 G HNE.
+  split.
+Admitted.
+  
+Lemma map_add : forall A x tau1 B y tau2 G1 G2,
+    A <> B ->
+    (ChorTEnv.MapsTo A x tau1 G1 -> ChorTEnv.MapsTo A x tau1 G2) ->
+    (ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G1) ->
+     ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G2)).
+Proof.
+  intros A x tau1 B y tau2 G1 G2 HNE HMA.
+  rewrite -> (map_upd A x tau1 B y tau2 G1) in HMA.
+  rewrite -> (map_upd A x tau1 B y tau2 G2) in HMA.
+  auto.
+  auto.
+  auto.
+Qed.
+
+Lemma weakening_gen : forall G D C G',
+    WellTyped G D C ->
+    (forall A x tau, ChorTEnv.MapsTo A x tau G -> ChorTEnv.MapsTo A x tau G') ->
+    WellTyped G' D C.
+Proof.
+  intros G D C G' HWT.
   induction HWT.
   
-  - intros G' HW. apply Nil. auto.
+  - intros HW. apply Nil. auto. 
 
-  - intros G' HW. apply EPR. auto.
+  - intros HW. apply EPR. auto.
     auto.
     auto.
     auto.
 
-  - intros G' HW. eapply Send. auto.
+  - intros HW. eapply Send. auto.
     eapply Expr.weakening_gen. eauto.
 
-    intros x tau' HEW. rewrite <- extension.
+    intros x tau' HEW.
+    rewrite <- extension.
     apply extension in HEW.
-    specialize HW with (A := A).
-    specialize HW with (x := x).
-    specialize HW with (tau := tau').
+    apply (HW A x tau') in HEW.
     auto.
     
+    evar (x : Var.t).
+    evar (tau' : Expr.typ).
+    specialize (HW A x tau').
+    pose proof map_add as HMA.
+    specialize (HMA A x tau' B y tau G G').
+
 Admitted.
         
 Lemma wt_subst_bang : forall tau G D A x v C,
