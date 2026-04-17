@@ -193,24 +193,50 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
     WellTyped G D ((Insn.LetPair A x1 x2 e)::C)
 .
 
-Lemma weakening_gen : forall G D A C,
+Lemma extension : forall A G x tau,
+    ChorTEnv.MapsTo A x tau G <-> Var.Map.MapsTo x tau (ChorTEnv.find A G).
+Proof.
+  intros A G x tau.
+  split.
+  auto.
+  auto.
+Qed.
+
+(* I need to define this for some reason? *)
+Lemma extension' : forall A G x tau,
+    Var.Map.MapsTo x tau (ChorTEnv.find A G) <-> ChorTEnv.MapsTo A x tau G.
+Proof.
+  intros A G x tau.
+  split.
+  auto.
+  auto.
+Qed.
+
+Lemma weakening_gen : forall G D C,
     WellTyped G D C ->
-    forall G',
-      (forall x tau, ChorTEnv.MapsTo A x tau G -> ChorTEnv.MapsTo A x tau G') ->
+    forall G', 
+      (forall A x tau, ChorTEnv.MapsTo A x tau G -> ChorTEnv.MapsTo A x tau G') ->
       WellTyped G' D C.
 Proof.
-  intros G D A C HWT.
+  intros G D C HWT.
   induction HWT.
-  * intros G' HW. apply Nil. auto.
-  * intros G' HW. apply EPR.
+  
+  - intros G' HW. apply Nil. auto.
+
+  - intros G' HW. apply EPR. auto.
     auto.
     auto.
     auto.
-    auto.
-  * intros G' HW. eapply Send.
-    auto.
+
+  - intros G' HW. eapply Send. auto.
     eapply Expr.weakening_gen. eauto.
-    intros x tau' HEW. 
+
+    intros x tau' HEW. apply extension'.
+    apply extension in HEW.
+    specialize HW with (A := A).
+    specialize HW with (x := x).
+    specialize HW with (tau := tau').
+    auto. 
 Admitted.
         
 Lemma wt_subst_bang : forall tau G D A x v C,
