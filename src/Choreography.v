@@ -196,10 +196,22 @@ Inductive WellTyped : ChorTEnv.t -> ChorTEnv.t -> Choreography.t -> Prop :=
 Lemma weakening_gen : forall G D A C,
     WellTyped G D C ->
     forall G',
-      (forall x tau, ChorTEnv.MapsTo A x tau G -> ChorTEnv.MapsTo A x tau G) ->
+      (forall x tau, ChorTEnv.MapsTo A x tau G -> ChorTEnv.MapsTo A x tau G') ->
       WellTyped G' D C.
 Proof.
-  Admitted.
+  intros G D A C HWT.
+  induction HWT.
+  * intros G' HW. apply Nil. auto.
+  * intros G' HW. apply EPR.
+    auto.
+    auto.
+    auto.
+    auto.
+  * intros G' HW. eapply Send.
+    auto.
+    eapply Expr.weakening_gen. eauto.
+    intros x tau' HEW. 
+Admitted.
         
 Lemma wt_subst_bang : forall tau G D A x v C,
     WellTyped G D C ->
@@ -210,7 +222,6 @@ Lemma wt_subst_bang : forall tau G D A x v C,
 Proof.
 Admitted.
 
-(* This needs correction wrt removing x from D *)
 Lemma wt_subst_lin : forall tau G D A x v C,
     WellTyped G D C ->
     Expr.Val v ->
