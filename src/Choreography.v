@@ -202,16 +202,6 @@ Proof.
   auto.
 Qed.
 
-(* I need to define this for some reason? *)
-Lemma extension' : forall A G x tau,
-    Var.Map.MapsTo x tau (ChorTEnv.find A G) <-> ChorTEnv.MapsTo A x tau G.
-Proof.
-  intros A G x tau.
-  split.
-  auto.
-  auto.
-Qed.
-
 Lemma weakening_gen : forall G D C,
     WellTyped G D C ->
     forall G', 
@@ -231,12 +221,13 @@ Proof.
   - intros G' HW. eapply Send. auto.
     eapply Expr.weakening_gen. eauto.
 
-    intros x tau' HEW. apply extension'.
+    intros x tau' HEW. rewrite <- extension.
     apply extension in HEW.
     specialize HW with (A := A).
     specialize HW with (x := x).
     specialize HW with (tau := tau').
-    auto. 
+    auto.
+    
 Admitted.
         
 Lemma wt_subst_bang : forall tau G D A x v C,
