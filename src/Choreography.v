@@ -202,31 +202,13 @@ Proof.
   auto.
 Qed.
 
-Lemma map_upd : forall A x tau1 B y tau2 G,
-    A <> B ->
-    ChorTEnv.MapsTo A x tau1 G <-> ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G).
-Proof.
-  intros A x tau1 B y tau2 G HNE.
-  split.
-Admitted.
-
-
-Lemma map_sep_upd : forall A B G,
-    A <> B ->
-    (forall x tau1 y tau2,
-        ChorTEnv.MapsTo A x tau1 G <->
-          ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G)).
-Proof.
-  intros A B G HNE x tau1 y tau2.
-  split.
-Admitted.
-
 Lemma map_add : forall G1 G2,
     (forall A x tau, (ChorTEnv.MapsTo A x tau G1 -> ChorTEnv.MapsTo A x tau G2)) ->
     (forall A x tau1 B y tau2,
         (ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G1) ->
          ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G2))).
 Proof.
+  intros G1 G2 HMA1 A x tau1 B y tau2 HMA2.
 Admitted.
 
 Lemma weakening_gen : forall G D C,
@@ -261,8 +243,24 @@ Proof.
 
     auto.
 
-    - intros G' HW. eapply LetBang.
-    
+  - intros G' HW. eapply LetBang.
+    pose proof (Expr.weakening_gen
+                  (ChorTEnv.find A G) DeltaA1 e (Expr.BANG tau) H (ChorTEnv.find A G'))
+      as HEW.
+    apply HEW.
+    intros x' tau' HVM.
+    specialize (HW A x' tau').
+    rewrite -> extension in HW.
+    rewrite -> extension in HW.
+    auto.
+
+    specialize (IHHWT (ChorTEnv.add A x tau G')).
+    apply IHHWT.
+    intros A0 x0 tau0 HE.
+    pose proof (map_add G G' HW A0 x0 tau0 A x tau) as HMA.
+    auto.
+
+    auto.
 Admitted.
         
 Lemma wt_subst_bang : forall tau G D A x v C,
