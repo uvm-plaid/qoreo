@@ -265,10 +265,33 @@ Proof.
   - intros G' HW. eapply LetIn.
     pose proof (Expr.weakening_gen (ChorTEnv.find A G) DeltaA1 e tau H (ChorTEnv.find A G'))
       as HEW.
-    specialize (HW A).
+    setoid_rewrite -> extension in HW.
+    auto.
 
-Admitted.
-        
+    apply IHHWT.
+    auto.
+
+    apply H0.
+
+    auto.
+
+  - intros G' HW. eapply LetPair.
+    pose proof (Expr.weakening_gen (ChorTEnv.find A G) DeltaA1 e
+                  (Expr.Tensor tau1 tau2) H (ChorTEnv.find A G'))
+      as HEW.
+    setoid_rewrite -> extension in HW.
+    auto.
+    
+    apply IHHWT.
+    auto.
+
+    apply H0.
+
+    auto.
+
+    auto.
+Qed.
+    
 Lemma wt_subst_bang : forall tau G D A x v C,
     WellTyped G D C ->
     Expr.Val v ->
