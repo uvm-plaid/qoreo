@@ -208,7 +208,7 @@ Lemma map_add : forall G1 G2,
         (ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G1) ->
          ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G2))).
 Proof.
-  intros G1 G2 HMA1 A x tau1 B y tau2 HMA2.
+  intros G1 G2 HMA1 A x tau1 B y tau2 HMA2. 
 Admitted.
 
 Lemma weakening_gen : forall G D C,
@@ -291,6 +291,7 @@ Proof.
 
     auto.
 Qed.
+
     
 Lemma wt_subst_bang : forall tau G D A x v C,
     WellTyped G D C ->
@@ -299,8 +300,29 @@ Lemma wt_subst_bang : forall tau G D A x v C,
     ChorTEnv.MapsTo A x tau G ->
     WellTyped G D (Choreography.subst A x v C).
 Proof.
-Admitted.
+  intros tau G D A x v C HWT.
+  induction HWT.
 
+  - intros HV HWTB HM. apply Nil. apply H.
+
+  - intros HV HWTB HM. apply EPR. apply H.
+
+    apply IHHWT.
+    auto.
+    auto.
+    auto.
+    auto.
+    auto.
+
+  - intros HV HWTB HM. eapply Send.
+
+    auto.
+
+    (* I think we need a nonlinear Expr.wt_subst to proceed with this case? *)
+Admitted.
+    
+    
+    
 Lemma wt_subst_lin : forall tau G D A x v C,
     WellTyped G D C ->
     Expr.Val v ->
