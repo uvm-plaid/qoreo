@@ -261,6 +261,12 @@ Proof.
     auto.
 
     auto.
+
+  - intros G' HW. eapply LetIn.
+    pose proof (Expr.weakening_gen (ChorTEnv.find A G) DeltaA1 e tau H (ChorTEnv.find A G'))
+      as HEW.
+    specialize (HW A).
+
 Admitted.
         
 Lemma wt_subst_bang : forall tau G D A x v C,
