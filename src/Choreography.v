@@ -298,29 +298,30 @@ Lemma wt_subst_bang : forall tau G D A x v C,
     Expr.Val v ->
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) v (Expr.BANG tau) ->
     ChorTEnv.MapsTo A x tau G ->
-    WellTyped G D (Choreography.subst A x v C).
+               WellTyped G D (Choreography.subst A x v C).
 Proof.
-  intros tau G D A x v C HWT.
+  intros tau G D A x v C HWT HV HWTV HA.
   induction HWT.
 
-  - intros HV HWTB HM. apply Nil. apply H.
+  - apply Nil. apply H.
 
-  - intros HV HWTB HM. apply EPR. apply H.
-
+  - apply EPR. apply H.
     apply IHHWT.
     auto.
     auto.
     auto.
-    auto.
-    auto.
 
-  - intros HV HWTB HM. eapply Send.
+  - eapply Send.
 
-    auto.
+    apply H.
 
     (* I think we need a nonlinear Expr.wt_subst to proceed with this case? *)
-Admitted.
+    admit.
+
+    apply IHHWT.
+    (* Choreography.subst is not tracking bound variables... *)
     
+Admitted.
     
     
 Lemma wt_subst_lin : forall tau G D A x v C,
