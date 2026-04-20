@@ -192,7 +192,7 @@ Module Config.
       qrefs := qrefs cfg;
       qstate := rho'
     |}.
-    
+
   Definition new (b : bool) (cfg : t) : Var.t * t :=
     let x := Var.fresh (qrefs cfg) in
     let q := dim cfg in
@@ -274,13 +274,33 @@ End Config.
 
 Module Actor.
 
+  Lemma bool_dec_refl : forall (b : bool), bool_dec b b = left (eq_refl b).
+  Proof. destruct b; auto. Qed.
+  Lemma ascii_dec_refl : forall (a : Ascii.ascii), Ascii.ascii_dec a a = left (eq_refl a).
+  Proof.
+    destruct a. simpl.
+    repeat rewrite bool_dec_refl.
+    simpl.
+    reflexivity.
+  Qed.
+
   Module Export V := OrderedTypeEx.UOT_to_OT (OrderedTypeEx.String_as_OT).
   Definition t := V.t.
   Definition eq_dec : forall (x y : t), {x=y} + {x <> y} := string_dec.
+
+
+  Lemma eq_dec_refl : forall A, eq_dec A A = left (eq_refl A).
+  Proof.
+    induction A; auto.
+    simpl. rewrite IHA. simpl.
+    rewrite ascii_dec_refl.
+    reflexivity.
+  Qed.
   
   Module Map := FSets.FMapList.Make(V).
   Module MapFacts := FMapFacts.Properties(Map).
   Module FSet := FSets.FSetList.Make(V).
+  Module FSetFacts := FSetFacts.WFacts(FSet).
 
   #[export] Existing Instance MapFacts.F.EqualSetoid.
 
@@ -292,3 +312,10 @@ Module Actor.
     Map.Equal m (Map.add x a (Map.empty _)).
 
 End Actor.
+Module Tactics.
+  Create HintDb actor_db.
+  #[export] Hint Rewrite Actor.FSetFacts.inter_iff : actor_db.
+  #[export] Hint Rewrite Actor.FSetFacts.add_iff : actor_db.
+  #[export] Hint Rewrite Actor.FSetFacts.singleton_iff : actor_db.
+
+End Tactics.
