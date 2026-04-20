@@ -1,5 +1,6 @@
 From Stdlib Require Import String.
 From Stdlib Require Lists.List.
+From Stdlib Require Import extraction.ExtrOcamlNativeString.
 Import List.ListNotations.
 
 From Qoreo Require Import Base Expr Choreography.
