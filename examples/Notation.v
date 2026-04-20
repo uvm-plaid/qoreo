@@ -1,5 +1,8 @@
 From Stdlib Require Import String.
-From Qoreo Require Import Base Expr Choreography.
+From Stdlib Require Lists.List.
+Import List.ListNotations.
+
+From Qoreo Require Import Base Expr Choreography Network NetQasm.
 
 Open Scope string_scope.
 
@@ -26,19 +29,19 @@ Module ExampleNotation.
   Definition if_ (cond_ then_ else_ : Expr.t) : Expr.t :=
     Expr.If cond_ then_ else_.
 
-  Notation "'epr{' A ',' x ';' B ',' y '}'" := (Insn.EPR A x B y)
+  Notation "'epr{' A ',' x ';' B ',' y '}'" := (Choreography.Insn.EPR A x B y)
     (at level 0, x at next level, y at next level).
 
-  Notation "'send{' A ',' x '->' B ',' y '}'" := (Insn.Send A (ref x) B y)
+  Notation "'send{' A ',' x '->' B ',' y '}'" := (Choreography.Insn.Send A (ref x) B y)
     (at level 0, x at next level, y at next level).
 
-  Notation "'let{' A ',' x ':=' e '}'" := (Insn.Let A x e)
+  Notation "'let{' A ',' x ':=' e '}'" := (Choreography.Insn.Let A x e)
     (at level 0, x at next level, e at next level).
 
-  Notation "'let!{' A ',' x ':=' e '}'" := (Insn.LetBang A x e)
+  Notation "'let!{' A ',' x ':=' e '}'" := (Choreography.Insn.LetBang A x e)
     (at level 0, x at next level, e at next level).
 
-  Notation "'letp{' A ',' '(' x ',' y ')' ':=' e '}'" := (Insn.LetPair A x y e)
+  Notation "'letp{' A ',' '(' x ',' y ')' ':=' e '}'" := (Choreography.Insn.LetPair A x y e)
     (at level 0, x at next level, y at next level, e at next level).
 
   Notation "'H[' x ']'" := (apply1 H x)
@@ -54,3 +57,24 @@ Module ExampleNotation.
   Notation "'New[' b ']'" := (new b)
     (at level 0, b at next level).
 End ExampleNotation.
+
+Module ExampleExtraction.
+  Definition render_party (choreo : Choreography.t) (p : Actor.t)
+    : option AppFile.t :=
+    match Network.epp p choreo with
+    | Some proc =>
+        Some {| AppFile.party := p; AppFile.source := render_app p proc |}
+    | None => None
+    end.
+
+  Fixpoint render_parties (choreo : Choreography.t) (ps : list Actor.t)
+    : option (list AppFile.t) :=
+    match ps with
+    | [] => Some []
+    | p :: ps' =>
+        match render_party choreo p, render_parties choreo ps' with
+        | Some app, Some apps => Some (app :: apps)
+        | _, _ => None
+        end
+    end.
+End ExampleExtraction.

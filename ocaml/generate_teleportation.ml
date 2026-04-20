@@ -3,5 +3,5 @@ module W = Write_apps.Make (T)
 
 let () =
   W.run
-    ~apps:T.TeleportationNetQasm.apps
+    ~apps:T.Teleportation.apps
     ~default_out_dir:"generated/teleportation"

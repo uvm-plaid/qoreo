@@ -43,32 +43,14 @@ Module Teleportation.
       let{B, b := if_ (ref z) (Z[b]) (ref b)};
       let{B, b := if_ (ref x) (X[b]) (ref b)}
     ].
-End Teleportation.
 
-Module TeleportationNetQasm.
   Definition parties : list Actor.t :=
-    [Teleportation.A; Teleportation.B].
+    [A; B].
 
-  Definition render_party (p : Actor.t) : option AppFile.t :=
-    match Network.epp p Teleportation.choreo with
-    | Some proc =>
-        Some {| AppFile.party := p; AppFile.source := render_app p proc |}
-    | None => None
-    end.
-
-  Fixpoint render_parties (ps : list Actor.t) : option (list AppFile.t) :=
-    match ps with
-    | [] => Some []
-    | p :: ps' =>
-        match render_party p, render_parties ps' with
-        | Some app, Some apps => Some (app :: apps)
-        | _, _ => None
-        end
-    end.
-
-  Definition apps : option (list AppFile.t) := render_parties parties.
-End TeleportationNetQasm.
+  Definition apps : option (list AppFile.t) :=
+    ExampleExtraction.render_parties choreo parties.
+End Teleportation.
 
 Extraction Language OCaml.
 Set Extraction Output Directory "extracted".
-Extraction "teleportation_netqasm.ml" TeleportationNetQasm.apps.
+Extraction "teleportation_netqasm.ml" Teleportation.apps.
