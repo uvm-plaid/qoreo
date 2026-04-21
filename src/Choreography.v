@@ -40,19 +40,28 @@ Module Insn.
         LetPair B y1 y2 e'
     end.
 
-    Definition bind_eqb  (A : Actor.t) (x : Var.t)  (B : Actor.t) (y : Var.t) : bool :=
-      if Actor.eq_dec A B then if Var.eq_dec x y then true else false else false.
-    
+    Definition bindt : Type := Actor.t * Var.t.
+
+    Definition bindings (I : t) : list bindt :=
+      match I with
+      | Send B1 e B2 y => [(B2,y)]    
+      | EPR B1 y1 B2 y2 => [(B1,y1);(B2,y2)]
+      | Let B y e => [(B,y)]
+      | LetBang B y e => [(B,y)]
+      | LetPair B y1 y2 e => [(B,y1);(B,y2)]
+    end.
+           
+    Definition bind_eqb  (Ax : bindt) (By: bindt) : bool :=
+      if Actor.eq_dec (fst Ax) (fst By) then if Var.eq_dec (snd Ax) (snd By) then true else false else false.
+
     Definition rebound_in (A : Actor.t) (x : Var.t) (I : t) : bool :=
       match I with
-      | Send B1 e B2 y => bind_eqb A x B2 y    
-      | EPR B1 y1 B2 y2 => (bind_eqb A x B1 y1) || (bind_eqb A x B2 y2)
-      | Let B y e => bind_eqb A x B y 
-      | LetBang B y e => bind_eqb A x B y 
-      | LetPair B y1 y2 e => (bind_eqb A x B y1) || (bind_eqb A x B y2)
-    end.
-      
-      
+      | Send B1 e B2 y => bind_eqb (A,x) (B2,y)    
+      | EPR B1 y1 B2 y2 => (bind_eqb (A,x) (B1,y1)) || (bind_eqb (A,x) (B2,y2))
+      | Let B y e => bind_eqb (A,x) (B,y) 
+      | LetBang B y e => bind_eqb (A,x) (B,y) 
+      | LetPair B y1 y2 e => (bind_eqb (A,x) (B,y1)) || (bind_eqb (A,x) (B,y2)) 
+    end.       
 End Insn.
 
 Module Choreography.
@@ -65,12 +74,18 @@ Module Choreography.
       match C with
       | [] => []
       | (Ins :: C') => (Insn.subst A x v Ins)::(if (Insn.rebound_in A x Ins)
-                                                then C' else (subst A x v C'))
-      end.
+                                                then C' else (subst A x v C')) 
+      end. 
 
-    Definition subst' (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
-      List.map (Insn.subst A x v) C.
-    
+    (* Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
+      match C with
+      | [] => []
+      | (Ins :: C') =>
+          if (List.existsb (Insn.bind_eqb (A,x)) (Insn.bindings (Ins))) then
+            (Insn.subst A x v Ins)::C'
+          else
+            (Insn.subst A x v Ins)::(subst A x v C') 
+      end.*)
 End Choreography.
 
 Module Label.
@@ -308,8 +323,14 @@ Proof.
     auto.
 Qed.
 
+Lemma no_capture_add : forall A x tau1 I G, 
+    (Insn.rebound_in A x I) = false ->
+    (forall B y tau2, (List.In (B,y) (Insn.bindings I)) ->
+                      ChorTEnv.MapsTo A x tau1 G -> ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G))
+.
+Proof.
+Admitted.
 
-    
 Lemma wt_subst_bang : forall tau G D A x v C,
     WellTyped G D C ->
     Expr.Val v ->
@@ -345,8 +366,18 @@ Proof.
     fold Choreography.subst.
     destruct (Insn.rebound_in A x (Insn.Send A0 e B y)) eqn:Heq.
     { eapply HWT. }
-    { apply IHHWT. auto. }
+    {
+      apply IHHWT.
+      pose proof (no_capture_add A x tau (Insn.Send A0 e B y) G) as HNCA.
+      specialize (HNCA Heq B y tau0).
+      apply HNCA.
+      unfold Insn.bindings.
+      simpl.
+      auto.
+      auto.
+    }
 
+    eauto.
     
 Admitted.
     
