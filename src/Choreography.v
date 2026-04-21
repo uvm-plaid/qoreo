@@ -39,6 +39,20 @@ Module Insn.
         let e' := if Actor.eq_dec A B then Expr.subst x v e else e in
         LetPair B y1 y2 e'
     end.
+
+    Definition bind_eqb  (A : Actor.t) (x : Var.t)  (B : Actor.t) (y : Var.t) : bool :=
+      if Actor.eq_dec A B then if Var.eq_dec x y then true else false else false.
+    
+    Definition rebound_in (A : Actor.t) (x : Var.t) (I : t) : bool :=
+      match I with
+      | Send B1 e B2 y => bind_eqb A x B2 y    
+      | EPR B1 y1 B2 y2 => (bind_eqb A x B1 y1) || (bind_eqb A x B2 y2)
+      | Let B y e => bind_eqb A x B y 
+      | LetBang B y e => bind_eqb A x B y 
+      | LetPair B y1 y2 e => (bind_eqb A x B y1) || (bind_eqb A x B y2)
+    end.
+      
+      
 End Insn.
 
 Module Choreography.
@@ -47,10 +61,16 @@ Module Choreography.
     Definition actors (C : t) : Actor.FSet.t :=
         List.fold_left (fun X I => Actor.FSet.union X (Insn.actors I)) C Actor.FSet.empty.
 
+    Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
+      match C with
+      | [] => []
+      | (Ins :: C') => (Insn.subst A x v Ins)::(if (Insn.rebound_in A x Ins)
+                                                then C' else (subst A x v C'))
+      end.
 
-    Definition subst    (A : Actor.t) (x : Var.t) (v : Expr.t)
-                        (C : t) : t :=
-        List.map (Insn.subst A x v) C.
+    Definition subst' (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
+      List.map (Insn.subst A x v) C.
+    
 End Choreography.
 
 Module Label.
@@ -221,10 +241,7 @@ Proof.
   
   - intros G' HW. apply Nil. auto. 
 
-  - intros G' HW. apply EPR. auto.
-    auto.
-    auto.
-    auto.
+  - intros G' HW. apply EPR; auto.
 
   - intros G' HW. eapply Send. auto.
     eapply Expr.weakening_gen. eauto.
@@ -286,11 +303,11 @@ Proof.
     auto.
 
     apply H0.
-
     auto.
 
     auto.
 Qed.
+
 
     
 Lemma wt_subst_bang : forall tau G D A x v C,
@@ -303,13 +320,20 @@ Proof.
   intros tau G D A x v C HWT HV HWTV HA.
   induction HWT.
 
-  - apply Nil. apply H.
+  - apply Nil. auto.
 
-  - apply EPR. apply H.
-    apply IHHWT.
+  - apply EPR.
+
     auto.
+
+    fold Choreography.subst.
+    destruct (Insn.rebound_in A x (Insn.EPR A0 x0 B y)).
+    { auto. }
+    { apply IHHWT. auto. }
+    
     auto.
-    auto.
+    
+    auto. 
 
   - eapply Send.
 
@@ -318,8 +342,11 @@ Proof.
     (* I think we need a nonlinear Expr.wt_subst to proceed with this case? *)
     admit.
 
-    apply IHHWT.
-    (* Choreography.subst is not tracking bound variables... *)
+    fold Choreography.subst.
+    destruct (Insn.rebound_in A x (Insn.Send A0 e B y)) eqn:Heq.
+    { eapply HWT. }
+    { apply IHHWT. auto. }
+
     
 Admitted.
     
