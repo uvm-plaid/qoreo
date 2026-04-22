@@ -155,18 +155,28 @@ Module Var.
 
 End Var.
 
-Module QRef := Var.
 
 Inductive unitary :=
 | H | X | Y | Z | CNOT | SGATE | Sdag | TGATE | Tdag.
 
 
 Module Config.
+  
   Record t := {
     dim : nat;
     qrefs : Var.Map.t nat;
     qstate : Matrix dim dim
   }.
+
+  Module Refs.
+    Definition Partition cfg cfg1 cfg2 :=
+      Var.MapFacts.Partition (qrefs cfg) (qrefs cfg1) (qrefs cfg2).
+    Definition Singleton x cfg :=
+      Var.Map.In x (qrefs cfg) /\ Var.Map.cardinal (qrefs cfg) = 1%nat.
+    Definition Empty cfg :=
+      Var.Map.Empty (qrefs cfg).
+
+  End Refs.
 
   Record WellScoped (cfg : t) := {
     wf_qstate : Matrix.WF_Matrix (qstate cfg);
@@ -189,7 +199,7 @@ Module Config.
     let rho' := super (pad_u q (dim cfg) (bool_to_matrix b)) (qstate cfg) in
     {|
       dim := dim cfg;
-      qrefs := qrefs cfg;
+      qrefs := Var.Map.remove x (qrefs cfg);
       qstate := rho'
     |}.
 
@@ -314,6 +324,13 @@ Module Actor.
 End Actor.
 Module Tactics.
   Create HintDb actor_db.
+
+  #[export] Hint Rewrite Var.MapFacts.F.add_mapsto_iff : var_db.
+  #[export] Hint Rewrite Var.MapFacts.F.empty_mapsto_iff Var.MapFacts.F.remove_in_iff Var.MapFacts.F.remove_mapsto_iff : var_db.
+
+  #[export] Hint Rewrite Var.eq_dec_refl Var.remove_add_eq Var.remove_empty : var_db.
+
+
   #[export] Hint Rewrite Actor.FSetFacts.inter_iff : actor_db.
   #[export] Hint Rewrite Actor.FSetFacts.add_iff : actor_db.
   #[export] Hint Rewrite Actor.FSetFacts.singleton_iff : actor_db.
