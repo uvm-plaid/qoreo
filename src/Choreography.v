@@ -359,10 +359,16 @@ Proof.
   - eapply Send.
 
     apply H.
-
-    (* I think we need a nonlinear Expr.wt_subst to proceed with this case? *)
-    admit.
-
+    destruct (Actor.eq_dec A A0) eqn:Heq.
+    {
+      pose proof (Expr.wt_subst_bang tau (ChorTEnv.find A0 G) DeltaA1 x v e (Expr.BANG tau0)) as HEWTS.
+      apply HEWTS; auto.
+      rewrite <- e0.
+      rewrite <- extension.
+      auto.
+    }
+    { auto. }
+    
     fold Choreography.subst.
     destruct (Insn.rebound_in A x (Insn.Send A0 e B y)) eqn:Heq.
     { eapply HWT. }
@@ -380,9 +386,21 @@ Proof.
     eauto.
 
   - eapply LetBang.
-    
-    admit.
 
+    destruct (Actor.eq_dec A A0) eqn:Heq.
+    {
+      pose proof (Expr.wt_subst_bang tau (ChorTEnv.find A0 G) DeltaA1 x v e (Expr.BANG tau0)) as HEWTS.
+      eapply HEWTS.
+      auto.
+      auto.
+      auto.
+      auto.
+      rewrite <- extension.
+      rewrite <- e0.
+      auto.
+    }
+    { auto. }
+    
     fold Choreography.subst.
     destruct (Insn.rebound_in A x (Insn.LetBang A0 x0 e)) eqn:Heq.
     { eapply HWT. }
