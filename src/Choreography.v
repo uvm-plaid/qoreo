@@ -445,9 +445,33 @@ Proof.
     auto.
     auto.
 
-    - eapply LetPair.
+  - eapply LetPair.
     
-Admitted.
+    destruct (Actor.eq_dec A A0) eqn:Heq.
+    {
+      pose proof (Expr.wt_subst_bang tau (ChorTEnv.find A0 G) DeltaA1 x v e (Expr.Tensor tau1 tau2)) as HEWTS.
+      eapply HEWTS.
+      auto.
+      auto.
+      auto.
+      rewrite <- extension.
+      rewrite <- e0.
+      auto.
+    }      
+    { auto. }
+
+    fold Choreography.subst.
+    destruct (Insn.rebound_in A x (Insn.LetPair A0 x1 x2 e)) eqn:Heq.
+    { eauto. }
+    {
+      eapply IHHWT.
+      auto.
+    }
+    
+    auto.
+    auto.
+    auto.
+Qed.
     
     
 Lemma wt_subst_lin : forall tau G D A x v C,
