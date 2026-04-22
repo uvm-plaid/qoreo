@@ -476,6 +476,14 @@ Proof.
     firstorder.
 Qed.
 
+Lemma wt_subst_bang : forall τ Γ Δ x v e τ',
+  WellTyped Γ Δ e τ' ->
+  Val v ->
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) v (BANG τ) ->
+  Var.Map.MapsTo x τ Γ ->
+  WellTyped Γ Δ (subst x v e) τ'.
+Proof.
+Admitted.
 
 Lemma wt_subst : forall τ Γ Δ x v e τ',
   WellTyped Γ Δ e τ' ->

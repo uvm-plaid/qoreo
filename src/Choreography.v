@@ -237,7 +237,7 @@ Proof.
   auto.
 Qed.
 
-Lemma map_add : forall G1 G2,
+Lemma map_subset_add : forall G1 G2,
     (forall A x tau, (ChorTEnv.MapsTo A x tau G1 -> ChorTEnv.MapsTo A x tau G2)) ->
     (forall A x tau1 B y tau2,
         (ChorTEnv.MapsTo A x tau1 (ChorTEnv.add B y tau2 G1) ->
@@ -270,7 +270,7 @@ Proof.
     specialize (IHHWT (ChorTEnv.add B y tau G')).
     apply IHHWT.
     intros A0 x tau' HWB.
-    pose proof (map_add G G' HW A0 x tau' B y tau) as HMA.
+    pose proof (map_subset_add G G' HW A0 x tau' B y tau) as HMA.
     auto.
 
     auto.
@@ -289,7 +289,7 @@ Proof.
     specialize (IHHWT (ChorTEnv.add A x tau G')).
     apply IHHWT.
     intros A0 x0 tau0 HE.
-    pose proof (map_add G G' HW A0 x0 tau0 A x tau) as HMA.
+    pose proof (map_subset_add G G' HW A0 x0 tau0 A x tau) as HMA.
     auto.
 
     auto.
@@ -378,6 +378,56 @@ Proof.
     }
 
     eauto.
+
+  - eapply LetBang.
+    
+    admit.
+
+    fold Choreography.subst.
+    destruct (Insn.rebound_in A x (Insn.LetBang A0 x0 e)) eqn:Heq.
+    { eapply HWT. }
+    {
+      apply IHHWT.
+      pose proof (no_capture_add A x tau (Insn.LetBang A0 x0 e) G) as HNCA.
+      specialize (HNCA Heq A0 x0 tau0).
+      apply HNCA.
+      unfold Insn.bindings.
+      simpl.
+      auto.
+      auto.
+    }
+
+    eauto.
+
+  - eapply LetIn.
+
+    destruct (Actor.eq_dec A A0) eqn:Heq.
+
+    {
+      pose proof (Expr.wt_subst_bang tau (ChorTEnv.find A0 G) DeltaA1 x v e tau0) as HEWTS.
+      eapply HEWTS.
+      auto.
+      auto.
+      auto.
+      auto.
+      rewrite <- e0.
+      rewrite <- extension.
+      auto.
+    }
+    { auto. }
+
+    fold Choreography.subst.
+    destruct (Insn.rebound_in A x (Insn.Let A0 x0 e)) eqn:Heq.
+    { eapply HWT. }
+    {
+      apply IHHWT.
+      auto.
+    }
+    
+    auto.
+    auto.
+
+    - eapply LetPair.
     
 Admitted.
     
