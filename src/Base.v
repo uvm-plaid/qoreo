@@ -164,10 +164,11 @@ Module Config.
   
   Record t := {
     dim : nat;
-    qrefs : Var.Map.t nat;
+    (*qrefs : Var.Map.t nat;*)
     qstate : Matrix dim dim
   }.
 
+  (*
   Module Refs.
     Definition Partition cfg cfg1 cfg2 :=
       Var.MapFacts.Partition (qrefs cfg) (qrefs cfg1) (qrefs cfg2).
@@ -177,53 +178,53 @@ Module Config.
       Var.Map.Empty (qrefs cfg).
 
   End Refs.
+  *)
 
-  Record WellScoped (cfg : t) := {
+  Record WellScoped (refs : Var.Map.t nat) (cfg : t) := {
     wf_qstate : Matrix.WF_Matrix (qstate cfg);
     wf_qrefs : List.Forall
               (fun x => snd x < dim cfg)%nat
-              (Var.Map.elements (qrefs cfg))
+              (Var.Map.elements refs)
   }.
 
-    Definition find (x : Var.t) (cfg : t) : nat :=
-      match Var.Map.find x (qrefs cfg) with
+  
+    Definition find (x : Var.t) refs : nat :=
+      match Var.Map.find x refs with
       | Some q => q
       | None   => 0%nat
       end.
+      
 
 
   (* Project onto the state where qubit q is in the classical state |b> *)
   (*Definition proj q dim (b : bool) := pad_u dim q (bool_to_matrix b).*)
-  Definition measure (b : bool) (x : Var.t) (cfg : t) : t :=
-    let q := find x cfg in
+  Definition measure (b : bool) (x : Var.t) refs (cfg : t)
+    : Var.Map.t nat * t :=
+    let q := find x refs in
     let rho' := super (pad_u q (dim cfg) (bool_to_matrix b)) (qstate cfg) in
-    {|
+    (Var.Map.remove x refs, {|
       dim := dim cfg;
-      qrefs := Var.Map.remove x (qrefs cfg);
       qstate := rho'
-    |}.
+    |}).
 
-  Definition new (b : bool) (cfg : t) : Var.t * t :=
-    let x := Var.fresh (qrefs cfg) in
+  Definition new (b : bool) refs (cfg : t) : Var.t * Var.Map.t nat * t :=
+    let x := Var.fresh refs in
     let q := dim cfg in
     let rho' := kron (qstate cfg) (bool_to_ket b) in
-    (x, {|
+    (x, Var.Map.add x q refs, {|
       dim := 1 + dim cfg;
-      qrefs := Var.Map.add x q (qrefs cfg);
       qstate := rho'
     |}).
 
   Definition apply_matrix (cfg : t) (U : Matrix (2 ^ dim cfg) (2 ^ dim cfg)) : t :=
   {|
     dim := dim cfg;
-    qrefs := qrefs cfg;
     qstate := super U (qstate cfg)
   |}.
   
 
-  Definition epr (cfg : t) : Var.t * Var.t * t :=
+  Definition epr refs (cfg : t) : Var.t * Var.t * Var.Map.t nat * t :=
     let d := dim cfg in
-    let refs := qrefs cfg in
     let x1 := Var.fresh refs in
     let refs' := Var.Map.add x1 d refs in
     let x2 := Var.fresh refs' in
@@ -231,9 +232,8 @@ Module Config.
 
     let bell00 := Quantum.EPRpair † × Quantum.EPRpair in
     let rho' := kron (qstate cfg) bell00 in
-    (x1, x2, {|
+    (x1, x2, refs'', {|
       dim := 2 + dim cfg;
-      qrefs := refs'';
       qstate := rho'
     |}).
 
@@ -252,8 +252,8 @@ Module Config.
   | _, _ => Zero
   end.
 
-  Definition apply_gate (U : unitary) (xs : list Var.t) (cfg : t) : t :=
-    let qs := List.map (fun x => find x cfg) xs in
+  Definition apply_gate (U : unitary) (xs : list Var.t) refs (cfg : t) : t :=
+    let qs := List.map (fun x => find x refs) xs in
     apply_matrix cfg (gate_to_matrix _ U qs).
 
     

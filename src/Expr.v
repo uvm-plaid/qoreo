@@ -22,16 +22,95 @@ Inductive t :=
 | Fix : Var.t -> Var.t -> t -> t
 | App : t -> t -> t
 .
-Inductive Val : t -> Prop :=
-| QRefVal : forall q, Val (QRef q)
-(*| VarVal : forall x, Val x*)
-| BangVal : forall e, Val (Bang e)
-| BitVal  : forall b, Val (Bit b)
-| PairVal : forall v1 v2, Val v1 -> Val v2 -> Val (Pair v1 v2)
-| LambdaVal : forall x e, Val (Lambda x e)
-| FixVal    : forall f x e, Val (Fix f x e)
+
+Inductive WFRefs : Var.Map.t nat -> Expr.t -> Prop :=
+| WFVar : forall refs x,
+  Var.Map.Empty refs ->
+  WFRefs refs (Var x)
+| WFLetIn : forall refs x e1 e2 refs1 refs2,
+  WFRefs refs1 e1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  WFRefs refs (LetIn x e1 e2)
+| WFBang : forall refs e,
+  WFRefs refs e ->
+  WFRefs refs (Bang e)
+| WFLetBang : forall refs x e1 e2 refs1 refs2,
+  WFRefs refs1 e1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  WFRefs refs (LetBang x e1 e2)
+| WFBit : forall refs b,
+  Var.Map.Empty refs ->
+  WFRefs refs (Bit b)
+
+| WFIf : forall refs' refs'' refs e e1 e2,
+
+  WFRefs refs' e ->
+  WFRefs refs'' e1 ->
+  WFRefs refs'' e2 ->
+
+  Var.MapFacts.Partition refs refs' refs'' ->
+  WFRefs refs (If e e1 e2)
+
+| WFPair : forall refs e1 e2 refs1 refs2,
+  WFRefs refs1 e1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  WFRefs refs (Pair e1 e2)
+| WFLetPair : forall refs x1 x2 e1 e2 refs1 refs2,
+  WFRefs refs1 e1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  WFRefs refs (LetPair x1 x2 e1 e2)
+| WFMeas : forall refs e,
+  WFRefs refs e ->
+  WFRefs refs (Meas e)
+| WFQRef : forall refs x q,
+  Var.Singleton x q refs ->
+  WFRefs refs (QRef x)
+| WFNew : forall refs e,
+  WFRefs refs e ->
+  WFRefs refs (New e)
+| WFUnitary : forall refs u e,
+  WFRefs refs e ->
+  WFRefs refs (Unitary u e)
+| WFLambda : forall refs x e,
+  WFRefs refs e ->
+  WFRefs refs (Lambda x e)
+| WFFix : forall refs f x e,
+  WFRefs refs e ->
+  WFRefs refs (Fix f x e)
+| WFApp : forall refs e1 e2 refs1 refs2,
+  WFRefs refs1 e1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  WFRefs refs (App e1 e2)
 .
 
+
+Inductive Val : Var.Map.t nat -> t -> Prop :=
+| QRefVal : forall refs q i,
+  Var.Singleton q i refs ->
+  Val refs (QRef q)
+(*| VarVal : forall x, Val x*)
+| BangVal : forall refs e,
+  WFRefs refs e ->
+  Val refs (Bang e)
+| BitVal  : forall refs b,
+  Var.Map.Empty refs ->
+  Val refs (Bit b)
+| PairVal : forall refs1 refs2 refs v1 v2,
+  Val refs1 v1 -> Val refs2 v2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Val refs (Pair v1 v2)
+| LambdaVal : forall refs x e,
+  WFRefs refs e ->
+  Val refs (Lambda x e)
+| FixVal    : forall refs f x e,
+  WFRefs refs e ->
+  Val refs (Fix f x e)
+.
 
 (*************************)
 (* Operational Semantics *)
@@ -112,111 +191,386 @@ Fixpoint subst x v e :=
   end.
 
 
-Reserved Notation "cfg1 ~> cfg2" (at level 55).
 
-Inductive step : Expr.t * Config.t -> Expr.t * Config.t -> Prop :=
+Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat -> Config.t -> Prop :=
 
 (* Let *)
-| LetC : forall x e1 e2 cfg e1' e2' cfg',
-  step (e1, cfg) (e1', cfg') ->
-  e2' = e2 ->
-  (LetIn x e1 e2, cfg) ~> (LetIn x e1' e2', cfg')
-| LetB : forall x e1 e2 cfg e2',
-  Val e1 ->
-  e2' = subst x e1 e2 ->
-  (LetIn x e1 e2, cfg) ~> (e2', cfg)
+| LetC :
+  forall refs1 refs1' refs2,
+  forall x e1 e2 refs cfg e1' refs' cfg',
+  
+  step e1 refs1 cfg e1' refs1' cfg' ->
+
+  WFRefs refs1 e1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1' refs2 ->
+
+  step (LetIn x e1 e2) refs cfg (LetIn x e1' e2) refs' cfg'
+
+| LetB : forall refs1 refs2 x v1 e2 refs cfg e2',
+  Val refs1 v1 ->
+  e2' = subst x v1 e2 ->
+
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+
+  step (LetIn x v1 e2) refs cfg e2' refs cfg
 
 (* Bang *)
 (* no reduction under Bang *)
 
 (* LetBang *)
-| LetBangC : forall x e1 e2 cfg e1' cfg',
-  (e1, cfg) ~> (e1', cfg') ->
-  (LetBang x e1 e2, cfg) ~> (LetBang x e1' e2, cfg')
-| LetBangB : forall x e1 e2 cfg e2',
+| LetBangC :
+  forall refs1 refs1' refs2,
+  forall x e1 e2 refs cfg e1' refs' cfg',
+
+  step e1 refs1 cfg e1' refs1' cfg' ->
+
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1' refs2 ->
+
+  step (LetBang x e1  e2) refs cfg
+       (LetBang x e1' e2) refs' cfg'
+
+| LetBangB : forall refs1 refs2 x e1 e2 refs cfg e2',
   e2' = subst x (Bang e1) e2 ->
-  (LetBang x (Bang e1) e2, cfg) ~> (e2', cfg)
+  
+  WFRefs refs1 e1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+
+  step (LetBang x (Bang e1) e2) refs cfg
+       e2' refs cfg
 
 (* If *)
-| IfC : forall e e1 e2 cfg e' e1' e2' cfg',
-  (e, cfg) ~> (e', cfg') ->
-  e1' = e1 -> e2' = e2 ->
-  (If e e1 e2, cfg) ~> (If e' e1' e2', cfg')
-| IfB : forall (b : bool) e1 e2 cfg e' cfg',
-  (if b then e' = e1 else e' = e2) ->
-  cfg' = cfg ->
-  (If (Bit b) e1 e2, cfg) ~> (e', cfg')
+| IfC : forall refs1 refs1' refs2,
+  forall e1 e2 e3 refs cfg e1' refs' cfg',
+  step e1 refs1 cfg e1' refs1' cfg' ->
 
+  WFRefs refs2 e2 ->
+  WFRefs refs2 e3 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1' refs2 ->
+
+  step (If e1  e2 e3) refs cfg
+       (If e1' e2 e3) refs' cfg'
+  
+
+| IfB : forall (b : bool) e2 e3 refs cfg e',
+
+  (e' = if b then e2 else e3) ->
+  WFRefs refs e2 ->
+  WFRefs refs e3 ->
+  
+  step (If (Bit b) e2 e3) refs cfg
+       e' refs cfg
 
 (* Pair *)
-| PairC1 : forall e1 e2 cfg e1' e2' cfg',
-  (e1, cfg) ~> (e1', cfg') ->
-  e2' = e2 ->
-  (Pair e1 e2, cfg) ~> (Pair e1' e2', cfg')
-| PairC2 : forall e1 e2 cfg e1' e2' cfg',
-  Val e1 -> e1' = e1 ->
-  (e2, cfg) ~> (e2', cfg') ->
-  (Pair e1 e2, cfg) ~> (Pair e1' e2', cfg')
+| PairC1 : forall refs1 refs2 refs1',
+  forall e1 e2 refs cfg e1' refs' cfg',
+  step e1 refs1 cfg e1' refs1' cfg' ->
+
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1' refs2 ->
+
+  step (Pair e1 e2) refs cfg (Pair e1' e2) refs' cfg'
+
+| PairC2 : forall refs1 refs2 refs2',
+  forall e1 e2 refs cfg e2' refs' cfg',
+
+  Val refs1 e1 ->
+  step e2 refs2 cfg e2' refs2' cfg' ->
+
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1 refs2' ->
+
+  step (Pair e1 e2) refs cfg (Pair e1 e2') refs' cfg'
 
 (* LetPair *)
-| LetPairC : forall x1 x2 e1 e2 cfg e1' e2' cfg',
-  (e1, cfg) ~> (e1', cfg') ->
-  e2' = e2 ->
-  (LetPair x1 x2 e1 e2, cfg) ~> (LetPair x1 x2 e1' e2', cfg')
-| LetPairB : forall x1 x2 v1 v2 e' cfg e'' cfg',
-  Val v1 ->
-  Val v2 ->
-  e'' = subst x1 v1 (subst x2 v2 e') ->
-  cfg' = cfg ->
-  (LetPair x1 x2 (Pair v1 v2) e', cfg) ~> (e'', cfg')
+| LetPairC : forall refs1 refs2 refs1',
+  forall x1 x2 e1 e2 refs cfg e1' refs' cfg',
 
-| AppC1 : forall e1 e2 cfg e1' e2' cfg',
-  (e1, cfg) ~> (e1', cfg') ->
-  e2' = e2 ->
-  (App e1 e2, cfg) ~> (App e1' e2', cfg')
-| AppC2 : forall e1 e2 cfg e1' e2' cfg',
-  Val e1 -> e1' = e1 ->
-  (e2,cfg) ~> (e2', cfg') ->
-  (App e1 e2, cfg) ~> (App e1' e2', cfg')
-| AppB : forall x e v cfg e' cfg',
-  Val v ->
+  step e1 refs1 cfg e1' refs1' cfg' ->
+  WFRefs refs2 e2 ->
+
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1' refs2 ->
+
+  step (LetPair x1 x2 e1 e2) refs cfg
+       (LetPair x1 x2 e1' e2) refs' cfg'
+
+| LetPairB : forall refs1 refs2 x1 x2 v1 v2 e' refs cfg e'',
+  Val refs1 (Pair v1 v2) ->
+  WFRefs refs2 e' ->
+  e'' = subst x1 v1 (subst x2 v2 e') ->
+
+  Var.MapFacts.Partition refs refs1 refs2 ->
+
+  step (LetPair x1 x2 (Pair v1 v2) e') refs cfg 
+        e'' refs cfg
+
+| AppC1 : forall refs1 refs2 refs1',
+  forall e1 e2 refs cfg e1' refs' cfg',
+
+  step e1 refs1 cfg e1' refs1' cfg' ->
+  WFRefs refs2 e2 ->
+
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1' refs2 ->
+
+  step (App e1 e2) refs cfg
+        (App e1' e2) refs' cfg'
+
+| AppC2 : forall refs1 refs2 refs2',
+  forall e1 e2 refs cfg e2' refs' cfg',
+
+  Val refs1 e1 ->
+  step e2 refs2 cfg e2' refs2' cfg' ->
+
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.MapFacts.Partition refs' refs1 refs2' ->
+
+  step (App e1 e2) refs cfg
+        (App e1 e2') refs' cfg'
+
+| AppB : forall refs1 refs2 x e v refs cfg e',
+  WFRefs refs1 e ->
+  Val refs2 v ->
   e' = subst x v e ->
-  cfg' = cfg ->
-  (App (Lambda x e) v, cfg) ~> (e', cfg')
-| AppFixB : forall f x e v cfg e' cfg',
-  Val v ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+
+  step (App (Lambda x e) v) refs cfg
+        e' refs cfg
+
+| AppFixB : forall refs1 refs2 f x e v refs cfg e',
+
+  WFRefs refs1 e ->
+  Val refs2 v ->
   e' = subst x v (subst f (Fix f x e) e) ->
-  cfg' = cfg ->
-  (App (Fix f x e) v, cfg) ~> (e', cfg')
+
+  Var.MapFacts.Partition refs refs1 refs2 ->
+
+  step (App (Fix f x e) v) refs cfg e' refs cfg
+
 
 (* New *)
-| NewC : forall e cfg e' cfg',
-  (e, cfg) ~> (e', cfg') ->
-  (New e, cfg) ~> (New e', cfg')
-| New0 : forall b cfg x cfg',
-  (x, cfg') = Config.new b cfg ->
-  (New (Bit b), cfg) ~> (QRef x, cfg')
+| NewC : forall e refs cfg e' refs' cfg',
+
+  step e refs cfg e' refs' cfg' ->
+
+  step (New e) refs cfg (New e') refs' cfg'
+
+| New0 : forall b refs cfg x refs' cfg',
+
+  Var.Map.Empty refs ->
+  (x, refs', cfg') = Config.new b refs cfg ->
+
+  step (New (Bit b)) refs cfg
+        (QRef x) refs' cfg'
 
 (* Meas *)
-| MeasC : forall e cfg e' cfg',
-  (e, cfg) ~> (e',cfg') ->
-  (Meas e, cfg) ~> (Meas e', cfg')
-| MeasB : forall b x cfg cfg',
-  cfg' = Config.measure b x cfg ->
-  (Meas (QRef x), cfg) ~> (Bang (Bit b), cfg')
+| MeasC : forall e refs cfg e' refs' cfg',
+
+  step e refs cfg e' refs' cfg' ->
+
+  step (Meas e)  refs  cfg
+       (Meas e') refs' cfg'
+
+| MeasB : forall i b x refs cfg refs' cfg',
+  Var.Singleton x i refs ->
+  (refs', cfg') = Config.measure b x refs cfg ->
+
+  step (Meas (QRef x)) refs cfg (Bang (Bit b)) refs' cfg'
+
 
 (* Unitary *)
-| UnitaryC : forall u e cfg e' cfg',
-  (e, cfg) ~> (e', cfg') ->
-  (Unitary u e, cfg) ~> (Unitary u e', cfg')
-| UnitaryB1 : forall g q cfg cfg',
-  cfg' = Config.apply_gate g [q] cfg ->
-  (Unitary g (QRef q), cfg) ~> (QRef q, cfg')
-| UnitaryB2 : forall g q1 q2 cfg cfg',
-  cfg' = Config.apply_gate g [q1;q2] cfg ->
-  (Unitary g (Pair (QRef q1) (QRef q2)), cfg) ~> (Pair (QRef q1) (QRef q2), cfg')
+| UnitaryC : forall u e refs cfg e' refs' cfg',
 
-where "cfg1 '~>' cfg2" :=  (step cfg1 cfg2) : qoreo.
+  step e refs cfg e' refs' cfg' ->
+
+  step (Unitary u e) refs cfg
+       (Unitary u e') refs' cfg'
+
+| UnitaryB1 : forall i g q refs cfg cfg',
+  Var.Singleton q i refs ->
+  cfg' = Config.apply_gate g [q] refs cfg ->
+
+  step (Unitary g (QRef q)) refs cfg
+       (QRef q) refs cfg'
+
+| UnitaryB2 : forall i1 i2 g q1 q2 refs cfg cfg',
+  Var.Map.Equal refs (Var.Map.add q1 i1 (Var.Map.add q2 i2 (Var.Map.empty _))) ->
+  cfg' = Config.apply_gate g [q1;q2] refs cfg ->
+
+  step (Unitary g (Pair (QRef q1) (QRef q2))) refs cfg
+       (Pair (QRef q1) (QRef q2)) refs cfg'
+.
+
+Lemma wfrefs_val : forall refs v,
+  Val refs v ->
+  WFRefs refs v.
+Proof.
+  intros ? ? Hval.
+  induction Hval; econstructor; eauto.
+Qed.
+Hint Resolve wfrefs_val : qoreo_db.
+Hint Constructors WFRefs : qoreo_db.
+
+Lemma partition_empty_l : forall A m,
+  Var.MapFacts.Partition m (Var.Map.empty A) m.
+Admitted.
+Lemma partition_empty_r : forall A m,
+  Var.MapFacts.Partition m m (Var.Map.empty A).
+Admitted.
+Lemma singleton_singleton : forall A x (a : A),
+  Var.Singleton x a (Var.Map.add x a (Var.Map.empty _)).
+Admitted.
+
+Lemma partition_add_l : forall A x (a:A) m m1 m2,
+  Var.MapFacts.Partition m m1 m2 ->
+  Var.MapFacts.Partition (Var.Map.add x a m) (Var.Map.add x a m1) m2.
+Admitted.
+Lemma partition_add_r : forall A x (a:A) m m1 m2,
+  Var.MapFacts.Partition m m1 m2 ->
+  Var.MapFacts.Partition (Var.Map.add x a m) m1 (Var.Map.add x a m2).
+Admitted.
+Hint Resolve partition_empty_l partition_empty_r singleton_singleton : var_db.
+Hint Resolve Var.Map.empty_1 partition_add_l partition_add_r : var_db.
+Lemma wfrefs_step : forall e refs cfg e' refs' cfg',
+  step e refs cfg e' refs' cfg' ->
+  WFRefs refs e.
+Proof.
+  intros ? ? ? ? ? ? Hstep.
+  induction Hstep;
+    eauto with qoreo_db var_db.
+  * econstructor.
+    econstructor; eauto with qoreo_db var_db.
+    rewrite H.
+    auto with var_db.
+Qed.
+
+(* need to add the typing judgment to this to make sure it actually gets substituted correctly....... this lemma is not correct as stated 
+and then what about the bang substitution.... it should indeed be the case that there are no qrefs in bang...*)
+Lemma wfrefs_subst : forall refs1 refs2 refs x v1 e2,
+  Val refs1 v1 ->
+  WFRefs refs2 e2 ->
+  Var.MapFacts.Partition refs refs1 refs2 ->
+  WFRefs refs (subst x v1 e2).
+Admitted.
+
+
+Lemma empty_map_equal : forall {A} (m : Var.Map.t A),
+  Var.Map.Empty m -> Var.Map.Equal m (Var.Map.empty A).
+Proof.
+  intros A m Hempty k.
+  destruct (Var.Map.find k m) eqn:Hfind.
+  - apply Var.Map.find_2 in Hfind. exfalso. eapply Hempty; eauto.
+  - destruct (Var.Map.find k (Var.Map.empty A)) eqn:Hfind'.
+    + apply Var.Map.find_2 in Hfind'.
+      apply Var.MapFacts.F.empty_mapsto_iff in Hfind'. contradiction.
+    + reflexivity.
+Qed.
+
+Lemma partition_of_empty : forall {A} (Δ1 Δ2 : Var.Map.t A),
+  Var.MapFacts.Partition (Var.Map.empty A) Δ1 Δ2 ->
+  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
+Proof.
+  intros A Δ1 Δ2 [Hdisj Hiff].
+  split; intros k v Hmap.
+  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
+    { apply Hiff. left; auto. }
+    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
+  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
+    { apply Hiff. right; auto. }
+    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
+Qed.
+
+Lemma empty_partition_empty : forall {A} (Δ Δ1 Δ2 : Var.Map.t A),
+  Var.Map.Empty Δ ->
+  Var.MapFacts.Partition Δ Δ1 Δ2 ->
+  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
+Proof.
+  intros A Δ Δ1 Δ2 Hempty Hpart.
+  apply empty_map_equal in Hempty.
+  rewrite Hempty in Hpart.
+  apply partition_of_empty. auto.
+Qed.
+
+Lemma partition_empty : forall {A},
+  Var.MapFacts.Partition (Var.Map.empty A) (Var.Map.empty A) (Var.Map.empty A).
+Admitted.
+Lemma partition_empty1 : forall {A} (Δ1 Δ2 : Var.Map.t A),
+  Var.MapFacts.Partition (Var.Map.empty _) Δ1 Δ2 ->
+  Var.Map.Equal Δ1 (Var.Map.empty _).
+Admitted.
+Lemma partition_empty2 : forall {A} (Δ1 Δ2 : Var.Map.t A),
+  Var.MapFacts.Partition (Var.Map.empty _) Δ1 Δ2 ->
+  Var.Map.Equal Δ2 (Var.Map.empty _).
+Admitted.
+Ltac partition_empty :=
+  repeat match goal with
+  | [ H : Var.Map.Empty ?G |- _ ] =>
+    rewrite (empty_map_equal G H) in *;
+    clear H
+
+  | [ H : Var.MapFacts.Partition (Var.Map.empty _) ?D1 ?D2 |- _ ] =>
+    rewrite (partition_empty1 D1 D2 H) in *;
+    rewrite (partition_empty2 D1 D2 H) in *;
+    clear D1 D2 H
+  | [ |- Var.MapFacts.Partition (Var.Map.empty _) _ _ ] =>
+    apply Var.MapFacts.Partition_Empty
+  | [ |- Var.Map.Empty (Var.Map.empty _) ] =>
+    apply Var.Map.empty_1
+
+  end.
+
+Lemma wfrefs_step_r : forall e refs cfg e' refs' cfg',
+  step e refs cfg e' refs' cfg' ->
+  WFRefs refs' e'.
+Proof.
+  intros ? ? ? ? ? ? Hstep.
+  induction Hstep; subst; eauto with qoreo_db var_db.
+  * eapply wfrefs_subst; eauto.
+  * eapply wfrefs_subst; eauto.
+    constructor; auto.
+  * destruct b; auto.
+  * inversion H; subst; clear H.
+    eapply wfrefs_subst; eauto.
+    eapply wfrefs_subst; eauto.
+    admit (* true *) .
+    admit (* true *).
+  * eapply wfrefs_subst; eauto. admit (* symmetry *).
+  * eapply wfrefs_subst; eauto.
+    eapply wfrefs_subst; eauto.
+    { constructor; eauto. }
+    admit (* wrong? *).
+    admit (* symmetry *).
+  * unfold Config.new in *.
+    inversion H0; subst; clear H0.
+    econstructor.
+    unfold Var.Singleton.
+    assert (Var.Map.Equal refs (Var.Map.empty nat))
+      by (partition_empty; reflexivity).
+    admit (* not sure why this isn't going through *).
+    
+  * inversion H0; subst; clear H0.
+    constructor. constructor.
+    unfold Var.Singleton in *.
+    rewrite H.
+    autorewrite with var_db.
+    partition_empty.
+  * econstructor.
+    { econstructor. unfold Var.Singleton. reflexivity. }
+    { econstructor. unfold Var.Singleton. reflexivity. }
+    rewrite H. eauto with var_db.
+  Unshelve.
+  + apply Var.Map.empty.
+  + apply Var.Map.empty.
+  + exact 0%nat.
+Admitted. 
 
 Fixpoint qrefs (e : Expr.t) : Var.FSet.t :=
   match e with
@@ -237,13 +591,18 @@ Fixpoint qrefs (e : Expr.t) : Var.FSet.t :=
   | App e1 e2 => Var.FSet.union (qrefs e1) (qrefs e2)
   end.
 
-Inductive Scope : Var.FSet.t -> Expr.t -> Prop := .
-Inductive WTConfig : Var.FSet.t -> Config.t -> Prop := .
 
-Lemma scope_preservation :
-  Scope refs e ->
-  (e, cfg) ~> (e', cfg') ->
-  exists refs', Scope refs' e' /\ WTConfig refs' cfg'.
+
+
+Lemma scope_preservation : forall e refs cfg e' refs' cfg',
+  step e refs cfg e' refs' cfg' ->
+  WFRefs refs cfg e ->
+  WFRefs refs' cfg' e'.
+Proof.
+  intros ? ? ? ? ? ? Hstep.
+  induction Hstep; inversion 1; subst.
+  * econstructor; eauto.
+    apply IHHstep; auto. 
 
 
 (* WFConfig S e: the set of all QRefs in expression e is exactly S *)
@@ -675,70 +1034,6 @@ Proof.
     + apply IHHstep; auto.
   Qed.
 
-Lemma empty_map_equal : forall {A} (m : Var.Map.t A),
-  Var.Map.Empty m -> Var.Map.Equal m (Var.Map.empty A).
-Proof.
-  intros A m Hempty k.
-  destruct (Var.Map.find k m) eqn:Hfind.
-  - apply Var.Map.find_2 in Hfind. exfalso. eapply Hempty; eauto.
-  - destruct (Var.Map.find k (Var.Map.empty A)) eqn:Hfind'.
-    + apply Var.Map.find_2 in Hfind'.
-      apply Var.MapFacts.F.empty_mapsto_iff in Hfind'. contradiction.
-    + reflexivity.
-Qed.
-
-Lemma partition_of_empty : forall {A} (Δ1 Δ2 : Var.Map.t A),
-  Var.MapFacts.Partition (Var.Map.empty A) Δ1 Δ2 ->
-  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
-Proof.
-  intros A Δ1 Δ2 [Hdisj Hiff].
-  split; intros k v Hmap.
-  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
-    { apply Hiff. left; auto. }
-    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
-  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
-    { apply Hiff. right; auto. }
-    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
-Qed.
-
-Lemma empty_partition_empty : forall {A} (Δ Δ1 Δ2 : Var.Map.t A),
-  Var.Map.Empty Δ ->
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
-Proof.
-  intros A Δ Δ1 Δ2 Hempty Hpart.
-  apply empty_map_equal in Hempty.
-  rewrite Hempty in Hpart.
-  apply partition_of_empty. auto.
-Qed.
-
-Lemma partition_empty : forall {A},
-  Var.MapFacts.Partition (Var.Map.empty A) (Var.Map.empty A) (Var.Map.empty A).
-Admitted.
-Lemma partition_empty1 : forall {A} (Δ1 Δ2 : Var.Map.t A),
-  Var.MapFacts.Partition (Var.Map.empty _) Δ1 Δ2 ->
-  Var.Map.Equal Δ1 (Var.Map.empty _).
-Admitted.
-Lemma partition_empty2 : forall {A} (Δ1 Δ2 : Var.Map.t A),
-  Var.MapFacts.Partition (Var.Map.empty _) Δ1 Δ2 ->
-  Var.Map.Equal Δ2 (Var.Map.empty _).
-Admitted.
-Ltac partition_empty :=
-  repeat match goal with
-  | [ H : Var.Map.Empty ?G |- _ ] =>
-    rewrite (empty_map_equal G H) in *;
-    clear H
-
-  | [ H : Var.MapFacts.Partition (Var.Map.empty _) ?D1 ?D2 |- _ ] =>
-    rewrite (partition_empty1 D1 D2 H) in *;
-    rewrite (partition_empty2 D1 D2 H) in *;
-    clear D1 D2 H
-  | [ |- Var.MapFacts.Partition (Var.Map.empty _) _ _ ] =>
-    apply Var.MapFacts.Partition_Empty
-  | [ |- Var.Map.Empty (Var.Map.empty _) ] =>
-    apply Var.Map.empty_1
-
-  end.
 
 Theorem preservation : forall e cfg e' cfg',
   (e, cfg) ~> (e',cfg') ->
