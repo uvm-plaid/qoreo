@@ -27,7 +27,18 @@ Qoreo uses the OCaml/Rocq concept of modules to define data structures. The vari
 
 # Compiling to NetQASM
 
-The file `examples/Teleportation.v` contains a simple example choreography. To run endpoint projection on this choreography and compile the resulting processes to Python files using the NetQASM API, run:
+The `examples` directory includes:
+
+* `examples/MeasureSend.v` - Alice creates a qubit, applies `H`, measures it, and sends the resulting classical bit to Bob
+* `examples/Teleportation.v` - a more involved teleportation choreography
+
+To run endpoint projection on the simple measurement example and compile the resulting processes to Python files using the NetQASM API, run:
+
+```
+make generate-measure-send-py
+```
+
+For the teleportation example, run:
 
 ```
 make generate-teleportation-py

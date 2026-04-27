@@ -7,3 +7,4 @@ src/Network.v
 src/NetQasm.v
 examples/Notation.v
 examples/Teleportation.v
+examples/MeasureSend.v
