@@ -1,7 +1,6 @@
 From Stdlib Require Import FSets.FMapList FSets.FSetList FSets.FMapFacts OrderedType OrderedTypeEx.
 From QuantumLib Require Import Matrix Pad Quantum.
 From Qoreo Require Import Base.
-Import Base.Tactics.
 
 Open Scope qoreo.
 
@@ -357,45 +356,8 @@ Qed.
 Hint Resolve wfrefs_val : qoreo_db.
 Hint Constructors WFRefs : qoreo_db.
 *)
-
-Lemma partition_empty_l : forall A m,
-  Var.MapFacts.Partition m (Var.Map.empty A) m.
-Admitted.
-Lemma partition_empty_r : forall A m,
-  Var.MapFacts.Partition m m (Var.Map.empty A).
-Admitted.
-Lemma singleton_singleton : forall A x (a : A),
-  Var.Singleton x a (Var.Map.add x a (Var.Map.empty _)).
-Admitted.
-
-Lemma partition_add_l : forall A x (a:A) m m1 m2,
-  Var.MapFacts.Partition m m1 m2 ->
-  Var.MapFacts.Partition (Var.Map.add x a m) (Var.Map.add x a m1) m2.
-Admitted.
-Lemma partition_add_r : forall A x (a:A) m m1 m2,
-  Var.MapFacts.Partition m m1 m2 ->
-  Var.MapFacts.Partition (Var.Map.add x a m) m1 (Var.Map.add x a m2).
-Admitted.
-Hint Resolve partition_empty_l partition_empty_r singleton_singleton : var_db.
-Hint Resolve Var.Map.empty_1 partition_add_l partition_add_r : var_db.
-
-Ltac subst_map :=
-  repeat match goal with
-  | [ Heq : Var.Map.Equal ?m1 ?m2, H : context[?m1] |- _ ] =>
-    setoid_rewrite Heq in H;
-    try clear m1 Heq
-  | [ Heq : Var.Map.Equal ?m1 ?m2 |- context[?m1] ] =>
-    setoid_rewrite Heq;
-    try clear m1 Heq
-  end;
-  repeat match goal with
-  | [ Heq : Var.Map.Equal ?m1 ?m2, H : context[?m2] |- _ ] =>
-    setoid_rewrite <- Heq in H;
-    try clear m1 Heq
-  | [ Heq : Var.Map.Equal ?m1 ?m2 |- context[?m2] ] =>
-    setoid_rewrite <- Heq;
-    try clear m1 Heq
-  end.
+(*
+*)
 
 (*
 Lemma wfrefs_step : forall e refs cfg e' refs' cfg',
@@ -421,95 +383,13 @@ Lemma wfrefs_subst : forall refs1 refs2 refs x v1 e2,
 Admitted.
 *)
 
-Lemma empty_map_equal : forall {A} (m : Var.Map.t A),
-  Var.Map.Empty m -> Var.Map.Equal m (Var.Map.empty A).
-Proof.
-  intros A m Hempty k.
-  destruct (Var.Map.find k m) eqn:Hfind.
-  - apply Var.Map.find_2 in Hfind. exfalso. eapply Hempty; eauto.
-  - destruct (Var.Map.find k (Var.Map.empty A)) eqn:Hfind'.
-    + apply Var.Map.find_2 in Hfind'.
-      apply Var.MapFacts.F.empty_mapsto_iff in Hfind'. contradiction.
-    + reflexivity.
-Qed.
-
-Lemma partition_of_empty : forall {A} (Δ1 Δ2 : Var.Map.t A),
-  Var.MapFacts.Partition (Var.Map.empty A) Δ1 Δ2 ->
-  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
-Proof.
-  intros A Δ1 Δ2 [Hdisj Hiff].
-  split; intros k v Hmap.
-  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
-    { apply Hiff. left; auto. }
-    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
-  - assert (H : Var.Map.MapsTo k v (Var.Map.empty A)).
-    { apply Hiff. right; auto. }
-    apply Var.MapFacts.F.empty_mapsto_iff in H. exact H.
-Qed.
-
-Lemma empty_partition_empty : forall {A} (Δ Δ1 Δ2 : Var.Map.t A),
-  Var.Map.Empty Δ ->
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  Var.Map.Empty Δ1 /\ Var.Map.Empty Δ2.
-Proof.
-  intros A Δ Δ1 Δ2 Hempty Hpart.
-  apply empty_map_equal in Hempty.
-  rewrite Hempty in Hpart.
-  apply partition_of_empty. auto.
-Qed.
-
-Lemma partition_empty : forall {A},
-  Var.MapFacts.Partition (Var.Map.empty A) (Var.Map.empty A) (Var.Map.empty A).
-Admitted.
-Lemma partition_empty1 : forall {A} (Δ1 Δ2 : Var.Map.t A),
-  Var.MapFacts.Partition (Var.Map.empty _) Δ1 Δ2 ->
-  Var.Map.Equal Δ1 (Var.Map.empty _).
-Admitted.
-Lemma partition_empty2 : forall {A} (Δ1 Δ2 : Var.Map.t A),
-  Var.MapFacts.Partition (Var.Map.empty _) Δ1 Δ2 ->
-  Var.Map.Equal Δ2 (Var.Map.empty _).
-Admitted.
 
 
-Lemma partition_remove : forall {A} x0 (Δ Δ1 Δ2 : Var.Map.t A),
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  Var.MapFacts.Partition (Var.Map.remove x0 Δ) (Var.Map.remove x0 Δ1) (Var.Map.remove x0 Δ2).
-Proof.
-  intros A x0 Δ Δ1 Δ2 [Hdisj Hiff].
-  split.
-  - (* Disjoint (remove x0 Δ1) (remove x0 Δ2) *)
-    intros k [Hin1 Hin2].
-    autorewrite with var_db in *.
-    destruct Hin1 as [_ Hin1].
-    destruct Hin2 as [_ Hin2].
-    apply (Hdisj k); split; auto.
-  - (* forall k e, MapsTo k e (remove x0 Δ) <-> MapsTo k e (remove x0 Δ1) \/ MapsTo k e (remove x0 Δ2) *)
-    intros k e.
-    autorewrite with var_db in *.
-    firstorder.
-Qed.
 
 
-Lemma partition_map_iff : forall A B (f : A -> B) m m1 m2,
-  Var.MapFacts.Partition m m1 m2 <->
-  Var.MapFacts.Partition (Var.Map.map f m) (Var.Map.map f m1) (Var.Map.map f m2).
-Admitted.
-
-Hint Rewrite Var.remove_add_eq : var_db.
 
 
-Lemma var_remove_not_in : forall A x (m : Var.Map.t A),
-  ~ Var.Map.In x m ->
-  Var.Map.Equal
-    (Var.Map.remove x m)
-    m.
-Admitted.
 
-Lemma var_remove_map : forall A B x (f : A -> B) m,
-  Var.Map.Equal
-    (Var.Map.remove x (Var.Map.map f m))
-    (Var.Map.map f (Var.Map.remove x m)).
-Admitted.
 (*Hint Rewrite var_remove_map : var_db.*)
 
 
@@ -518,84 +398,9 @@ Admitted.
     Δ1=map _ refs1 /\ Δ2 = map _ refs2
   such that refs == refs1 + refs2
 *)
-Lemma partition_map : forall A B (f : A -> B) m n1 n2,
-  Var.MapFacts.Partition (Var.Map.map f m) n1 n2 ->
-  exists m1 m2,
-    Var.Map.Equal n1 (Var.Map.map f m1)
-    /\
-    Var.Map.Equal n2 (Var.Map.map f m2)
-    /\
-    Var.MapFacts.Partition m m1 m2.
-Admitted.
 
 
-Lemma empty_map_Empty : forall {A B} (f : A -> B) m,
-  Var.Map.Empty (Var.Map.map f m) <->
-  Var.Map.Empty m.
-Admitted.
-Lemma empty_map_empty : forall {A B} (f : A -> B),
-  Var.Map.Equal (Var.Map.map f (Var.Map.empty A)) (Var.Map.empty B).
-Admitted.
     
-Lemma partition_empty1_eq : forall A m m0,
-    Var.MapFacts.Partition m (Var.Map.empty A) m0 ->
-    Var.Map.Equal m m0.
-Admitted.
-Lemma partition_empty2_eq : forall A m m0,
-    Var.MapFacts.Partition m m0 (Var.Map.empty A) ->
-    Var.Map.Equal m m0.
-Admitted.
-Ltac map_simpl :=
-  repeat match goal with
-
-  (* Empty maps *)
-  | [ |- Var.Map.Empty (Var.Map.empty _) ] =>
-    apply Var.Map.empty_1
-  | [ H : Var.Map.Empty (Var.Map.map ?f ?m) |- _ ] =>
-    apply empty_map_Empty in H
-  | [ H : Var.Map.Empty ?G |- _ ] =>
-    apply empty_map_equal in H
-  | [ H : context[Var.Map.map ?f (Var.Map.empty _)] |- _ ] =>
-    setoid_rewrite empty_map_empty in H
-  | [ |- context[Var.Map.map ?f (Var.Map.empty _)] ] =>
-    setoid_rewrite empty_map_empty
-
-  (* Partitions with the empty map *)
-  | [ H : Var.MapFacts.Partition (Var.Map.empty _) ?D1 ?D2 |- _ ] =>
-    let H1 := fresh "H1" in
-    set (H1 := partition_empty1 D1 D2 H);
-    set (H2 := partition_empty2 D1 D2 H);
-    subst_map;
-    clear D1 D2 H
-  
-  | [ H : Var.MapFacts.Partition ?m (Var.Map.empty _) ?m0 |- _ ] =>
-    apply partition_empty1_eq in H
-  | [ H : Var.MapFacts.Partition ?m ?m0 (Var.Map.empty _) |- _ ] =>
-    apply partition_empty2_eq in H
-
-  (* Partitions with remove*)
-  | [ |- Var.MapFacts.Partition (Var.Map.remove ?x _) (Var.Map.remove ?x _) (Var.Map.remove ?x _) ] =>
-    apply partition_remove
-
-  (* Partitions with map *)
-  | [ |- Var.MapFacts.Partition (Var.Map.map ?f _) (Var.Map.map ?f _) (Var.Map.map ?f _) ] =>
-    apply partition_map_iff
-  | [ H : Var.MapFacts.Partition (Var.Map.map ?f _) (Var.Map.map ?f _) (Var.Map.map ?f _) |- _ ] =>
-    apply partition_map_iff in H
-
-  | [H : Var.MapFacts.Partition (Var.Map.map ?f ?m) ?n1 ?n2 |- _] =>
-    let m1 := fresh "m1" in
-    let m2 := fresh "m2" in
-    let Heq1 := fresh "Heq1" in
-    let Heq2 := fresh "Heq2" in
-    destruct (partition_map _ _ _ _ _ _ H)
-      as [m1 [m2 [Heq1 [Heq2 Hpart]]]]; auto;
-     subst_map; try rewrite Heq1, Heq2 in *; try clear n1 Heq1 n2 Heq2
-
-
-  | [ H : Var.Map.Equal _ _ |- _ ] => subst_map
-
-  end.
 
 (*
 Lemma wfrefs_step_r : forall e refs cfg e' refs' cfg',
@@ -909,9 +714,6 @@ Proof.
       try rewrite <- HΓ;
       try reflexivity;
       auto; fail).
-  * apply WTQVar.
-    unfold Var.Singleton in *.
-    rewrite <- HΔ; auto.
 Qed.
     
 
@@ -924,6 +726,8 @@ Proof.
   * rewrite HΓ; reflexivity.
   * rewrite HΔ; reflexivity. 
 Qed.
+
+#[global] Hint Rewrite Var.MapFacts.F.add_mapsto_iff : var_db.
 
 Lemma weakening_gen : forall Γ Δ e τ,
   WellTyped Γ Δ e τ ->
@@ -959,6 +763,8 @@ Qed.
 (* Type safety *)
 (***************)
 
+#[global] Hint Rewrite Var.MapFacts.F.empty_mapsto_iff : var_db.
+
 Lemma weakening : forall Γ Δ e τ,
   WellTyped (Var.Map.empty _) Δ e τ ->
   WellTyped Γ Δ e τ.
@@ -972,19 +778,6 @@ Proof.
 Qed.
 
 
-(* If Δ(x0)=τ0 and Δ==Δ1,Δ2 and x ∉ Δ2 then Δ1(x0)=τ0 *)
-Lemma partition_not_in_r : forall Δ Δ2 Δ1 x (τ : typ),
-  Var.Map.MapsTo x τ Δ ->
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  ~ (Var.Map.In x Δ2) ->
-  Var.Map.MapsTo x τ Δ1.
-Proof.
-  intros ? ? ? x τ Hx [Hdisjoint Hmapsto] Hnotin.
-  apply Hmapsto in Hx.
-  destruct Hx; auto.
-  * contradict Hnotin.
-    exists τ; auto.
-Qed.
 
 Lemma wt_subst_bang : forall τ Γ Δ x v e τ',
   Val v ->
@@ -1003,13 +796,6 @@ Lemma wt_subst : forall Δ1 Δ2 τ Γ Δ' x v e τ',
 Proof.
 Admitted. 
 
-
-Lemma fset_in_union : forall x X1 X2,
-  Var.FSet.In x (Var.FSet.union X1 X2)
-  <->
-  Var.FSet.In x X1 \/ Var.FSet.In x X2.
-Admitted.
-Hint Rewrite fset_in_union : var_db.
 
 Lemma step_weakening : forall e refs ρ e' refs' ρ',
   
@@ -1037,91 +823,7 @@ Ltac step_weakening_tac :=
       edestruct (step_weakening _ _ _ _ _ _ Hstep) as [refs1 [Hstep1 Hpart1]]; eauto
   end.
 
-Hint Rewrite Var.MapFacts.F.add_in_iff : var_db.
 
-
-Lemma partition_concat : forall {A} (m m1 m2 : Var.Map.t A),
-  Var.MapFacts.Partition m m1 m2 <->
-  Var.MapFacts.Disjoint m1 m2 /\ Var.Map.Equal m (Var.concat m1 m2).
-Admitted.
-Lemma concat_assoc : forall {A} (m1 m2 m3 : Var.Map.t A),
-  Var.Map.Equal (Var.concat m1 (Var.concat m2 m3)) (Var.concat (Var.concat m1 m2) m3).
-Admitted.
-
-Lemma map_concat : forall {A B} (f : A -> B) m1 m2,
-  Var.Map.Equal (Var.Map.map f (Var.concat m1 m2))
-                (Var.concat (Var.Map.map f m1) (Var.Map.map f m2)).
-Admitted.
-
-
-Global Instance concatProper : forall A, Proper (@Var.Map.Equal A ==> @Var.Map.Equal A ==> @Var.Map.Equal A) (@Var.concat A).
-Admitted.
-
-
-
-
-Lemma concat_sym : forall {A} (m1 m2 : Var.Map.t A),
-  Var.MapFacts.Disjoint m1 m2 ->
-  Var.Map.Equal (Var.concat m1 m2) (Var.concat m2 m1).
-Admitted.
-
-Lemma concat_disjoint : forall {A} (m1 m2 m3 : Var.Map.t A),
-  Var.MapFacts.Disjoint m1 (Var.concat m2 m3) <->
-  Var.MapFacts.Disjoint m1 m2 /\ Var.MapFacts.Disjoint m1 m3.
-Admitted.
-Lemma disjoint_sym : forall {A} (m1 m2 : Var.Map.t A),
-  Var.MapFacts.Disjoint m1 m2 ->
-  Var.MapFacts.Disjoint m2 m1.
-Admitted.
-Lemma disjoint_map : forall {A B} (f : A -> B) m1 m2,
-  Var.MapFacts.Disjoint m1 m2 <->
-  Var.MapFacts.Disjoint (Var.Map.map f m1) (Var.Map.map f m2).
-Admitted.
-
-
-Ltac reflect_partition :=
-  repeat match goal with
-        | [ H : Var.MapFacts.Partition ?m ?m1 ?m2 |- _ ] =>
-          apply partition_concat in H;
-          let Hdisj := fresh "Hdisj" in
-          let Heq := fresh "Heq" in
-          destruct H as [Hdisj Heq];
-          subst_map
-        | [ H : context[Var.Map.map _ (Var.concat _ _)] |- _] =>
-          rewrite map_concat in H
-        | [ |- context[Var.Map.map _ (Var.concat _ _)] ] =>
-          rewrite map_concat
-  end.
-  Ltac reduce_disjoint :=
-  repeat match goal with
-        | [ H : Var.MapFacts.Disjoint ?m1 ?m2 |- Var.MapFacts.Disjoint ?m2 ?m1 ] =>
-          apply disjoint_sym; exact H
-        | [ |- Var.MapFacts.Disjoint _ (Var.concat _ _)] =>
-          apply concat_disjoint; split
-        | [ |- Var.MapFacts.Disjoint _ (Var.concat _ _)] =>
-          apply disjoint_sym; apply concat_disjoint; split; apply disjoint_sym
-        | [ H : Var.MapFacts.Disjoint _ (Var.concat _ _) |- _ ] =>
-          apply concat_disjoint in H;
-          destruct H
-        | [ H : Var.MapFacts.Disjoint (Var.concat _ _) _ |- _ ] =>
-          apply disjoint_sym in H;
-          apply concat_disjoint in H;
-          let H1 := fresh "Hdisj" in
-          let H2 := fresh "Hdisj" in
-          destruct H as [H1 H2];
-          apply disjoint_sym in H1;
-          apply disjoint_sym in H2
-  end.
-
-Lemma singleton_remove : forall {A} (a : A) x m,
-  Var.Singleton x a m ->
-  Var.Map.Empty (Var.Map.remove x m).
-Admitted.
-
-Lemma map_add : forall {A B} (f : A -> B) x a m,
-  Var.Map.Equal (Var.Map.map f (Var.Map.add x a m))
-                (Var.Map.add x (f a) (Var.Map.map f m)).
-Admitted.
 
 Lemma well_typed_qubit : forall {A} (refs : Var.Map.t A) q τ,
   WellTyped (Var.Map.empty typ) (Var.Map.map (fun _ => QUBIT) refs) (Var q) τ ->
@@ -1129,13 +831,10 @@ Lemma well_typed_qubit : forall {A} (refs : Var.Map.t A) q τ,
 Proof.
     intros ? ? ? ? HWT.
     inversion HWT; subst; clear HWT.
-    2:{ apply Var.MapFacts.F.empty_mapsto_iff in H3. contradiction. }
+    2:{ autorewrite with var_db in *. contradiction. }
     unfold Var.Singleton in *.
     specialize (H2 q).
-    rewrite Var.MapFacts.F.add_eq_o in H2; auto.
-    Search Var.Map.find Var.Map.map.
-    rewrite Var.MapFacts.F.map_o in H2.
-    unfold option_map in H2.
+    autorewrite with var_db in *.
     destruct (Var.Map.find q refs); inversion H2; auto.
 Qed.
 
