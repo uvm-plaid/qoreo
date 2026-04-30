@@ -429,7 +429,7 @@ Proof.
     econstructor.
     unfold Var.Singleton.
     assert (Var.Map.Equal refs (Var.Map.empty nat))
-      by (map_simpl; reflexivity).
+      by (Var.Tactics.vsimpl; reflexivity).
     admit (* not sure why this isn't going through *).
     
   * inversion H0; subst; clear H0.
@@ -437,7 +437,7 @@ Proof.
     unfold Var.Singleton in *.
     rewrite H.
     autorewrite with var_db.
-    map_simpl.
+    Var.Tactics.vsimpl.
   * econstructor.
     { econstructor. unfold Var.Singleton. reflexivity. }
     { econstructor. unfold Var.Singleton. reflexivity. }
@@ -794,6 +794,20 @@ Lemma wt_subst : forall Δ1 Δ2 τ Γ Δ' x v e τ',
   Var.MapFacts.Partition Δ' Δ1 Δ2 ->
   WellTyped Γ Δ' (subst x v e) τ'.
 Proof.
+Admitted.
+
+Lemma wt_subst2 : forall Δ1 Δ2 τ1 τ2 Γ Δ Δ' x1 v1 x2 v2 e τ',
+  Val v1 ->
+  Val v2 ->
+  WellTyped Γ Δ1 v1 τ1 ->
+  WellTyped Γ Δ2 v2 τ2 ->
+  WellTyped Γ (Var.Map.add x1 τ1 (Var.Map.add x2 τ2 Δ')) e τ' ->
+  Var.MapFacts.Disjoint Δ1 Δ2 ->
+  Var.MapFacts.Partition Δ (Var.concat Δ1 Δ2) Δ' ->
+  ~ Var.Map.In x1 Δ' ->
+  ~ Var.Map.In x2 Δ' ->
+  WellTyped Γ Δ (subst x2 v2 (subst x1 v1 e)) τ'.
+Proof.
 Admitted. 
 
 
@@ -838,6 +852,9 @@ Proof.
     destruct (Var.Map.find q refs); inversion H2; auto.
 Qed.
 
+#[global] Hint Resolve Var.Map.empty_1 : var_db.
+#[global] Hint Rewrite Var.MapFacts.F.map_in_iff : var_db.
+
 Lemma preservation : forall Γ Δ e τ,
   WellTyped Γ Δ e τ ->
 
@@ -857,7 +874,7 @@ Proof.
     try (rewrite HΔ' in *; clear Δ' HΔ');
     try (inversion Hstep; auto; fail).
   *
-    repeat map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + (* e1 -> e1' *) 
 
@@ -868,15 +885,15 @@ Proof.
       (* So by the IH, Γ;refs1' |- e1' : τ *)
       eapply (IHHWT1) in Hstep1; eauto with var_db;
         try reflexivity.
-      econstructor; eauto with var_db.
-      map_simpl; auto.
+      econstructor; eauto with var_db. 
+      Var.Tactics.vsimpl; auto.
 
     + eapply wt_subst; eauto;
       autorewrite with var_db; auto.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
   * (* Let!*)
-    repeat map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + (* e1 -> e1' *) 
 
@@ -885,56 +902,54 @@ Proof.
       step_weakening_tac.
 
       (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply (IHHWT1) in Hstep1; eauto;
-        try map_simpl;
+      eapply IHHWT1 in Hstep1; eauto with var_db;
+        try Var.Tactics.vsimpl;
         try reflexivity.
       econstructor; eauto.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
     + inversion HWT1; subst.
-      
-      assert (Var.Map.Empty m1)
-        by (eapply empty_map_Empty; eauto).
-      map_simpl.
+      Var.Tactics.vsimpl.
+      autorewrite with var_db in *.
 
       eapply wt_subst_bang; eauto.
       { constructor. }
 
   * (* If *) 
-    map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + (* e -> e1' *)
       step_weakening_tac.
-      eapply (IHHWT1) in Hstep1; eauto;
-        map_simpl;
+      eapply (IHHWT1) in Hstep1; eauto with var_db;
+        Var.Tactics.vsimpl;
         try reflexivity.
       econstructor; eauto.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
     + inversion HWT1; subst.
-      map_simpl.
+      Var.Tactics.vsimpl.
       destruct b; auto.
   * (* Pair *)
-    map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + step_weakening_tac.
-      eapply (IHHWT1) in Hstep1; eauto;
-        map_simpl;
+      eapply (IHHWT1) in Hstep1; eauto with var_db;
+        Var.Tactics.vsimpl;
         try reflexivity.
       econstructor; eauto.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
     + apply Var.MapFacts.Partition_sym in Hpart.
       step_weakening_tac.
       apply Var.MapFacts.Partition_sym in Hpart1.
-      eapply (IHHWT2) in Hstep1; eauto;
-        map_simpl;
+      eapply (IHHWT2) in Hstep1; eauto with var_db;
+        Var.Tactics.vsimpl;
         try reflexivity.
       econstructor; eauto.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
   * (* LetPair *) 
-    map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + (* e1 -> e1' *) 
 
@@ -945,115 +960,106 @@ Proof.
       (* So by the IH, Γ;refs1' |- e1' : τ *)
       eapply (IHHWT1) in Hstep1; eauto with var_db;
         try reflexivity.
-      econstructor; eauto with var_db.
-      map_simpl; auto.
+      
+      clear H (*duplicate*). clear H12 (* unnecessary *).
+
+      econstructor; eauto; autorewrite with var_db.
+      { Var.Tactics.vsimpl; auto. }
 
     + inversion HWT1; subst; clear HWT1.
-      inversion H12; subst.
-      apply (partition_map_iff _ _ (fun _ => QUBIT)) in Hpart.
-      reflect_partition.
-      rewrite Heq in Hdisj0.
-      reduce_disjoint.
-      eapply wt_subst; eauto.
-      2:{
-        apply partition_concat.
-        rewrite Heq.
-        rewrite (concat_sym Δ1 Δ2); auto.
-        rewrite <- (concat_assoc Δ2 Δ1).
-        split; try reflexivity.
-
-        reduce_disjoint; auto.
-      }
-      eapply wt_subst; eauto.
+      inversion H12; subst; clear H12.
+      Var.Tactics.reflect_partition; auto.
+      eapply wt_subst2; eauto.
       {
-        apply partition_add_r.
-        apply partition_concat.
-        split; auto; try reflexivity.
+        Var.Tactics.reflect_partition; auto.
+        ** eapply Var.Tactics.disjoint_map in Hdisj0.
+           rewrite Heq in Hdisj0.
+           auto.
+        ** rewrite Heq; reflexivity.
       }
 
   * (* Meas *)
-    map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + (* e1 -> e1' *) 
 
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac.
-      { apply partition_empty_r. }
+      { apply Var.Tactics.partition_empty_r. }
 
       (* So by the IH, Γ;refs1' |- e1' : τ *)
       eapply (IHHWT) in Hstep1; eauto with var_db;
         try reflexivity.
       econstructor; eauto with var_db.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
     + econstructor; eauto.
 
         inversion H1; subst; clear H1.
-        apply empty_map_Empty.
-        eapply singleton_remove; eauto.
+        Var.Tactics.vsimpl.
+        eapply Var.Tactics.singleton_remove; eauto.
 
   * (* New *)
-    map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + (* e1 -> e1' *) 
 
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac.
-      { apply partition_empty_r. }
+      { apply Var.Tactics.partition_empty_r. }
 
       (* So by the IH, Γ;refs1' |- e1' : τ *)
       eapply (IHHWT) in Hstep1; eauto with var_db;
         try reflexivity.
       econstructor; eauto with var_db.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
     + econstructor; eauto.
       inversion H0; subst; clear H0.
       inversion HWT; subst; clear HWT.
       unfold Var.Singleton.
-      rewrite map_add.
+      autorewrite with var_db.
 
-      map_simpl.
+      Var.Tactics.vsimpl.
       apply Var.MapFacts.F.add_m_Proper; auto.
-      rewrite H2. map_simpl. reflexivity.
+      rewrite H2. autorewrite with var_db. reflexivity.
 
   * (* Unitary *)
-    map_simpl.
+    Var.Tactics.vsimpl.
     inversion Hstep; subst; clear Hstep.
     + (* e1 -> e1' *) 
 
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac.
-      { apply partition_empty_r. }
+      { apply Var.Tactics.partition_empty_r. }
 
       (* So by the IH, Γ;refs1' |- e1' : τ *)
       eapply (IHHWT) in Hstep1; eauto with var_db;
         try reflexivity.
       econstructor; eauto with var_db.
-      map_simpl; auto.
+      Var.Tactics.vsimpl; auto.
 
     + econstructor; eauto.
       unfold Var.Singleton in *.
-      subst_map.
+      Var.Tactics.subst_map.
 
       replace (type_of_unitary U) with QUBIT in * by
         (symmetry; eapply well_typed_qubit; eauto).
-      rewrite map_add.
-      rewrite empty_map_empty.
+      autorewrite with var_db.
       reflexivity.
 
     + inversion HWT; subst; auto.
-      map_simpl.
+      Var.Tactics.vsimpl.
       replace τ1 with QUBIT in * by
         (symmetry; eapply well_typed_qubit; eauto).
       replace τ2 with QUBIT in * by
         (symmetry; eapply well_typed_qubit; eauto).
       econstructor; eauto.
       {
-        map_simpl; auto.
+        Var.Tactics.vsimpl; auto.
       }
 Qed.
 
@@ -1073,11 +1079,11 @@ Proof.
   induction Hwt; intros cfg Hscoped HΓ HΔ Hwf.
   * contradict H.
     unfold Var.Singleton.
-    map_simpl.
+    Var.Tactics.vsimpl.
     admit (* lemma *).
-  * exfalso. map_simpl.
+  * exfalso. Var.Tactics.vsimpl.
     autorewrite with var_db in *; auto.
-  * map_simpl.
+  * Var.Tactics.vsimpl.
     unfold WellFormed in 
   
   exfalso.

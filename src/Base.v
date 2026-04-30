@@ -288,7 +288,7 @@ Module Tactics.
     rewrite MapFacts.F.empty_o.
     reflexivity.
   Qed.
-  Hint Rewrite @empty_map_empty : var_db.
+  #[global] Hint Rewrite @empty_map_empty : var_db.
 
 
   Lemma singleton_remove : forall {A} (a : A) x m,
@@ -413,6 +413,12 @@ Module Tactics.
   repeat match goal with
         | [ H : Var.MapFacts.Disjoint ?m1 ?m2 |- Var.MapFacts.Disjoint ?m2 ?m1 ] =>
           apply disjoint_sym; exact H
+
+        | [ |- Var.MapFacts.Disjoint (Var.Map.map _ _) (Var.Map.map _ _)] =>
+          apply disjoint_map
+        | [ H : Var.MapFacts.Disjoint (Var.Map.map _ _) (Var.Map.map _ _) |- _] =>
+          apply disjoint_map in H
+
         | [ |- Var.MapFacts.Disjoint _ (Var.concat _ _)] =>
           apply concat_disjoint; split
         | [ |- Var.MapFacts.Disjoint _ (Var.concat _ _)] =>
