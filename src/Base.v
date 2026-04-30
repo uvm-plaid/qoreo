@@ -20,8 +20,6 @@ Module Var.
   Module MapFacts := FMapFacts.Properties(Map).
   Module FSet := FSets.FSetList.Make(V).
 
-  #[export] Existing Instance MapFacts.F.EqualSetoid.
-
   Definition domain {A} (m : Map.t A) : FSet.t :=
     let f := fun x _ s => FSet.add x s in
     Map.fold f m FSet.empty.
@@ -37,19 +35,20 @@ Module Var.
   Definition concat {A} (m1 m2 : Map.t A) : Map.t A :=
   Map.fold (fun k v acc => Map.add k v acc) m1 m2.
 
-Module Tactics.
+Module Proofs.
 
-  (**
-    Provides:
-      * compare x y     - destructs eq_dec x y (or Map.E.eq_dec x y) and substitutes
-      * reduce_eq_dec   - applies compare to goals/hypotheses containing eq_dec or Map.E.eq_dec
-      * subst_map       - eliminates hypotheses of the form Map.Equal m1 m2 by rewriting
-      * simpl_Empty     - simplifies Map.Empty goals/hypotheses; reduces map-of-empty and substitutes
-      * reduce_disjoint - simplifies Disjoint goals/hypotheses using symmetry and concat lemmas
-      * reflect_partition - converts Partition hypotheses into Disjoint + Map.Equal (concat) form
-      * reduce_partition - simplifies Partition hypotheses
-      * vsimpl - combines the above tactics
-  *)
+  (* Create a rewrite database of MapFacts *)
+  #[global] Existing Instance MapFacts.F.EqualSetoid.
+  #[global] Hint Rewrite MapFacts.F.add_mapsto_iff : var_db.
+  #[global] Hint Rewrite MapFacts.F.empty_mapsto_iff : var_db.
+  #[global] Hint Rewrite MapFacts.F.add_in_iff : var_db.
+  #[global] Hint Rewrite MapFacts.F.map_o : var_db.
+  #[global] Hint Rewrite MapFacts.F.remove_o : var_db.
+  #[global] Hint Rewrite MapFacts.F.add_o : var_db.
+  #[global] Hint Rewrite MapFacts.F.empty_o : var_db.
+  #[global] Hint Rewrite Var.MapFacts.F.map_in_iff : var_db.
+
+  #[global] Hint Resolve Var.Map.empty_1 : var_db.
 
   #[global] Instance singletonProper : forall A,
     Proper (@eq t ==> @eq A ==> @Map.Equal A ==> iff) (@Singleton A).
@@ -96,8 +95,6 @@ Module Tactics.
     destruct (Map.find z m2); auto.
   Qed.
 
-  #[global] Hint Rewrite MapFacts.F.add_in_iff : var_db.
-
   Lemma concat_in : forall A x (m1 m2 : Map.t A),
     Map.In x (concat m1 m2) <-> Map.In x m1 \/ Map.In x m2.
   Proof.
@@ -111,8 +108,6 @@ Module Tactics.
   Qed.
   #[global] Hint Rewrite concat_in : var_db.
 
-
-  #[global] Hint Rewrite MapFacts.F.map_o : var_db.
   Lemma map_concat : forall {A B} (f : A -> B) m1 m2,
     Var.Map.Equal (Var.Map.map f (Var.concat m1 m2))
                   (Var.concat (Var.Map.map f m1) (Var.Map.map f m2)).
@@ -171,8 +166,6 @@ Module Tactics.
 
   (** Lemmas about remove *)
 
-  #[global] Hint Rewrite MapFacts.F.remove_o : var_db.
-
   Lemma var_remove_not_in : forall A x (m : Var.Map.t A),
     ~ Var.Map.In x m ->
     Var.Map.Equal
@@ -203,7 +196,6 @@ Module Tactics.
   #[global] Hint Rewrite var_remove_map : var_db.
 
 
-    #[global] Hint Rewrite MapFacts.F.add_o : var_db.
 
 
   Ltac compare x y :=
@@ -266,6 +258,7 @@ Module Tactics.
         apply Var.MapFacts.F.empty_mapsto_iff in Hfind'. contradiction.
       + reflexivity.
   Qed.
+  #[global] Hint Resolve @empty_map_equal : var_db.
 
   Lemma empty_map_Empty : forall {A B} (f : A -> B) m,
     Var.Map.Empty (Var.Map.map f m) <->
@@ -301,6 +294,7 @@ Module Tactics.
     autorewrite with var_db.
     apply Map.empty_1.
   Qed.
+  #[global] Hint Resolve @singleton_remove : var_db.
 
   Ltac subst_map :=
     repeat match goal with
@@ -378,7 +372,6 @@ Module Tactics.
       apply MapFacts.F.map_in_iff in Hin2.
       exact (H k (conj Hin1 Hin2)).
   Qed.
-  Search Var.MapFacts.Disjoint Map.Empty.
 
   Lemma disjoint_empty_1 : forall A m,
     Var.MapFacts.Disjoint (Var.Map.empty A) m.
@@ -394,6 +387,7 @@ Module Tactics.
     rewrite MapFacts.F.empty_in_iff.
     intros [? ?]; contradiction.
   Qed.
+  #[global] Hint Resolve disjoint_empty_1 disjoint_empty_2 : var_db.
 
   Lemma disjoint_remove_1 : forall {A} (m1 m2 : Map.t A) x,
     MapFacts.Disjoint m1 m2 ->
@@ -541,7 +535,6 @@ Module Tactics.
         exists τ; auto.
     Qed.
 
-    #[global] Hint Rewrite MapFacts.F.empty_o : var_db.
 
     Lemma partition_empty_l : forall A m,
       Var.MapFacts.Partition m (Var.Map.empty A) m.
@@ -694,8 +687,33 @@ Module Tactics.
     | [ H : Map.Equal _ _ |- _ ] => subst_map
     end.
 
-End Tactics.
+  End Proofs.
 
+
+Module Tactics.
+  (**
+    Provides:
+      * compare x y       - destructs eq_dec x y (or Map.E.eq_dec x y) and substitutes
+      * reduce_eq_dec     - applies compare to goals/hypotheses containing eq_dec or Map.E.eq_dec
+      * subst_map         - eliminates hypotheses of the form Map.Equal m1 m2 by rewriting
+      * reflect_partition - converts Partition hypotheses into Disjoint + Map.Equal (concat) form
+      * vsimpl            - simplifies hypotheses and goals that use maps
+
+    vsimpl builds on the following tactics in Proofs:
+      * simpl_Empty       - simplifies Map.Empty goals/hypotheses and substitutes
+      * reduce_disjoint   - simplifies Disjoint goals/hypotheses using symmetry and concat lemmas
+      * reduce_partition  - simplifies Partition hypotheses
+
+    In addition, there is are rewrite and auto databases for simplifying goals:
+      * autorewrite with var_db [in H]
+      * auto/eauto with var_db
+  *)
+  Ltac compare x y := Proofs.compare x y.
+  Ltac reduce_eq_dec := Proofs.reduce_eq_dec.
+  Ltac subst_map := Proofs.subst_map.
+  Ltac reflect_partition := Proofs.reflect_partition.
+  Ltac vsimpl := Proofs.vsimpl.
+End Tactics.
 
 End Var.
 
