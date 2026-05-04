@@ -50,9 +50,29 @@ Module Insn.
       | LetBang B y e => [(B,y)]
       | LetPair B y1 y2 e => [(B,y1);(B,y2)]
     end.
-           
-    Definition bind_eqb  (Ax : bindt) (By: bindt) : bool :=
-      if Actor.eq_dec (fst Ax) (fst By) then if Var.eq_dec (snd Ax) (snd By) then true else false else false.
+
+    Definition bind_eq  (Ax : bindt) (By: bindt) : Prop :=
+      (fst Ax) = (fst By) /\ (snd Ax) = (snd By).
+
+    Lemma nbeq : forall Ax By,
+        ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) ->
+        ~(bind_eq Ax By).
+    Proof.
+      intros Ax By HOR.
+      unfold bind_eq.
+      tauto.
+    Qed.
+    
+    Definition bind_eq_dec  (Ax : bindt) (By: bindt) : {bind_eq Ax By} + {~(bind_eq Ax By)} :=
+      match ((Actor.eq_dec (fst Ax) (fst By)), (Var.eq_dec (snd Ax) (snd By))) with
+      | (left pt1, left pt2) => left (conj pt1 pt2)
+      | (right pt1, _) => right (nbeq Ax By (or_introl pt1))
+      | (_, right pt2) => right (nbeq Ax By (or_intror pt2))
+      end.
+    
+    Definition bind_eqb (Ax : bindt) (By: bindt) : bool :=
+      if (bind_eq_dec Ax By) then true else false.
+        (* why not bool_of_sumbool (bind_eq_dec Ax By) ?*)
 
     Definition rebound_in (A : Actor.t) (x : Var.t) (I : t) : bool :=
       match I with
