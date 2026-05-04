@@ -55,9 +55,7 @@ Module Insn.
 
     Lemma nbeq : forall Ax By, ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) -> ~(bind_eq Ax By).
     Proof.
-      intros Ax By HOR.
-      unfold bind_eq.
-      tauto.
+      intros Ax By HOR. unfold bind_eq. tauto.
     Qed.
     
     Definition bind_eq_dec  (Ax : bindt) (By: bindt) : {bind_eq Ax By} + {~(bind_eq Ax By)} :=
@@ -68,8 +66,9 @@ Module Insn.
       end.
     
     Definition bind_eqb (Ax : bindt) (By: bindt) : bool :=
-      if (bind_eq_dec Ax By) then true else false.
-        (* why not bool_of_sumbool (bind_eq_dec Ax By) ?*)
+      match (bool_of_sumbool (bind_eq_dec Ax By)) with
+      | exist _ x _ => x
+      end.
 
     Definition rebound_in (A : Actor.t) (x : Var.t) (I : t) : bool :=
       match I with
