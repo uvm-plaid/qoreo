@@ -51,8 +51,7 @@ Module Insn.
       | LetPair B y1 y2 e => [(B,y1);(B,y2)]
     end.
 
-    Definition bind_eq  (Ax : bindt) (By: bindt) : Prop :=
-      (fst Ax) = (fst By) /\ (snd Ax) = (snd By).
+    Definition bind_eq  (Ax : bindt) (By: bindt) : Prop := (fst Ax) = (fst By) /\ (snd Ax) = (snd By).
 
     Lemma nbeq : forall Ax By,
         ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) ->
