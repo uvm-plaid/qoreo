@@ -21,7 +21,7 @@ Module Insn.
         end.
 
     
-(* substitute the value v for A.x in I *)
+    (* substitute the value v for A.x in I *)
     Definition subst (A : Actor.t) (x : Var.t) (v : Expr.t)  (I : t) : t :=
     match I with
     | Send B1 e B2 y => 
