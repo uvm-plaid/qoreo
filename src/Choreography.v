@@ -55,7 +55,7 @@ Module Insn.
 
     Lemma nbeq : forall Ax By, ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) -> ~(bind_eq Ax By).
     Proof.
-      intros Ax By HOR. unfold bind_eq. tauto.
+      intros. unfold bind_eq. tauto.
     Qed.
     
     Definition bind_eq_dec  (Ax : bindt) (By: bindt) : {bind_eq Ax By} + {~(bind_eq Ax By)} :=
