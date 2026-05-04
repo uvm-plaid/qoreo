@@ -53,9 +53,7 @@ Module Insn.
 
     Definition bind_eq  (Ax : bindt) (By: bindt) : Prop := (fst Ax) = (fst By) /\ (snd Ax) = (snd By).
 
-    Lemma nbeq : forall Ax By,
-        ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) ->
-        ~(bind_eq Ax By).
+    Lemma nbeq : forall Ax By, ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) -> ~(bind_eq Ax By).
     Proof.
       intros Ax By HOR.
       unfold bind_eq.
