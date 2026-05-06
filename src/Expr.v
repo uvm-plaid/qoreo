@@ -803,7 +803,7 @@ Lemma wt_subst_bang : forall τ Γ Δ Θ x v e τ',
 Proof.
 Admitted.
 
-Lemma wt_subst : forall Θ1 Θ2 τ Γ Δ Θ x v e τ',
+Lemma wt_subst : forall e Θ1 Θ2 τ Γ Δ Θ x v τ',
   Val v ->
   WellTyped Γ (Var.Map.empty _) Θ1 v τ ->
   WellTyped Γ (Var.Map.add x τ Δ) Θ2 e τ' ->
@@ -812,6 +812,18 @@ Lemma wt_subst : forall Θ1 Θ2 τ Γ Δ Θ x v e τ',
 
   WellTyped Γ Δ Θ (subst x v e) τ'.
 Proof.
+  intros e; induction e;
+    intros ? ? ? ? ? ? ? ? ? Hval Hv He Hpart Hin.
+  * simpl.
+    inversion He; subst; clear He.
+    2:{
+      vsimpl. contradict H0.
+      intros Heq; specialize (Heq x);
+        autorewrite with var_db in Heq;
+        discriminate.
+    }
+    vsimpl.
+    admit (* lemma *).
 Admitted.
 
 Lemma wt_subst2 : forall Θ1 Θ2 Θ0 Θ τ1 τ2 Γ Δ Θ' x1 v1 x2 v2 e τ',
