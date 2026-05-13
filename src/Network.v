@@ -1,5 +1,4 @@
 From Qoreo Require Import Base.
-Import Tactics.
 From Qoreo Require Expr Choreography.
 
 Module Label := Choreography.Label.
@@ -278,39 +277,46 @@ Proof.
     { contradict HEPPA. simpl; inversion 1. }
     inversion HEPPA; subst;
     inversion HEPPB; subst; simpl in *;
-        autorewrite with actor_db in *.
+        autorewrite with var_db in *.
     * destruct I as   [ (*Send*) A0 v0 B0 y0
                     | (*EPR*)  A0 x0 B0 y0
                     | (*Let*)  A0 x0 e0
                     | (*Let!*) A0 x0 e0
                     | (*LetPair *) A0 x0 y0 e0
       ];
-        simpl in *; autorewrite with actor_db in *.
-      + destruct (Actor.eq_dec A A0); try (subst; firstorder; fail). 
+        simpl in *; autorewrite with var_db in *.
+      + rewrite Actor.Map.MProofs.FSetProperties.add_iff in H2.
+        autorewrite with var_db in *.
+       Actor.Map.Tactics.compare A A0.
+
+
+        
+      
+      destruct (Actor.eq_dec A A0); subst; try tauto.
         apply Choreography.Delay.
         { eapply IHC'; eauto. }
-        { simpl; intros D. autorewrite with actor_db. 
+        { simpl; intros D. autorewrite with var_db. 
           intros [[? | ?] [? | ?]]; subst; firstorder.
         }
       + apply Choreography.Delay.
         { eapply IHC'; eauto. }
-        { simpl; intros D. autorewrite with actor_db. 
+        { simpl; intros D. autorewrite with var_db. 
           intros [[? | ?] [? | ?]]; subst; firstorder.
         }
 
       + apply Choreography.Delay.
         { eapply IHC'; eauto. }
-        { simpl; intros D. autorewrite with actor_db. 
+        { simpl; intros D. autorewrite with var_db. 
           intros [[? | ?] ?]; subst; firstorder.
         }
       + apply Choreography.Delay.
         { eapply IHC'; eauto. }
-        { simpl; intros D. autorewrite with actor_db. 
+        { simpl; intros D. autorewrite with var_db. 
           intros [[? | ?] ?]; subst; firstorder.
         }
       + apply Choreography.Delay.
         { eapply IHC'; eauto. }
-        { simpl; intros D. autorewrite with actor_db. 
+        { simpl; intros D. autorewrite with var_db. 
           intros [[? | ?] ?]; subst; firstorder.
         }
 

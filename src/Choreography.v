@@ -207,8 +207,8 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
     WellTyped (ChorEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA1 T) C ->
 
-    Var.MapFacts.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
-    Var.MapFacts.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+    Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
+    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
 
     WellTyped G D T ((Insn.Send A e B y)::C)
 
@@ -217,8 +217,8 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
     WellTyped (ChorEnv.add A x tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA1 T) C ->
 
-    Var.MapFacts.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
-    Var.MapFacts.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+    Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
+    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
 
     WellTyped G D T ((Insn.LetBang A x e)::C)
 
@@ -227,8 +227,8 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e tau ->
     WellTyped G (Actor.Map.add A (Var.Map.add x tau DeltaA2) D) (Actor.Map.add A ThetaA1 T) C ->
 
-    Var.MapFacts.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
-    Var.MapFacts.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+    Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
+    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
     ~ Var.Map.In x DeltaA2 ->
 
     WellTyped G D T ((Insn.Let A x e)::C)
@@ -238,8 +238,8 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) ->
     WellTyped G (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D) (Actor.Map.add A ThetaA1 T) C ->
 
-    Var.MapFacts.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
-    Var.MapFacts.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+    Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
+    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
     ~ Var.Map.In x1 DeltaA2 -> 
     ~ Var.Map.In x2 DeltaA2 ->
 
@@ -432,7 +432,7 @@ Lemma wt_subst_lin : forall ThetaA1 ThetaA2 tau G D T A x v C,
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) ThetaA1 v tau ->
 
     ChorEnv.MapsTo A x tau D ->
-    Var.MapFacts.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
 
     WellTyped G D T (Choreography.subst A x v C).
 Proof.

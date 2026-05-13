@@ -1,7 +1,7 @@
 From Stdlib Require Import FSets.FMapList FSets.FSetList FSets.FMapFacts OrderedType OrderedTypeEx.
 From QuantumLib Require Import Matrix Pad Quantum.
 From Qoreo Require Import Base.
-Import Base.Var.Tactics.
+
 
 Open Scope qoreo.
 
@@ -31,7 +31,7 @@ Inductive WFRefs : Var.Map.t nat -> Expr.t -> Prop :=
 | WFLetIn : forall refs x e1 e2 refs1 refs2,
   WFRefs refs1 e1 ->
   WFRefs refs2 e2 ->
-  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.Map.Partition refs refs1 refs2 ->
   WFRefs refs (LetIn x e1 e2)
 | WFBang : forall refs e,
   WFRefs refs e ->
@@ -39,7 +39,7 @@ Inductive WFRefs : Var.Map.t nat -> Expr.t -> Prop :=
 | WFLetBang : forall refs x e1 e2 refs1 refs2,
   WFRefs refs1 e1 ->
   WFRefs refs2 e2 ->
-  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.Map.Partition refs refs1 refs2 ->
   WFRefs refs (LetBang x e1 e2)
 | WFBit : forall refs b,
   Var.Map.Empty refs ->
@@ -51,24 +51,24 @@ Inductive WFRefs : Var.Map.t nat -> Expr.t -> Prop :=
   WFRefs refs'' e1 ->
   WFRefs refs'' e2 ->
 
-  Var.MapFacts.Partition refs refs' refs'' ->
+  Var.Map.Partition refs refs' refs'' ->
   WFRefs refs (If e e1 e2)
 
 | WFPair : forall refs e1 e2 refs1 refs2,
   WFRefs refs1 e1 ->
   WFRefs refs2 e2 ->
-  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.Map.Partition refs refs1 refs2 ->
   WFRefs refs (Pair e1 e2)
 | WFLetPair : forall refs x1 x2 e1 e2 refs1 refs2,
   WFRefs refs1 e1 ->
   WFRefs refs2 e2 ->
-  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.Map.Partition refs refs1 refs2 ->
   WFRefs refs (LetPair x1 x2 e1 e2)
 | WFMeas : forall refs e,
   WFRefs refs e ->
   WFRefs refs (Meas e)
 (*| WFQRef : forall refs x q,
-  Var.Singleton x q refs ->
+  Var.Map.Singleton x q refs ->
   WFRefs refs (QRef x)
   *)
 | WFNew : forall refs e,
@@ -86,7 +86,7 @@ Inductive WFRefs : Var.Map.t nat -> Expr.t -> Prop :=
 | WFApp : forall refs e1 e2 refs1 refs2,
   WFRefs refs1 e1 ->
   WFRefs refs2 e2 ->
-  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.Map.Partition refs refs1 refs2 ->
   WFRefs refs (App e1 e2)
 .
 *)
@@ -107,6 +107,7 @@ Inductive Val : t -> Prop :=
 | FixVal    : forall f x e,
   Val (Fix f x e)
 .
+#[global] Hint Constructors Val : var_db.
 
 (*************************)
 (* Operational Semantics *)
@@ -317,7 +318,7 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
        (Meas e') refs' cfg'
 
 | MeasB : forall i b x refs cfg refs' cfg',
-  Var.Singleton x i refs ->
+  Var.Map.Singleton x i refs ->
   (refs', cfg') = Config.measure b x refs cfg ->
 
   step (Meas (QRef x)) refs cfg (Bit b) refs' cfg'
@@ -332,7 +333,7 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
        (Unitary u e') refs' cfg'
 
 | UnitaryB1 : forall i g q refs cfg cfg',
-  Var.Singleton q i refs ->
+  Var.Map.Singleton q i refs ->
   cfg' = Config.apply_gate g [q] refs cfg ->
 
   step (Unitary g (QRef q)) refs cfg
@@ -379,7 +380,7 @@ and then what about the bang substitution.... it should indeed be the case that 
 Lemma wfrefs_subst : forall refs1 refs2 refs x v1 e2,
   Val refs1 v1 ->
   WFRefs refs2 e2 ->
-  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.Map.Partition refs refs1 refs2 ->
   WFRefs refs (subst x v1 e2).
 Admitted.
 *)
@@ -428,20 +429,20 @@ Proof.
   * unfold Config.new in *.
     inversion H0; subst; clear H0.
     econstructor.
-    unfold Var.Singleton.
+    unfold Var.Map.Singleton.
     assert (Var.Map.Equal refs (Var.Map.empty nat))
       by (vsimpl; reflexivity).
     admit (* not sure why this isn't going through *).
     
   * inversion H0; subst; clear H0.
     constructor. constructor.
-    unfold Var.Singleton in *.
+    unfold Var.Map.Singleton in *.
     rewrite H.
     autorewrite with var_db.
     vsimpl.
   * econstructor.
-    { econstructor. unfold Var.Singleton. reflexivity. }
-    { econstructor. unfold Var.Singleton. reflexivity. }
+    { econstructor. unfold Var.Map.Singleton. reflexivity. }
+    { econstructor. unfold Var.Map.Singleton. reflexivity. }
     rewrite H. eauto with var_db.
   Unshelve.
   + apply Var.Map.empty.
@@ -588,7 +589,7 @@ end.
 Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t -> typ -> Prop :=
 
 | WTQVar : forall Γ Δ Θ x τ,
-  Var.Singleton x τ Δ ->
+  Var.Map.Singleton x τ Δ ->
   Var.Map.Empty Θ ->
   WellTyped Γ Δ Θ (Var x) τ
 
@@ -603,9 +604,9 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
 
   WellTyped Γ (Var.Map.add x τ Δ2) Θ2 e2 τ' ->
   
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
+  Var.Map.Partition Δ Δ1 Δ2 ->
   ~ Var.Map.In x Δ2 ->
-  Var.MapFacts.Partition Θ Θ1 Θ2 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
 
   WellTyped Γ Δ Θ (LetIn x e1 e2) τ'
 
@@ -621,8 +622,8 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
   WellTyped Γ Δ1 Θ1 e1 (BANG τ) ->
   WellTyped (Var.Map.add x τ Γ) Δ2 Θ2 e2 τ' ->
 
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  Var.MapFacts.Partition Θ Θ1 Θ2 ->
+  Var.Map.Partition Δ Δ1 Δ2 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
 
   WellTyped Γ Δ Θ (LetBang x e1 e2) τ'
 
@@ -637,8 +638,8 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
   WellTyped Γ Δ2 Θ2 eT τ ->
   WellTyped Γ Δ2 Θ2 eF τ ->
 
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  Var.MapFacts.Partition Θ Θ1 Θ2 ->
+  Var.Map.Partition Δ Δ1 Δ2 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
 
   WellTyped Γ Δ Θ (If e eT eF) τ
 
@@ -646,8 +647,8 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
   WellTyped Γ Δ1 Θ1 e1 τ1 ->
   WellTyped Γ Δ2 Θ2 e2 τ2 ->
 
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
-  Var.MapFacts.Partition Θ Θ1 Θ2 ->
+  Var.Map.Partition Δ Δ1 Δ2 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
 
   WellTyped Γ Δ Θ (Pair e1 e2) (Tensor τ1 τ2)
 
@@ -656,11 +657,11 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
   WellTyped Γ Δ1 Θ1 e (Tensor τ1 τ2) ->
   WellTyped Γ (Var.Map.add x1 τ1 (Var.Map.add x2 τ2 Δ2)) Θ2 e' τ' ->
   
-  Var.MapFacts.Partition Δ Δ1 Δ2 ->
+  Var.Map.Partition Δ Δ1 Δ2 ->
   ~ Var.Map.In x1 Δ2 ->
   ~ Var.Map.In x2 Δ2 ->
   x1 <> x2 ->
-  Var.MapFacts.Partition Θ Θ1 Θ2 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
 
   WellTyped Γ Δ Θ (LetPair x1 x2 e e') τ'
 
@@ -671,7 +672,7 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
 | WTQRef : forall Γ Δ Θ q idx,
 
   Var.Map.Empty Δ ->
-  Var.Singleton q idx Θ ->
+  Var.Map.Singleton q idx Θ ->
 
   WellTyped Γ Δ Θ (QRef q) QUBIT
 
@@ -803,11 +804,13 @@ Lemma wt_subst_bang : forall τ Γ Δ Θ x v e τ',
 Proof.
 Admitted.
 
+Import Var.Map.Tactics.
+
 Lemma wt_subst : forall e Θ1 Θ2 τ Γ Δ Θ x v τ',
   Val v ->
   WellTyped Γ (Var.Map.empty _) Θ1 v τ ->
   WellTyped Γ (Var.Map.add x τ Δ) Θ2 e τ' ->
-  Var.MapFacts.Partition Θ Θ1 Θ2 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
   ~ Var.Map.In x Δ ->
 
   WellTyped Γ Δ Θ (subst x v e) τ'.
@@ -817,9 +820,11 @@ Proof.
   * simpl.
     inversion He; subst; clear He.
     2:{
-      vsimpl. contradict H0.
+      vsimpl.
+      contradict H0.
       intros Heq; specialize (Heq x);
-        autorewrite with var_db in Heq;
+        autorewrite with var_db in Heq.
+        reduce_eq_dec.
         discriminate.
     }
     vsimpl.
@@ -833,8 +838,8 @@ Lemma wt_subst2 : forall Θ1 Θ2 Θ0 Θ τ1 τ2 Γ Δ Θ' x1 v1 x2 v2 e τ',
   WellTyped Γ (Var.Map.empty _) Θ2 v2 τ2 ->
   WellTyped Γ (Var.Map.add x1 τ1 (Var.Map.add x2 τ2 Δ)) Θ0 e τ' ->
 
-  Var.MapFacts.Partition Θ Θ1 Θ2 ->
-  Var.MapFacts.Partition Θ' Θ Θ0 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
+  Var.Map.Partition Θ' Θ Θ0 ->
   ~ Var.Map.In x1 Δ ->
   ~ Var.Map.In x2 Δ ->
   WellTyped Γ Δ Θ' (subst x2 v2 (subst x1 v1 e)) τ'.
@@ -848,11 +853,11 @@ Lemma step_weakening : forall e refs ρ e' refs' ρ',
 
   forall refs1 refs2 τ,
   WellTyped (Var.Map.empty _) (Var.Map.empty _) refs1 e τ ->
-  Var.MapFacts.Partition refs refs1 refs2 ->
+  Var.Map.Partition refs refs1 refs2 ->
   exists refs1', 
     step e refs1 ρ e' refs1' ρ'
     /\
-    Var.MapFacts.Partition refs' refs1' refs2.
+    Var.Map.Partition refs' refs1' refs2.
 Proof.
 Admitted.
 
@@ -877,16 +882,14 @@ Proof.
     intros ? ? ? ? HWT.
     inversion HWT; subst; clear HWT.
     2:{ autorewrite with var_db in *. contradiction. }
-    unfold Var.Singleton in *.
+    unfold Var.Map.Singleton in *.
     specialize (H2 q).
     autorewrite with var_db in *.
     destruct (Var.Map.find q refs); inversion H2; auto.
 Qed.
 *)
 
-Hint Resolve Var.Proofs.partition_empty_l Var.Proofs.partition_empty_r : var_db.
-Hint Constructors Val : var_db.
-Hint Resolve Var.MapFacts.Partition_sym : var_db.
+
 
 
 Lemma preservation : forall Γ Δ Θ e τ,
@@ -902,7 +905,7 @@ Lemma preservation : forall Γ Δ Θ e τ,
 Proof.
   intros ? ? ? ? ? HWT.
   induction HWT; intros ? ? ? ? HΓ HΔ Hstep;
-    unfold Var.Singleton in *;
+    unfold Var.Map.Singleton in *;
     try (rewrite HΔ in *; clear Δ HΔ);
     try (rewrite HΔ' in *; clear Δ' HΔ');
     try (inversion Hstep; auto; fail).
@@ -916,7 +919,7 @@ Proof.
       (* So by the IH, Γ;refs1' |- e1' : τ *)
       eapply (IHHWT1) in Hstep1; eauto with var_db;
         try reflexivity.
-      econstructor; eauto with var_db. 
+      econstructor; eauto with var_db.
 
     + eapply wt_subst; eauto.
 
@@ -938,11 +941,10 @@ Proof.
     + vsimpl.
       inversion HWT1; subst.
       vsimpl.
-      match goal with (* not sure why vsimple doesn't get this *)
-      | [ Heq : Var.Map.Equal Θ' _ |- _ ] =>
-        setoid_rewrite Heq
-      end.
+      subst_map.
+
       eapply wt_subst_bang; eauto with var_db.
+    
 
   * (* If *) 
     vsimpl.
@@ -956,9 +958,6 @@ Proof.
 
     + inversion HWT1; subst.
       vsimpl.
-      match goal with
-      | [ Heq : Var.Map.Equal Θ' _ |- _ ] => setoid_rewrite Heq
-      end.
       destruct b; auto.
   * (* Pair *)
     vsimpl.
@@ -970,10 +969,17 @@ Proof.
       econstructor; eauto with var_db.
 
     + step_weakening_tac; eauto with var_db.
+      {
+        apply Var.Map.Properties.Partition_sym.
+        eauto with var_db.
+      }
       eapply (IHHWT2) in Hstep1; eauto with var_db;
         vsimpl;
         try reflexivity.
       econstructor; eauto with var_db.
+      {
+        apply Var.Map.Properties.Partition_sym; auto.
+      }
 
   * (* LetPair *) 
     vsimpl.
@@ -1044,7 +1050,7 @@ Proof.
         clear Hidx.
       subst_map.
       econstructor; eauto with var_db.
-      unfold Var.Singleton. reflexivity.
+      unfold Var.Map.Singleton. reflexivity.
 
   * (* Unitary *)
     vsimpl.
@@ -1083,7 +1089,7 @@ Proof.
   intros e τ Γ Δ Hwt.
   induction Hwt; intros cfg Hscoped HΓ HΔ Hwf.
   * contradict H.
-    unfold Var.Singleton.
+    unfold Var.Map.Singleton.
     vsimpl.
     admit (* lemma *).
   * exfalso. vsimpl.
