@@ -429,7 +429,6 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
 
 | WTLambda : forall Γ Δ Θ x e τ1 τ2,
   ~ Var.Map.In x Δ ->
-  ~ Var.Map.In x Γ ->
   WellTyped (Var.Map.remove x Γ) (Var.Map.add x τ1 Δ) Θ e τ2 ->
   WellTyped Γ Δ Θ (Lambda x e) (Lolli τ1 τ2)
 
@@ -587,17 +586,167 @@ Proof.
   eapply wt_disjoint'; eauto.
 Qed.
 
-Lemma weakening_gen : forall e Γ Δ Θ τ,
+
+Lemma add_add_eq : forall A x (a b : A) m,
+  Var.Map.Equal 
+    (Var.Map.add x a (Var.Map.add x b m))
+    (Var.Map.add x a m).
+Admitted.
+
+
+Lemma weakening1 : forall e Γ Δ Θ τ,
+  WellTyped Γ Δ Θ e τ ->
+  forall x0 τ0,
+  ~ Var.Map.In x0 Γ ->
+  ~ Var.Map.In x0 Δ ->
+  WellTyped (Var.Map.add x0 τ0 Γ) Δ Θ e τ.
+Proof.
+  intros ? ? ? ? ? HWT;
+    induction HWT;
+    intros z α HΓ HΔ (*HΘ*);
+    vsimpl; autorewrite with var_db in *;
+
+    reflect_partition;
+    autorewrite with var_db in *;
+    repeat match goal with
+    | [H : ~ (_ \/ _) |- _ ] =>
+      apply Decidable.not_or in H;
+      destruct H
+    end;
+
+    try (econstructor; eauto with var_db; 
+          try Var.Map.Tactics.partition_concat;
+          fail).
+  * econstructor; eauto with var_db.
+    unfold Var.Map.Singleton in *.
+    vsimpl.
+    autorewrite with var_db in *.
+    intuition.
+  * eapply WTCVar; eauto with var_db.
+    assert (x <> z).
+    {
+      inversion 1; subst.
+      apply HΓ.
+      exists τ; auto.
+    }
+    autorewrite with var_db.
+    auto.
+  * (* LetIn *)
+    econstructor; eauto;
+      try Var.Map.Tactics.partition_concat.
+    autorewrite with var_db.
+    compare x z; auto.
+    (* x <> y *)
+    eapply IHHWT2; auto;
+      autorewrite with var_db;
+      intuition.
+
+  * econstructor; eauto with var_db.
+    apply IHHWT; auto;
+      autorewrite with var_db;
+      intuition.
+
+  * (* LetBang *)
+    econstructor; eauto with var_db;
+      try Var.Map.Tactics.partition_concat.
+
+    compare x z.
+    { rewrite add_add_eq; auto. }
+    {
+      rewrite Var.Map.Proofs.add_neq_sym; auto.
+      eapply IHHWT2; auto;
+        Var.simplify.
+    }
+
+  * (* LetPair *)
+    econstructor; eauto with var_db;
+      try Var.Map.Tactics.partition_concat.
+    autorewrite with var_db.
+    compare x2 z; auto.
+    autorewrite with var_db.
+    compare x1 z; auto.
+    eapply IHHWT2; auto;
+      Var.simplify.
+    
+  * (* Lambda *)
+    econstructor; auto.
+    autorewrite with var_db.
+    compare x z; auto.
+    apply IHHWT; auto;
+      Var.simplify.
+
+  * (* Fix *)
+    econstructor; auto with var_db.
+    compare f z.
+    {
+      rewrite (Var.Map.Proofs.add_neq_sym _ f x); auto.
+      rewrite add_add_eq; auto.
+      rewrite (Var.Map.Proofs.add_neq_sym _ x f); auto.
+    }
+    compare x z.
+    { rewrite add_add_eq; auto. }
+    rewrite (Var.Map.Proofs.add_neq_sym _ x z); auto.
+    rewrite (Var.Map.Proofs.add_neq_sym _ f z); auto.
+    eapply IHHWT;
+      Var.simplify.
+Qed.
+  
+
+Lemma weakening_gen : forall Γ0,
+  forall Γ Δ Θ e τ,
   WellTyped Γ Δ Θ e τ ->
   forall Γ',
-  (forall x τ, Var.Map.MapsTo x τ Γ -> Var.Map.MapsTo x τ Γ') ->
-  (forall x, Var.FSet.In x (vars e) -> ~ Var.Map.In x Γ') ->
+  Var.Map.Partition Γ' Γ Γ0 ->
+  Var.Map.Properties.Disjoint Γ0 Δ ->
   WellTyped Γ' Δ Θ e τ.
 Proof.
+  intros Γ0.
+  induction Γ0 using Var.Map.Properties.map_induction;
+  intros ? ? ? ? ? HWT Γ' Hsub Hdisj.
+  
+  * vsimpl.
+    reflect_partition.
+    setoid_replace (Var.Map.concat Γ (Var.Map.M.empty _))
+      with Γ; auto.
+    {
+      intros z. autorewrite with var_db.
+      destruct (Var.Map.M.find z Γ); auto.
+    }
+
+  * reflect_partition. 
+    assert (Var.Map.Equal Γ0_2
+            (Var.Map.add x e Γ0_1))
+      by auto.
+    Var.Map.Tactics.subst_map.
+    clear H1 Γ0_2 H0.
+    autorewrite with var_db in *.
+    destruct Hdisj as [Hdisj Hx].
+    destruct Hdisj0 as [Hdisj0 Hx0].
+    setoid_replace (Var.Map.concat Γ (Var.Map.add x e Γ0_1))
+      with (Var.Map.add x e (Var.Map.concat Γ Γ0_1)).
+    2:{
+      intros z. autorewrite with var_db.
+      compare x z.
+      { (* if x=z then z does not occur in Γ *)
+        apply Var.Map.Properties.F.not_find_in_iff in Hx0.
+        rewrite Hx0; auto.
+      }
+      destruct (Var.Map.M.find z Γ) eqn:Hfind; auto.
+    }
+    
+    apply weakening1; auto.
+    2:{
+      autorewrite with var_db. intuition.
+    }
+    eapply IHΓ0_1; eauto.
+    {
+      reflect_partition; auto; try reflexivity.
+    }
+  
   (*
   intros ? ? ? ? ? HWT;
   induction HWT; intros Γ' Hsub Hdisj;
-    vsimpl; (* simpl in Hdisj;*)
+    vsimpl; simpl in Hdisj;
     try (econstructor; eauto with var_db;
       try eapply IHHWT;
       try eapply IHHWT1;
@@ -607,22 +756,49 @@ Proof.
       try apply Hdisj; autorewrite with var_db; auto;
       fail
     ).
-
-  * 
-
+  *
+    assert (~ Var.Map.In x Γ').
+    {
+      apply Hdisj. autorewrite with var_db. auto.
+    }
+    econstructor; eauto with var_db.
+    + eapply IHHWT1; auto.
+      intros y Hy.
+      apply Hdisj.
+      autorewrite with var_db. intuition.
+    + eapply IHHWT2; auto.
+      {
+        intros z τ0 Hin.
+        autorewrite with var_db in *.
+        intuition.
+      }
+      {
+        intros z Hin.
+        autorewrite with var_db.
+        specialize (Hdisj z).
+        autorewrite with var_db in Hdisj.
+        intuition.
+      }
+  
   * (* Let! *)
     econstructor; eauto with var_db.
     + eapply IHHWT1; auto.
       intros y Hy.
       apply Hdisj. autorewrite with var_db. intuition.
-    + 
-    
+    +
+      
       eapply IHHWT2; auto.
       {
        intros y ? Hin. autorewrite with var_db in *.
        intuition.
       }
-      { intros y Hin Hin'. autorewrite with var_db in *.
+      { intros z Hin.
+        specialize (Hdisj z).
+        autorewrite with var_db in *.
+        
+        
+      
+      Hin'. autorewrite with var_db in *.
         destruct Hin' as [? | Hin']; subst; auto.
         2:{ revert Hin'. apply Hdisj. autorewrite with var_db. auto. }
         (* y ∈ vars(e2) *)
@@ -679,22 +855,17 @@ Proof.
       destruct Hy as [[Heqx Hmaps] | [Hneqx Hmaps]].
       - left; auto.
       - right; split; auto.
+      *)
 Qed.
-*)
-Admitted.
+
 
 Lemma weakening : forall Γ Δ Θ e τ,
   WellTyped (Var.Map.empty _) Δ Θ e τ ->
+  Var.Map.Properties.Disjoint Γ Δ ->
   WellTyped Γ Δ Θ e τ.
 Proof.
   intros Γ Δ Θ e τ HWT.
-  eapply weakening_gen; eauto.
-  { 
-  intros x τ' Hmaps.
-  exfalso.
-  autorewrite with var_db in Hmaps.
-  contradiction.
-  }
+  eapply weakening_gen; eauto with var_db.
 Qed.
 
 Lemma subst_not_in : forall x v e Γ Δ Θ τ,
