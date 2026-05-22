@@ -1198,43 +1198,59 @@ Module ChorEnv.
     Definition MapsTo {T} (A : Actor.t) (x : Var.t) (tau : T) (G : t T) : Prop :=
       Var.Map.MapsTo x tau (find A G).
 
+    
+    Definition epr (A B : Actor.t) (refs : t nat) (cfg : Config.t)
+                  : Var.t * Var.t * t nat * Config.t :=
+      match Config.epr_cfg cfg with
+      | (idx1, idx2, cfg') =>
+        let x1 := Var.fresh (find A refs) in
+        let refs' := add A x1 idx1 refs in
+        let x2 := Var.fresh (find B refs') in
+        let refs'' := add B x2 idx2 refs' in
 
-  Definition epr (A B : Actor.t) (refs : t nat) (cfg : Config.t)
-                 : Var.t * Var.t * t nat * Config.t :=
-    match Config.epr_cfg cfg with
-    | (idx1, idx2, cfg') =>
-      let x1 := Var.fresh (find A refs) in
-      let refs' := add A x1 idx1 refs in
-      let x2 := Var.fresh (find B refs') in
-      let refs'' := add B x2 idx2 refs' in
+        (x1, x2, refs'', cfg')
+      end.
 
-      (x1, x2, refs'', cfg')
-    end.
+    Lemma MapsTo_add : forall T A x (tau : T) G,
+      ChorEnv.MapsTo A x tau G ->
+      ChorEnv.Equal (ChorEnv.add A x tau G)
+                    G.
+    Proof.
+      intros T A x tau G H.
+      unfold ChorEnv.Equal.
+      unfold Actor.Map.Equiv, ChorEnv.add, ChorEnv.MapsTo, ChorEnv.find in *.
+      split; [intros B | intros B a1 a2];
+        autorewrite with actor_db var_db in *.
+      * split; auto.
+        intros [? | ?]; auto; subst.
+        apply Actor.Map.Properties.F.in_find_iff.
+        destruct (Actor.Map.find B G); try discriminate.
+        apply Var.Map.Properties.F.empty_mapsto_iff in H; auto.
+      * intros [ [? Hfind] | [? Ha1] ] Hmaps; subst.
+        + apply Actor.Map.Properties.F.find_mapsto_iff in Hmaps.
+          rewrite Hmaps in *; auto.
+          apply Var.Map.Properties.F.find_mapsto_iff in H.
+          intros z; autorewrite with var_db.
+          Var.Map.Tactics.compare x z; auto.
+        + apply Actor.Map.Properties.F.find_mapsto_iff in Hmaps.
+          apply Actor.Map.Properties.F.find_mapsto_iff in Ha1.
+          rewrite Hmaps in Ha1.
+          inversion Ha1; subst; reflexivity.
+    Qed.
 
-Lemma MapsTo_add : forall T A x (tau : T) G,
-  ChorEnv.MapsTo A x tau G ->
-  ChorEnv.Equal (ChorEnv.add A x tau G)
-                G.
-Proof.
-  intros T A x tau G H.
-  unfold ChorEnv.Equal.
-  unfold Actor.Map.Equiv, ChorEnv.add, ChorEnv.MapsTo, ChorEnv.find in *.
-  split; [intros B | intros B a1 a2];
-    autorewrite with actor_db var_db in *.
-  * split; auto.
-    intros [? | ?]; auto; subst.
-    apply Actor.Map.Properties.F.in_find_iff.
-    destruct (Actor.Map.find B G); try discriminate.
-    apply Var.Map.Properties.F.empty_mapsto_iff in H; auto.
-  * intros [ [? Hfind] | [? Ha1] ] Hmaps; subst.
-    + apply Actor.Map.Properties.F.find_mapsto_iff in Hmaps.
-      rewrite Hmaps in *; auto.
-      apply Var.Map.Properties.F.find_mapsto_iff in H.
-      intros z; autorewrite with var_db.
-      Var.Map.Tactics.compare x z; auto.
-    + apply Actor.Map.Properties.F.find_mapsto_iff in Hmaps.
-      apply Actor.Map.Properties.F.find_mapsto_iff in Ha1.
-      rewrite Hmaps in Ha1.
-      inversion Ha1; subst; reflexivity.
-Qed.
+
+
+    Lemma find_add : forall T A B x (a : T) G,
+      Var.Map.Equal
+        (ChorEnv.find A (ChorEnv.add B x a G))
+        (if Actor.eq_dec A B then Var.Map.add x a (ChorEnv.find A G) else ChorEnv.find A G).
+    Proof.
+      intros.
+      unfold ChorEnv.add, ChorEnv.find.
+      autorewrite with actor_db.
+      repeat Actor.Map.Tactics.reduce_eq_dec.
+      + destruct (Actor.Map.find B G); try reflexivity.
+      + destruct (Actor.Map.find B G); try reflexivity.
+    Qed.
+    #[global] Hint Rewrite find_add : var_db.
 End ChorEnv.
