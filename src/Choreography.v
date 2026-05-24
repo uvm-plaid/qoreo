@@ -2,6 +2,7 @@ From Qoreo Require Import Base.
 From Qoreo Require Expr.
 
 From Stdlib Require Import Structures.Equalities.
+From Stdlib Require Import Program.Equality.
 
 Module Insn.
     Inductive t : Type :=
@@ -290,7 +291,7 @@ Lemma weakening_gen : forall G D T C,
     WellTyped G D T C -> forall G',
       (forall A x tau, ChorEnv.MapsTo A x tau G -> ChorEnv.MapsTo A x tau G') ->
       WellTyped G' D T C.
-Proof.
+Proof. 
   intros G D T C HWT.
   induction HWT.
   
@@ -356,7 +357,7 @@ Lemma no_capture_add : forall A x (tau1 : Expr.typ) I G,
 Proof.
 Admitted.
 
-
+ 
 Lemma add_MapsTo : forall A x (tau : A) m,
   Var.Map.MapsTo x tau m ->
   Var.Map.Equal (Var.Map.add x tau m) m.
@@ -482,20 +483,42 @@ Proof.
         eauto.
 
 Qed.
-    
-    
+
+(* It would be great to eliminate this Lemma-- in Map tactics? *)
+Lemma add_empty : forall A Theta (T : ChorEnv.t nat),
+    Actor.Map.Empty (Actor.Map.add A Theta T) -> 
+    Actor.Map.Empty T.
+Proof.
+Admitted.
+
 Lemma wt_subst_lin : forall ThetaA1 ThetaA2 tau G D T A x v C,
     WellTyped G D (Actor.Map.add A ThetaA2 T) C ->
     Expr.Val v ->
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) ThetaA1 v tau ->
-
+    
     ChorEnv.MapsTo A x tau D ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
 
     WellTyped G D T (Choreography.subst A x v C).
 Proof.
-  Admitted.
+  intros ThetaA1 ThetaA2 tau G D T A x v C HWTC HV HWTV HA HAP.
+
+  (* Formulating the induction to not lost critical hypotheses. *)
+  generalize HWTC.
+  intros HWTCI.
+  dependent induction HWTCI.
+
+  (* Nil case at least requires careful (dependent) induction *)
+  - unfold Choreography.subst.
+    inversion HWTC; subst.
+    apply Nil.
+    auto.
+    apply (add_empty A ThetaA2 T).
+    auto.
   
+Admitted.
+
+    
 (* placeholder for well-formedness definition *)
 Definition  WellFormed (cfg : Config.t) (C : ChorEnv.t nat) : Prop := True.
 
