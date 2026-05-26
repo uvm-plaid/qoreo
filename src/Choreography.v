@@ -485,16 +485,30 @@ Proof.
 
 Qed.
 
-(* It would be great to eliminate this Lemma-- in Map tactics? *)
+(* It would be great to eliminate these next two Lemmas-- in Map tactics? *)
 Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
     ~ Actor.Map.Empty (ChorEnv.add A x tau D).
 Proof.
 Admitted.
 
-Lemma esubst_lin : forall Gamma Delta Theta e tau1 x tau2 v,
-    Expr.WellTyped Gamma Delta Theta e tau1 -> 
+Lemma find_add : forall A Theta (T : ChorEnv.t nat),
+    (ChorEnv.find A (Actor.Map.add A Theta T)) = Theta.
+Proof.
+Admitted.
+
+Lemma esubst_lin : forall Gamma Delta e x v tau,
+    (exists Theta tau', Expr.WellTyped Gamma Delta Theta e tau') -> 
     ~ Var.Map.In x Gamma -> 
-    (Var.Map.MapsTo x tau2 Delta) \/ (~(Var.Map.MapsTo x tau2 Delta) /\ (Expr.subst x v e) = e).
+    (exists Delta', ((Var.Map.add x tau Delta') = Delta) /\
+                      ~(Var.Map.MapsTo x tau Delta'))
+    \/ (~(Var.Map.MapsTo x tau Delta) /\ (Expr.subst x v e) = e).
+Proof.
+Admitted.
+
+Lemma partitioning : forall (Theta0 : Var.Map.t nat) Theta1 Theta2,
+    (exists Theta, Var.Map.Partition Theta Theta1 Theta2) ->
+    (exists Theta3, Var.Map.Partition Theta2 Theta0 Theta3) ->
+    Var.Map.Partition (Var.Map.concat Theta1 Theta0) Theta1 Theta0.
 Proof.
 Admitted.
 
@@ -520,13 +534,27 @@ Proof.
     + eapply Send.
       { inversion HC; subst; auto. }
       { destruct (Actor.FSet.MF.eq_dec A A') eqn:Heq. subst.
-        inversion HC. subst.
-        pose proof (esubst_lin (ChorEnv.find A' G) DeltaA1 ThetaA0 e (Expr.BANG tau0) x v H8 HninG) as HESL.
-        destruct HESL as [HESLL | HESLR].
-        { pose proof
-            (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A' G) DeltaA1 (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
-               Hval Hv) as HWTS.
-          rewrite -> (add_MapsTo (Expr.typ) x tau DeltaA1) in HWTS.
+        { inversion HC. subst.
+          pose proof (esubst_lin (ChorEnv.find A' G) DeltaA1 e x v tau) as HESL.
+          destruct HESL.
+          eauto.
+          auto.
+          destruct H as [DeltaA1'].
+          destruct H as [HDA HninDA].
+          rewrite <- HDA in H8.
+          { pose proof
+              (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A' G) DeltaA1'
+                 (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
+                 Hval Hv H8) as HWTS.
+            pose proof (partitioning ThetaA0 ThetaA1 ThetaA2) as HPartition.
+            (* EXIST Q *)
+            destruct HPartiotion.
+            eauto.
+            eauto.
+            pose proof (find_add A' ThetaA2 T) as HFA.
+            rewrite -> HFA in H11.
+            eauto.
+            
 Admitted.
 
     
