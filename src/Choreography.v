@@ -222,7 +222,8 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
 | Send : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A e tau B y C,
     A <> B ->
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
-    WellTyped (ChorEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA1 T) C ->
+    (* ces changed ThetaA1 to ThetaA2 below-- correct? fix other cases? *)
+    WellTyped (ChorEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
@@ -490,10 +491,10 @@ Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
 Proof.
 Admitted.
 
-Lemma esubst_lin : forall Gamma Delta Theta e tau x v,
-    Expr.WellTyped Gamma Delta Theta e tau -> 
+Lemma esubst_lin : forall Gamma Delta Theta e tau1 x tau2 v,
+    Expr.WellTyped Gamma Delta Theta e tau1 -> 
     ~ Var.Map.In x Gamma -> 
-    (Var.Map.MapsTo x tau Delta) \/ (~(Var.Map.MapsTo x tau Delta) /\ (Expr.subst x v e) = e).
+    (Var.Map.MapsTo x tau2 Delta) \/ (~(Var.Map.MapsTo x tau2 Delta) /\ (Expr.subst x v e) = e).
 Proof.
 Admitted.
 
@@ -518,14 +519,14 @@ Proof.
 
     + eapply Send.
       { inversion HC; subst; auto. }
-      { destruct (Actor.FSet.MF.eq_dec A A') eqn:Heq.
-        inversion HC. subst. 
+      { destruct (Actor.FSet.MF.eq_dec A A') eqn:Heq. subst.
+        inversion HC. subst.
         pose proof (esubst_lin (ChorEnv.find A' G) DeltaA1 ThetaA0 e (Expr.BANG tau0) x v H8 HninG) as HESL.
         destruct HESL as [HESLL | HESLR].
-        { rewrite <- (add_MapsTo (Expr.typ) x tau DeltaA1) in H8.
-          pose proof
-            (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A' G) DeltaA1 ThetaA3 x v (Expr.BANG tau0)
-               Hval Hv H8) as HWTS.
+        { pose proof
+            (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A' G) DeltaA1 (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
+               Hval Hv) as HWTS.
+          rewrite -> (add_MapsTo (Expr.typ) x tau DeltaA1) in HWTS.
 Admitted.
 
     
