@@ -12,6 +12,7 @@ Import Choreography.
 Import ExampleNotation.
 
 Open Scope string_scope.
+Open Scope choreo_scope.
 
 Module Teleportation.
   Definition A : Actor.t := actor "alice"%string.
@@ -24,26 +25,26 @@ Module Teleportation.
   Definition b : Var.t := var 4.
 
   Definition choreo : Choreography.t :=
-    [
+    <{
       (* Alice and Bob establish an entangled (EPR) pair. *)
-      epr{A, a; B, b};
+      epr A,a; B,b;
 
       (* Alice performs some local operations and obtains classical bits x and z. *)
-      let{A, q := New[false]};
-      let{A, q := H[q]};
-      letp{A, (q, a) := CNOT[q, a]};
-      let!{A, x := Measure[q]};
-      let!{A, z := Measure[a]};
+      let A,q := new false;
+      let A,q := H q;
+      letp A,(q,a) := CNOT q a;
+      let! A,x := measure q;
+      let! A,z := measure a;
 
       (* Alice sends x and z to Bob. *)
-      send{A, x -> B, x};
-      send{A, z -> B, z};
+      A,x -> B,x;
+      A,z -> B,z;
 
       (* Bob uses x and z to update his qubit. *)
-      let{B, b := if_ (ref z) (Z[b]) (ref b)};
-      let{B, b := if_ (ref x) (X[b]) (ref b)};
-      let{B, b := H[b]}
-    ].
+      let B,b := if z then Z b else b end;
+      let B,b := if x then X b else b end;
+      let B,b := H b
+    }>.
 
   Definition parties : list Actor.t :=
     [A; B].

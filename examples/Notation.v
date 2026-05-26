@@ -29,33 +29,76 @@ Module ExampleNotation.
   Definition if_ (cond_ then_ else_ : Expr.t) : Expr.t :=
     Expr.If cond_ then_ else_.
 
-  Notation "'epr{' A ',' x ';' B ',' y '}'" := (Choreography.Insn.EPR A x B y)
-    (at level 0, x at next level, y at next level).
+  Declare Custom Entry qexpr.
+  Declare Custom Entry insn.
+  Declare Custom Entry choreo.
+  Declare Scope choreo_scope.
 
-  Notation "'send{' A ',' x '->' B ',' y '}'" := (Choreography.Insn.Send A (ref x) B y)
-    (at level 0, x at next level, y at next level).
+  Notation "'<{' c '}>'" := c
+    (c custom choreo) : choreo_scope.
 
-  Notation "'let{' A ',' x ':=' e '}'" := (Choreography.Insn.Let A x e)
-    (at level 0, x at next level, e at next level).
+  Notation "i ; c" := (i :: c)
+    (in custom choreo at level 90, right associativity,
+     i custom insn at level 0, c custom choreo at level 90) : choreo_scope.
+  Notation "i" := (i :: nil)
+    (in custom choreo at level 90, i custom insn at level 0) : choreo_scope.
 
-  Notation "'let!{' A ',' x ':=' e '}'" := (Choreography.Insn.LetBang A x e)
-    (at level 0, x at next level, e at next level).
+  Notation "x" := (Expr.Var x)
+    (in custom qexpr at level 0, x constr at level 0) : choreo_scope.
+  Notation "( x )" := x
+    (in custom qexpr, x at level 99) : choreo_scope.
+  Notation "'true'" := (Expr.Bit true)
+    (in custom qexpr at level 0) : choreo_scope.
+  Notation "'false'" := (Expr.Bit false)
+    (in custom qexpr at level 0) : choreo_scope.
+  Notation "'new' b" := (Expr.New b)
+    (in custom qexpr at level 30, b custom qexpr at level 0) : choreo_scope.
+  Notation "'measure' x" := (Expr.Meas x)
+    (in custom qexpr at level 30, x custom qexpr at level 0) : choreo_scope.
+  Notation "u x" := (Expr.Unitary u x)
+    (in custom qexpr at level 30,
+     u constr at level 0,
+     x custom qexpr at level 0) : choreo_scope.
+  Notation "u x y" := (Expr.Unitary u (Expr.Pair x y))
+    (in custom qexpr at level 30,
+     u constr at level 0,
+     x custom qexpr at level 0,
+     y custom qexpr at level 0) : choreo_scope.
+  Notation "'if' c 'then' t 'else' f 'end'" := (Expr.If c t f)
+    (in custom qexpr at level 89,
+     c custom qexpr at level 0,
+     t custom qexpr at level 30,
+     f custom qexpr at level 0) : choreo_scope.
 
-  Notation "'letp{' A ',' '(' x ',' y ')' ':=' e '}'" := (Choreography.Insn.LetPair A x y e)
-    (at level 0, x at next level, y at next level, e at next level).
+  Notation "'epr' A ',' x ';' B ',' y" := (Choreography.Insn.EPR A x B y)
+    (in custom insn at level 0,
+     A constr at level 0,
+     x constr at level 0,
+     B constr at level 0,
+     y constr at level 0) : choreo_scope.
+  Notation "A ',' x '->' B ',' y" := (Choreography.Insn.Send A (Expr.Var x) B y)
+    (in custom insn at level 0,
+     A constr at level 0,
+     x constr at level 0,
+     B constr at level 0,
+     y constr at level 0) : choreo_scope.
+  Notation "'let' A ',' x ':=' e" := (Choreography.Insn.Let A x e)
+    (in custom insn at level 0,
+     A constr at level 0,
+     x constr at level 0,
+     e custom qexpr at level 99) : choreo_scope.
+  Notation "'let!' A ',' x ':=' e" := (Choreography.Insn.LetBang A x e)
+    (in custom insn at level 0,
+     A constr at level 0,
+     x constr at level 0,
+     e custom qexpr at level 99) : choreo_scope.
+  Notation "'letp' A ',' '(' x ',' y ')' ':=' e" := (Choreography.Insn.LetPair A x y e)
+    (in custom insn at level 0,
+     A constr at level 0,
+     x constr at level 0,
+     y constr at level 0,
+     e custom qexpr at level 99) : choreo_scope.
 
-  Notation "'H[' x ']'" := (apply1 H x)
-    (at level 0, x at next level).
-  Notation "'X[' x ']'" := (apply1 X x)
-    (at level 0, x at next level).
-  Notation "'Z[' x ']'" := (apply1 Z x)
-    (at level 0, x at next level).
-  Notation "'CNOT[' x ',' y ']'" := (apply2 CNOT x y)
-    (at level 0, x at next level, y at next level).
-  Notation "'Measure[' x ']'" := (measure x)
-    (at level 0, x at next level).
-  Notation "'New[' b ']'" := (new b)
-    (at level 0, b at next level).
 End ExampleNotation.
 
 Module ExampleExtraction.

@@ -548,7 +548,7 @@ Proof.
                  Hval Hv H8) as HWTS.
             pose proof (partitioning ThetaA0 ThetaA1 ThetaA2) as HPartition.
             (* EXIST Q *)
-            destruct HPartiotion.
+            destruct HPartition.
             eauto.
             eauto.
             pose proof (find_add A' ThetaA2 T) as HFA.

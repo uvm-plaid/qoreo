@@ -12,6 +12,7 @@ Import Choreography.
 Import ExampleNotation.
 
 Open Scope string_scope.
+Open Scope choreo_scope.
 
 Module MeasureSend.
   Definition A : Actor.t := actor "alice"%string.
@@ -22,12 +23,12 @@ Module MeasureSend.
   Definition y : Var.t := var 2.
 
   Definition choreo : Choreography.t :=
-    [
-      let{A, q := New[false]};
-      let{A, q := H[q]};
-      let!{A, x := Measure[q]};
-      send{A, x -> B, y}
-    ].
+    <{
+      let A,q := new false;
+      let A,q := H q;
+      let! A,x := measure q;
+      A,x -> B,y
+    }>.
 
   Definition parties : list Actor.t :=
     [A; B].
