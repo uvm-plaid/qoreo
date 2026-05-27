@@ -1671,6 +1671,17 @@ Ltac step_weakening_tac :=
 
 
 
+Ltac simplify_val :=
+  repeat match goal with
+  | [ Hval : Val ?e, Hwt : WellTyped _ _ _ ?e ?τ |- _ ] =>
+    match τ with
+    | BIT => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
+    | QUBIT  => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
+    | Tensor _ _ => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
+    | Lolli _ _ => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
+    | BANG _ => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
+    end
+  end.
 
 Lemma preservation : forall Γ Δ Θ e τ,
   WellTyped Γ Δ Θ e τ ->
@@ -1678,13 +1689,14 @@ Lemma preservation : forall Γ Δ Θ e τ,
   forall ρ e' Θ' ρ',
   Var.Map.Empty Γ ->
   Var.Map.Empty Δ ->
+  Config.WellScoped Θ ρ ->
   
   step e Θ ρ e' Θ' ρ' ->
   
   WellTyped Γ Δ Θ' e' τ.
 Proof.
   intros ? ? ? ? ? HWT.
-  induction HWT; intros ? ? ? ? HΓ HΔ Hstep;
+  induction HWT; intros ? ? ? ? HΓ HΔ HWS Hstep;
     try (rewrite HΔ in *; clear Δ HΔ);
     try (rewrite HΔ' in *; clear Δ' HΔ');
     try (inversion Hstep; auto; fail).
@@ -1697,12 +1709,13 @@ Proof.
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac; eauto.
-      (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply (IHHWT1) in Hstep1; eauto with var_db;
-        try reflexivity.
       econstructor; eauto with var_db.
-
+      reflect_partition. Var.simplify.
+      (* So by the IH, Γ;refs1' |- e1' : τ *)
+      eapply IHHWT1; eauto with var_db.
+      
     + eapply wt_subst; eauto.
+      Var.simplify.
 
   * (* Let!*)
     Var.simplify.
@@ -1712,19 +1725,15 @@ Proof.
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac.
-
+      econstructor; eauto with var_db; Var.simplify.
+      reflect_partition. Var.simplify.
       (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply IHHWT1 in Hstep1; eauto with var_db;
-        try Var.simplify;
-        try reflexivity.
-      econstructor; eauto with var_db.
-      Var.simplify.
+      eapply IHHWT1; eauto with var_db.
 
     + (* beta *)
 
       inversion HWT1; subst.
       Var.simplify.
-
       eapply wt_subst_bang; eauto with var_db.
     
 
@@ -1733,35 +1742,31 @@ Proof.
     inversion Hstep; subst; clear Hstep.
     + (* e -> e1' *)
       step_weakening_tac.
-      eapply (IHHWT1) in Hstep1; eauto with var_db;
-        Var.simplify;
-        try reflexivity.
       econstructor; eauto with var_db.
+      reflect_partition. Var.simplify.
+      eapply IHHWT1; eauto with var_db.
 
     + inversion HWT1; subst.
       Var.simplify.
       destruct b; auto.
+
   * (* Pair *)
     Var.simplify.
     inversion Hstep; subst; clear Hstep.
     + step_weakening_tac.
-      eapply (IHHWT1) in Hstep1; eauto with var_db;
-        Var.simplify;
-        try reflexivity.
       econstructor; eauto with var_db.
+      reflect_partition; Var.simplify.
+      eapply IHHWT1; eauto with var_db.      
 
     + step_weakening_tac; eauto with var_db.
       {
         apply Var.Map.Properties.Partition_sym.
         eauto with var_db.
       }
-      eapply (IHHWT2) in Hstep1; eauto with var_db;
-        Var.simplify;
-        try reflexivity.
       econstructor; eauto with var_db.
-      {
-        apply Var.Map.Properties.Partition_sym; auto.
-      }
+      2:{ apply Var.Map.Properties.Partition_sym; eauto. }
+      reflect_partition. Var.simplify.
+      eapply IHHWT2; eauto with var_db.
 
   * (* LetPair *) 
     Var.simplify.
@@ -1772,12 +1777,12 @@ Proof.
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac.
 
-      (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply (IHHWT1) in Hstep1; eauto with var_db;
-        try reflexivity.
-
       econstructor; eauto with var_db;
         Var.simplify.
+      reflect_partition; Var.simplify.
+
+      (* So by the IH, Γ;refs1' |- e1' : τ *)
+      eapply IHHWT1; eauto with var_db.
 
     + inversion HWT1; subst; clear HWT1.
       match goal with
@@ -1797,28 +1802,16 @@ Proof.
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac; eauto with var_db.
-
-      (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply (IHHWT) in Hstep1; eauto with var_db;
-        try reflexivity.
       econstructor; eauto with var_db.
+      
 
     + inversion HWT; subst; clear HWT.
-      vsimpl.
-      econstructor; eauto with var_db.
-      unfold Var.Map.Singleton in *.
-      vsimpl.      
-
       match goal with
       | [ H : _ = Config.measure _ _ _ _ |- _ ] =>
         inversion H; subst; clear H
       end.
-      vsimpl.
-      
-      autorewrite with var_db.
-      repeat reduce_eq_dec.
-      autorewrite with var_db.
-      auto with var_db.
+      Var.simplify.
+      econstructor; eauto with var_db.
 
   * (* New *)
     Var.simplify.
@@ -1828,10 +1821,6 @@ Proof.
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac; eauto with var_db.
-
-      (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply (IHHWT) in Hstep1; eauto with var_db;
-        try reflexivity.
       econstructor; eauto with var_db.
 
     + match goal with
@@ -1841,7 +1830,7 @@ Proof.
       inversion HWT; subst; clear HWT.
       Var.simplify.
       econstructor; eauto with var_db.
-      unfold Var.Map.Singleton. reflexivity.
+      Var.simplify.
 
   * (* Unitary *)
     Var.simplify.
@@ -1851,18 +1840,16 @@ Proof.
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac; eauto with var_db.
-
-      (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply (IHHWT) in Hstep1; eauto with var_db;
-        try reflexivity.
-      econstructor; eauto;
-        eauto with var_db.
+      econstructor; eauto.
+      eapply IHHWT; eauto with var_db.
 
     + inversion HWT; subst.
       econstructor; eauto.
+      Var.simplify.
 
     + inversion HWT; subst; auto.
       econstructor; eauto.
+      Var.simplify.
 
   * (* App *)
     Var.simplify.
@@ -1872,26 +1859,24 @@ Proof.
       (* We are given: (e1,refs) ~> (e1',refs') *)
       (* By weakening, we know that (e1,refs1) ~> (e1',refs1') where refs'=refs1' + refs2 *)
       step_weakening_tac; eauto with var_db.
-
-      (* So by the IH, Γ;refs1' |- e1' : τ *)
-      eapply (IHHWT1) in Hstep1;
-        eauto with var_db;
-        try reflexivity.
       econstructor; eauto; eauto with var_db.
+      reflect_partition. Var.simplify.
+      eapply IHHWT1; eauto with var_db.      
 
     + (* e2 -> e2' *)
       step_weakening_tac.
       { apply Var.Map.Properties.Partition_sym; eauto. }
-      eapply IHHWT2 in Hstep1; eauto with var_db.
       econstructor; eauto with var_db.
-      { apply Var.Map.Properties.Partition_sym; eauto. }
+      2:{ apply Var.Map.Properties.Partition_sym; eauto. }
 
+      reflect_partition. Var.simplify.
+
+      eapply IHHWT2; eauto with var_db.
 
     + (* Lambda beta reduction *)
       inversion HWT1; subst; clear HWT1.
-      rename H9 into HWT1.
-      autorewrite with var_db in HWT1.
-      eapply wt_subst; eauto with var_db.
+      Var.simplify.
+      eapply wt_subst; eauto; Var.simplify.
       { apply Var.Map.Properties.Partition_sym; eauto. }
 
     + (* Fix beta reduction *)
@@ -1905,8 +1890,9 @@ Proof.
       WTS
       ∅;∅;Θ1,Θ2 ⊢ e{fix f.x.e / f, e2/x} : τ'
       *)
-      inversion HWT1; subst. vsimpl.
-      inversion HWT2; subst. vsimpl.
+      inversion HWT1; subst.
+      inversion HWT2; subst.
+      Var.simplify.
 
       eapply wt_subst_bang; eauto with var_db.
       eapply wt_subst_bang; eauto with var_db.
@@ -1918,19 +1904,6 @@ Lemma step_WellScoped_disjoint : forall Θ2 e Θ1 cfg e' Θ1' cfg',
   Config.WellScoped Θ2 cfg ->
   Var.Map.Properties.Disjoint Θ1' Θ2.
 Admitted.
-
-
-Ltac simplify_val :=
-  repeat match goal with
-  | [ Hval : Val ?e, Hwt : WellTyped _ _ _ ?e ?τ |- _ ] =>
-    match τ with
-    | BIT => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
-    | QUBIT  => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
-    | Tensor _ _ => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
-    | Lolli _ _ => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
-    | BANG _ => inversion Hwt; subst; inversion Hval; subst; clear Hval Hwt
-    end
-  end.
 
 Ltac ws_partition_tac :=
   match goal with
@@ -1977,7 +1950,7 @@ Proof.
       eauto with var_db.
     + (* e1 is a value *)
       right. eexists. eexists. eexists.
-      eapply LetB; auto.
+      eapply LetB; eauto; try reflexivity.
 
     + (* e1 can take a step *)
       right. eexists. eexists. eexists.
@@ -1994,7 +1967,7 @@ Proof.
       (* e1 must be of the form (Bang e1') *)
       simplify_val.
       right. eexists. eexists. eexists.
-      eapply LetBangB; auto.
+      eapply LetBangB; auto; try reflexivity.
 
     + (* e1 can take a step *)
       right. eexists. eexists. eexists.
@@ -2011,7 +1984,7 @@ Proof.
       (* e1 must be of the form Bit b *)
       simplify_val.
       right. eexists. eexists. eexists.
-      eapply IfB; auto.
+      eapply IfB; auto; try reflexivity.
 
     + (* e1 can take a step *)
       right. eexists. eexists. eexists.
@@ -2052,7 +2025,7 @@ Proof.
       (* e1 must be of the form Bit b *)
       simplify_val.
       right. eexists. eexists. eexists.
-      eapply LetPairB; auto with var_db.
+      eapply LetPairB; auto with var_db; try reflexivity.
 
     + (* e1 can take a step *)
       right. eexists. eexists. eexists.
@@ -2066,15 +2039,8 @@ Proof.
     + (* e' is a value -- must be a qref *)
       simplify_val.
       right. eexists. eexists. eexists.
-      unfold Var.Map.Singleton in *.
-      vsimpl.
-      eapply MeasB.
-      { autorewrite with var_db; auto. }
-      {
-        unfold Config.measure.
-        f_equal.
-      }
-      reflexivity.
+      Var.simplify.
+      eapply MeasB; Var.simplify.
 
     + (* e' can take a step *)
       right. eexists. eexists. eexists.
@@ -2115,12 +2081,7 @@ Proof.
         vsimpl.
         reflect_partition.
         right. eexists. eexists. eexists.
-        eapply UnitaryB2; auto.
-        ++ Var.simplify.
-        ++ Var.simplify.
-        ++ inversion 1; subst.
-            apply (Hdisj q).
-            autorewrite with var_db; auto.
+        eapply UnitaryB2; auto; Var.simplify.
 
     + (* e can take a step *)
       right. eexists. eexists. eexists.
@@ -2153,11 +2114,11 @@ Proof.
     simplify_val.
     - (* v1 is a lambda *)
       right. eexists. eexists. eexists.
-      eapply AppB; eauto.
+      eapply AppB; eauto; try reflexivity.
 
     - (* v1 is a fix *)
       right. eexists. eexists. eexists.
-      eapply AppFixB; eauto.
+      eapply AppFixB; eauto; try reflexivity.
 
 Unshelve. exact true.
 Qed.
