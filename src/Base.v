@@ -56,10 +56,13 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   Ltac compare x y :=
     let Heq := fresh "Heq" in
     destruct (E.eq_dec x y) as [Heq | Heq];
-      try (rewrite <- Heq in *; clear Heq);
+      [try (rewrite <- Heq in *; clear y Heq) | ];
       try contradiction;
-      try match goal with
+      repeat match goal with
       | [ H : ~ E.eq ?x ?x |- _ ] => contradict H; reflexivity
+      | [ H : E.eq ?x ?x   |- _ ] => clear H
+      | [ H1 : ~ E.eq ?x ?y, H2 : ~ E.eq ?x ?y |- _ ] => clear H2
+      | [ H1 : ~ E.eq ?x ?y, H2 : ~ E.eq ?y ?x |- _ ] => clear H2
       end.
 
   Ltac reduce_eq_dec :=
@@ -610,6 +613,14 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       end
     end.
 
+  Lemma Empty_remove : forall A x (m : M.t A),
+    M.Empty (M.remove x m) -> M.Empty m.
+  Admitted.
+
+  Lemma Empty_concat : forall A (m1 m2 : M.t A),
+    M.Empty (concat m1 m2) <-> M.Empty m1 /\ M.Empty m2.
+  Admitted.
+
   Ltac simpl_Empty :=
       match goal with
       | [ H : M.Empty (M.add _ _ _) |- _ ] =>
@@ -618,13 +629,48 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
         apply empty_map_Empty in H
       | [ |- M.Empty (M.map _ _) ] =>
         apply empty_map_Empty
+      | [ H : M.Empty (M.remove _ _) |- _ ] =>
+        apply Empty_remove in H
+      | [ |- Empty (empty _) ] => apply M.empty_1
+      | [ H : M.Empty (concat _ _) |- _ ] =>
+        rewrite <- Empty_concat in H; destruct H
+      | [ |- M.Empty (concat _ _) ] =>
+        rewrite Empty_concat
 
-      (* Replace any instances of Empty m with m == empty
+      (* Replace any remaining instances of Empty m with m == empty
       and substitute *)
       | [ H : M.Empty ?m |- _ ] =>
         apply empty_map_equal in H;
         subst_map
       end.
+
+  Lemma Singleton_concat : forall A x (a : A) m1 m2,
+    Singleton x a (concat m1 m2) ->
+    Singleton x a m1 \/ (Empty m1 /\ Singleton x a m2).
+  Admitted.
+
+  Lemma Singleton_map : forall A B x (b : B) (f : A -> B) m,
+    Singleton x b (map f m) <->
+    exists a, f a = b /\ Singleton x a m.
+  Proof.
+    intros. unfold Singleton.
+    split.
+    * intros Heq.
+      specialize (Heq x) as Hx.
+      autorewrite with qoreo_db in Hx; reduce_eq_dec.
+      destruct (find x m) as [a | ] eqn:Hfind;
+        simpl in Heq; inversion Hx; subst; clear Hx.
+        
+      exists a. split; auto.
+      intros z. specialize (Heq z).
+      autorewrite with qoreo_db in *.
+      reduce_eq_dec; auto.
+      destruct (find z m); auto; discriminate.
+    * intros [a [Ha Hm]]. subst.
+      rewrite Hm.
+      autorewrite with qoreo_db.
+      reflexivity.
+  Qed.
 
   Ltac simpl_Singleton :=
     match goal with
@@ -633,6 +679,17 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       destruct H as [? [? ?]]; subst
     | [ |- Singleton ?x _ (M.add ?a _ (M.empty _)) ] =>
       apply singleton_singleton
+    | [ H : Singleton _ _ (empty _) |- _ ] =>
+      rewrite singleton_empty in H; contradiction
+    | [ H : Singleton _ _ (concat _ _) |- _ ] =>
+      apply Singleton_concat in H
+    | [ H : Singleton _ _ (map _ _) |- _ ] =>
+      rewrite Singleton_map in H;
+      destruct H as [? [? ?]]
+
+    (* Replace any remaining instances of Singleton with its definition *)
+    | [ H : Singleton _ _ _ |- _ ] => unfold Singleton in *; subst_map
+    | [ |- Singleton _ _ _ ] => unfold Singleton in *; subst_map
     end.
 
   (** Lemmas about disjointness *)
@@ -777,7 +834,7 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   Qed.
 
   Ltac reduce_disjoint :=
-  repeat match goal with
+  match goal with
         | [ H : Disjoint ?m1 ?m2 |- Disjoint ?m2 ?m1 ] =>
           apply disjoint_sym; exact H
 
@@ -1134,52 +1191,51 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       rewrite (remove_not_in _ x m1) in Hpart; auto.
   Qed.
 
-  Ltac decide_equal :=
-    repeat match goal with
-    | [ H : M.MapsTo ?x ?a ?m |- Some ?a = M.find ?x ?m ] =>
-      symmetry; apply M.find_1; auto
-    | [ H : M.MapsTo ?x ?a ?m |- M.find ?x ?m = Some ?a ] =>
-      apply M.find_1; auto
-    | [ |- M.Equal _ _ ] =>
-      intros z; autorewrite with var_db;
-      repeat reduce_eq_dec; auto with var_db
-    end; fail.
 
-  (* reflect_find db: normalizes In/MapsTo hypotheses to find-based form,
-     then reduces the goal using autorewrite with db in * + reduce_eq_dec.
-     fmap_decide_with db: calls reflect_find then closes with tauto/auto. *)
-  Ltac reflect_find_body :=
-    match goal with
-    | [ H : M.In ?x ?m |- _ ] =>
-      let v := fresh "v" in
-      destruct H as [v H]; fold (M.MapsTo x v m) in H
-    | [ H : M.MapsTo _ _ _ |- _ ] =>
-      apply F.find_mapsto_iff in H; try rewrite H in *
-    | [ H : ~ M.In ?x (concat ?m1 ?m2) |- _ ] =>
-      rewrite concat_in in H
-    | [ H : ~ (?P \/ ?Q) |- _ ] =>
-      let Hl := fresh in let Hr := fresh in
-      assert (Hl : ~P) by tauto;
-      assert (Hr : ~Q) by tauto;
-      clear H
-    | [ H : ~ M.In ?x ?m |- _ ] =>
-      apply F.not_find_in_iff in H; rewrite H in *
-    | [ |- M.Equal _ _ ] => intro z
-    | [ |- Disjoint _ _ ] => intro z
-    | [ |- M.In _ _ ] => apply F.in_find_iff
-    | [ |- ~ M.In _ _ ] => apply F.not_find_in_iff
-    | [ |- M.MapsTo _ _ _ ] => apply F.find_mapsto_iff
+  Lemma partition_not_in_inversion : forall A (m m1 m2 : M.t A) x,
+    Partition m m1 m2 ->
+    ~ M.In x m <->
+    ~ M.In x m1 /\ ~ M.In x m2.
+  Proof.
+    intros ? ? ? ? ? Hpart.
+    reflect_partition.
+    autorewrite with qoreo_db.
+    intuition.
+  Qed.
+
+
+  (* move m to the left-most element of the concatenation list *)
+  Ltac reduce_concat :=
+    repeat match goal with
+    | [ |- M.Equal (concat ?m _) (concat ?m _)] =>
+      apply concatProper; try reflexivity
+    | [ |- M.Equal (concat ?m _) (concat ?m0 ?m1)] =>
+      rewrite (concat_sym m0 m1);
+        [ | auto with var_db ];
+      repeat rewrite <- concat_assoc
     end.
 
-  (* instantiate this for each relevant hint database *)
-  Ltac reflect_find :=
-    repeat (
-      reflect_find_body;
-      autorewrite with qoreo_db in *;
-      repeat reduce_eq_dec
-    ).
-  Ltac decide_with := 
-    reflect_find; first [tauto | auto].
+    (*
+  Ltac partition_concat :=
+    match goal with
+    | [ |- Partition (concat ?m1 ?m2) ?m1 _ ] =>
+      reflect_partition;
+        [ | reflexivity];
+        vsimpl; auto with var_db
+
+    | [ |- Partition (concat ?m1 ?m2) ?m2 _ ] =>
+      reflect_partition;
+        [ | rewrite (concat_sym m1 m2); auto;
+            try reflexivity];
+        vsimpl; auto with var_db
+
+    | [ |- Partition _ (concat _ _) _ ] =>
+      reflect_partition; vsimpl; auto with var_db
+    | [ |- Partition _ _ (concat _ _) ] =>
+      reflect_partition; vsimpl; auto with var_db
+    end;
+    reduce_concat.
+    *)
 
   Ltac reduce_partition :=
     match goal with
@@ -1203,9 +1259,11 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
         subst_map
 
       (* partitions with add *)
+      (*
       | [ H : Partition (M.add _ _ _) _ _ |- _ ] =>
         apply partition_add_inversion in H; auto;
         try destruct H as [[? [? ?]] | [? [? ?]]]
+      *)
 
       (* Partitions with remove *)
       | [ |- Partition (M.remove ?x _) (M.remove ?x _) (M.remove ?x _) ] =>
@@ -1217,8 +1275,8 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       (*
       | [ H : Partition (M.map ?f _) (M.map ?f _) (M.map ?f _) |- _ ] =>
         apply map_partition in H
-      *)
-
+        
+        *)
       (*
       | [H : Partition (M.map ?f ?m) ?n1 ?n2 |- _] =>
         let m1 := fresh "m1" in
@@ -1229,10 +1287,105 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
           as [m1 [m2 [Heq1 [Heq2 Hpart]]]]; auto;
         subst_map; try rewrite Heq1, Heq2 in *; try clear n1 Heq1 n2 Heq2
         *)
+
+
+      (*
+      (* ~In inversion *)
+      | [ Hpart : Partition ?m ?m1 ?m2,
+          Hin : ~ M.In ?x ?m |- _ ] =>
+        let Hin' := fresh "Hin" in
+        assert (Hin' : ~ M.In x m1 /\ ~ M.In x m2)
+        by (eapply partition_not_in_inversion; eauto);
+        destruct Hin';
+        reduce_concat
+      *)
+
+      (* Partition with concat *)
+
+      | [ |- Partition (concat ?m1 ?m2) ?m1 _ ] =>
+        reflect_partition;
+          [ | reflexivity];
+        reduce_concat
+
+      | [ |- Partition (concat ?m1 ?m2) ?m2 _ ] =>
+        reflect_partition;
+          [ | rewrite (concat_sym m1 m2); auto;
+              try reflexivity];
+        reduce_concat
+
+      | [ |- Partition _ (concat _ _) _ ] =>
+        reflect_partition; reduce_concat
+      | [ |- Partition _ _ (concat _ _) ] =>
+        reflect_partition; reduce_concat
     end.
+
+(*
+  Ltac decide_equal :=
+    repeat match goal with
+    | [ H : M.MapsTo ?x ?a ?m |- Some ?a = M.find ?x ?m ] =>
+      symmetry; apply M.find_1; auto
+    | [ H : M.MapsTo ?x ?a ?m |- M.find ?x ?m = Some ?a ] =>
+      apply M.find_1; auto
+    | [ |- M.Equal _ _ ] =>
+      intros z; autorewrite with var_db;
+      repeat reduce_eq_dec; auto with var_db
+    end; fail.
+    *)
+
+  (* reflect_find db: normalizes In/MapsTo hypotheses to find-based form,
+     then reduces the goal using autorewrite with db in * + reduce_eq_dec.
+     fmap_decide_with db: calls reflect_find then closes with tauto/auto. *)
+  Ltac reflect_find_body :=
+    match goal with
+    | [ H : M.In ?x ?m |- _ ] =>
+      let v := fresh "v" in
+      destruct H as [v H]; fold (M.MapsTo x v m) in H
+    | [ H : M.MapsTo _ _ _ |- _ ] =>
+      apply F.find_mapsto_iff in H;
+      try rewrite H in *
+    | [ H : ~ M.In ?x (concat ?m1 ?m2) |- _ ] =>
+      rewrite concat_in in H
+    | [ H : ~ (?P \/ ?Q) |- _ ] =>
+      let Hl := fresh in let Hr := fresh in
+      assert (Hl : ~P) by tauto;
+      assert (Hr : ~Q) by tauto;
+      clear H
+    | [ H : ~ M.In ?x ?m |- _ ] =>
+      apply F.not_find_in_iff in H;
+      try rewrite H in *
+
+    | [ |- M.Equal _ _ ] => intro z
+    | [ |- Disjoint _ _ ] => intro z
+    | [ |- M.In _ _ ] => apply F.in_find_iff
+    | [ |- ~ M.In _ _ ] => apply F.not_find_in_iff
+    | [ |- M.MapsTo _ _ _ ] => apply F.find_mapsto_iff
+
+    | [ H : M.find ?x ?m = _ |- context[M.find ?x ?m] ] => rewrite H
+    end.
+
+  (* instantiate this for each relevant hint database *)
+  Ltac reflect_find :=
+    repeat (
+      reflect_find_body;
+      autorewrite with qoreo_db in *;
+      repeat reduce_eq_dec
+    ).
+  Ltac solve := 
+    reflect_find; first [tauto | auto; fail].
 
   Ltac vsimpl :=
   repeat match goal with
+
+  | [ H : ~ (?P \/ ?Q) |- _ ] =>
+      let Hl := fresh in let Hr := fresh in
+      assert (Hl : ~P) by tauto;
+      assert (Hr : ~Q) by tauto;
+      clear H
+  | [ |- ~ (_ \/ _) ] =>
+    apply Classical_Prop.and_not_or
+  | [ H : _ /\ _ |- _ ] =>
+    destruct H
+
   | [ |- M.Empty _ ] => simpl_Empty
   | [ H : M.Empty _ |- _ ] => simpl_Empty
 
@@ -1247,41 +1400,16 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   | [ H : context[Partition _ _ _ ] |- _ ] =>
     reduce_partition
 
+  | [ H : Properties.Add ?x ?a ?m ?m' |- _ ] =>
+    let Heq := fresh "Heq" in
+    assert (Heq : M.Equal m'
+            (M.add x a m))
+      by auto;
+    clear H;
+    subst_map
+
   | [ H : M.Equal _ _ |- _ ] => subst_map
   end.
-
-
-
-  (* move m to the left-most element of the concatenation list *)
-  Ltac reduce_concat :=
-    repeat match goal with
-    | [ |- M.Equal (concat ?m _) (concat ?m _)] =>
-      apply concatProper; try reflexivity
-    | [ |- M.Equal (concat ?m _) (concat ?m0 ?m1)] =>
-      rewrite (concat_sym m0 m1);
-        [ | auto with var_db; vsimpl; auto with var_db ];
-      repeat rewrite <- concat_assoc
-    end.
-
-  Ltac partition_concat :=
-    match goal with
-    | [ |- Partition (concat ?m1 ?m2) ?m1 _ ] =>
-      reflect_partition;
-        [ | reflexivity];
-        vsimpl; auto with var_db
-
-    | [ |- Partition (concat ?m1 ?m2) ?m2 _ ] =>
-      reflect_partition;
-        [ | rewrite (concat_sym m1 m2); auto;
-            try reflexivity];
-        vsimpl; auto with var_db
-
-    | [ |- Partition _ (concat _ _) _ ] =>
-      reflect_partition; vsimpl; auto with var_db
-    | [ |- Partition _ _ (concat _ _) ] =>
-      reflect_partition; vsimpl; auto with var_db
-    end;
-    reduce_concat.
 
   End Proofs.
 
@@ -1295,7 +1423,8 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       * reflect_partition - converts Partition hypotheses into Disjoint + Map.Equal (concat) form
       * vsimpl            - simplifies hypotheses and goals that use maps
 
-      * decide_equal - tries to prove goals of the form Equal m1 m2 through brute-force reasoning 
+      * reflect_find - simplifies hypotheses and goals by reflecting to the find function
+      * solve - tries to prove goals through reflection to find 
       * partition_concat  - simplifies goals specifically that deal with the intersection of partition and concatenation
 
     vsimpl builds on the following tactics in MapFacts:
@@ -1313,7 +1442,7 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
     Ltac reflect_partition := Proofs.reflect_partition.
     Ltac vsimpl := Proofs.vsimpl.
     Ltac partition_concat := Proofs.partition_concat.
-    Ltac decide_equal := Proofs.decide_equal.
+    Ltac solve := Proofs.solve.
 
   End Tactics.
 
@@ -1340,10 +1469,13 @@ Module Var.
     let f := fun x _ z_fresh => if Nat.leb z_fresh x then (x+1)%nat else z_fresh in
     Map.fold f m 0%nat.
 
+  
   Ltac simplify :=
-    autorewrite with var_db;
+    repeat
+    (autorewrite with var_db in *;
       Map.Tactics.vsimpl;
-      try (intuition; fail).
+      repeat Map.Tactics.reduce_eq_dec;
+      try (first [tauto | reflexivity | discriminate | auto | intuition]; fail)).
 
   (* instantiate this for each relevant hint database *)
   Ltac reflect_find :=
@@ -1352,8 +1484,8 @@ Module Var.
       autorewrite with var_db in *;
       repeat Map.Tactics.reduce_eq_dec
     ).
-  Ltac fmap_decide := 
-    reflect_find; first [tauto | auto].
+  Ltac solve := 
+    repeat (reflect_find; first [tauto | discriminate | auto; fail | intuition]).
 
   (* Global var_db hints: instantiations of FMap_fun's local qoreo_db hints for Var.Map *)
   #[global] Hint Rewrite Map.Properties.F.add_mapsto_iff : var_db.
@@ -1402,14 +1534,15 @@ Module Var.
   #[global] Hint Resolve Map.Proofs.disjoint_sym : extra_var_db.
   #[global] Hint Resolve Map.Proofs.concat_assoc : extra_var_db.
 
+  (*
   #[global] Hint Extern 4 (Map.Partition (Map.concat _ _) _ _) => Map.Proofs.partition_concat : extra_var_db.
   #[global] Hint Extern 4 (Map.Partition _ (Map.concat _ _) _) => Map.Tactics.partition_concat : extra_var_db.
   #[global] Hint Extern 4 (Map.Partition _ _ (Map.concat _ _)) => Map.Tactics.partition_concat : extra_var_db.
+*)
 
   #[global] Hint Rewrite Map.FSetProperties.inter_iff : var_db.
   #[global] Hint Rewrite Map.MProofs.FSetProperties.add_iff: var_db.
   #[global] Hint Rewrite Map.FSetProperties.singleton_iff : var_db.
-
 End Var.
 
 Inductive unitary :=
@@ -1677,9 +1810,11 @@ Module Actor.
   #[global] Hint Resolve Map.Proofs.disjoint_sym : actor_db.
   #[global] Hint Resolve Map.Proofs.concat_assoc : actor_db.
 
+  (*
   #[global] Hint Extern 4 (Map.Partition (Map.concat _ _) _ _) => Map.Proofs.partition_concat : actor_db.
   #[global] Hint Extern 4 (Map.Partition _ (Map.concat _ _) _) => Map.Tactics.partition_concat : actor_db.
   #[global] Hint Extern 4 (Map.Partition _ _ (Map.concat _ _)) => Map.Tactics.partition_concat : actor_db.
+  *)
 
   #[global] Hint Rewrite Map.FSetProperties.inter_iff : actor_db.
   #[global] Hint Rewrite Map.MProofs.FSetProperties.add_iff: actor_db.
