@@ -131,10 +131,11 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   step e1 refs cfg e1' refs' cfg' ->
   step (LetIn x e1 e2) refs cfg (LetIn x e1' e2) refs' cfg'
 
-| LetB : forall x v1 e2 refs cfg e2',
+| LetB : forall x v1 e2 refs cfg e2' refs',
   Val v1 ->
   e2' = subst x v1 e2 ->
-  step (LetIn x v1 e2) refs cfg e2' refs cfg
+  Var.Map.Equal refs' refs ->
+  step (LetIn x v1 e2) refs cfg e2' refs' cfg
 
 (* Bang *)
 (* no reduction under Bang *)
@@ -148,11 +149,12 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   step (LetBang x e1  e2) refs cfg
        (LetBang x e1' e2) refs' cfg'
 
-| LetBangB : forall x e1 e2 refs cfg e2',
+| LetBangB : forall x e1 e2 refs cfg e2' refs',
   e2' = subst x e1 e2 ->
+  Var.Map.Equal refs refs' ->
 
   step (LetBang x (Bang e1) e2) refs cfg
-       e2' refs cfg
+       e2' refs' cfg
 
 (* If *)
 | IfC : forall e1 e2 e3 refs cfg e1' refs' cfg',
@@ -162,12 +164,13 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
        (If e1' e2 e3) refs' cfg'
   
 
-| IfB : forall (b : bool) e2 e3 refs cfg e',
+| IfB : forall (b : bool) e2 e3 refs cfg e' refs',
 
   (e' = if b then e2 else e3) ->
+  Var.Map.Equal refs refs' ->
   
   step (If (Bit b) e2 e3) refs cfg
-       e' refs cfg
+       e' refs' cfg
 
 (* Pair *)
 | PairC1 : forall e1 e2 refs cfg e1' refs' cfg',
@@ -190,12 +193,13 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   step (LetPair x1 x2 e1 e2) refs cfg
        (LetPair x1 x2 e1' e2) refs' cfg'
 
-| LetPairB : forall x1 x2 v1 v2 e' refs cfg e'',
+| LetPairB : forall x1 x2 v1 v2 e' refs cfg e'' refs',
   Val (Pair v1 v2) ->
   e'' = subst x2 v2 (subst x1 v1 e') ->
+  Var.Map.Equal refs refs' ->
 
   step (LetPair x1 x2 (Pair v1 v2) e') refs cfg 
-        e'' refs cfg
+        e'' refs' cfg
 
 | AppC1 : forall e1 e2 refs cfg e1' refs' cfg',
 
@@ -212,19 +216,21 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   step (App e1 e2) refs cfg
         (App e1 e2') refs' cfg'
 
-| AppB : forall x e v refs cfg e',
+| AppB : forall x e v refs cfg e' refs',
 
   Val v ->
   e' = subst x v e ->
+  Var.Map.Equal refs refs' ->
 
   step (App (Lambda x e) v) refs cfg
-        e' refs cfg
+        e' refs' cfg
 
-| AppFixB : forall f x e e0 refs cfg e',
+| AppFixB : forall f x e e0 refs cfg e' refs',
 
   e' = subst x e0 (subst f (Fix f x e) e) ->
+  Var.Map.Equal refs refs' ->
 
-  step (App (Fix f x e) (Bang e0)) refs cfg e' refs cfg
+  step (App (Fix f x e) (Bang e0)) refs cfg e' refs' cfg
 
 (* New *)
 | NewC : forall e refs cfg e' refs' cfg',
@@ -265,39 +271,81 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   step (Unitary u e) refs cfg
        (Unitary u e') refs' cfg'
 
-| UnitaryB1 : forall g q refs cfg cfg',
+| UnitaryB1 : forall g q refs refs' cfg cfg',
   Var.Map.In q refs ->
   cfg' = Config.apply_gate g [q] refs cfg ->
+  Var.Map.Equal refs refs' ->
 
   step (Unitary g (QRef q)) refs cfg
-       (QRef q) refs cfg'
+       (QRef q) refs' cfg'
 
-| UnitaryB2 : forall g q1 q2 refs cfg cfg',
+| UnitaryB2 : forall g q1 q2 refs refs' cfg cfg',
   Var.Map.In q1 refs ->
   Var.Map.In q2 refs ->
   q1 <> q2 ->
   cfg' = Config.apply_gate g [q1;q2] refs cfg ->
+  Var.Map.Equal refs refs' ->
 
   step (Unitary g (Pair (QRef q1) (QRef q2))) refs cfg
-       (Pair (QRef q1) (QRef q2)) refs cfg'
+       (Pair (QRef q1) (QRef q2)) refs' cfg'
 .
 
-(*
-Lemma step_proper_ : forall e refs cfg e' refs' cfg',
-*)
+Global Instance config_find_Proper : Proper (eq ==> Var.Map.Equal ==> eq) Config.find.
+Proof.
+  intros x' x Hx refs1 refs2 Hrefs; subst.
+  unfold Config.find. rewrite Hrefs; auto.
+Qed.
+
+Global Instance config_apply_gate_proper :
+  Proper (eq ==> eq ==> Var.Map.Equal ==> eq ==> eq) Config.apply_gate.
+Proof.
+  intros g' g Hg ls' ls Hls refs1 refs2 Hrefs cfg1 cfg2 Hcfg;
+    subst.
+  unfold Config.apply_gate.
+  f_equal. f_equal.
+  apply Proper_map; auto.
+  intros x. rewrite Hrefs; auto.
+Qed.
+
+
+Lemma step_proper : forall e refs cfg e' refs' cfg',
+  step e refs cfg e' refs' cfg' ->
+  forall refs0 refs0',
+    Var.Map.Equal refs refs0 ->
+    Var.Map.Equal refs' refs0' ->
+    step e refs0 cfg e' refs0' cfg'.
+Proof.
+  intros ? ? ? ? ? ? Hstep.
+  induction Hstep; intros refs_ refs_' Hrefs Hrefs';
+  try (econstructor; eauto; Var.simplify; fail).
+  * (* NewB *)
+    inversion H; subst; clear H.
+    econstructor.
+    { reflexivity. }
+    Var.simplify.
+
+  * (* MeasB *)
+    match goal with
+    | [ H : _ = Config.measure _ _ _ _ |- _ ] =>
+      inversion H; subst; clear H
+    end.
+    econstructor.
+    2:{
+     unfold Config.measure.
+     replace (Config.find x refs_) with (Config.find x refs); auto.
+     { rewrite Hrefs; auto. }
+    }
+    all:Var.simplify.
+Qed.
 
 Global Instance stepProper : Proper (eq ==> Var.Map.Equal ==> eq ==> eq ==> Var.Map.Equal ==> eq ==> iff) step.
 Proof.
-  intros e1; induction e1;
-    intros e2 He refs1 refs2 Hrefs cfg1 cfg2 Hcfg
+  intros e1 e2 He refs1 refs2 Hrefs cfg1 cfg2 Hcfg
          e1' e2' He' refs1' refs2' Hrefs' cfg1' cfg2' Hcfg';
-    subst;
-    split; intros Hstep; inversion Hstep; subst; clear Hstep;
-    try (constructor; auto; fail).
-  * constructor.
-Admitted.
-
-
+    subst; split; intros;
+    eapply step_proper; eauto;
+    symmetry; auto.
+Qed.
 
 (*
 Fixpoint qrefs (e : Expr.t) : Var.FSet.t :=
@@ -1247,14 +1295,6 @@ Proof.
   }
 Qed.
 
-Lemma apply_gate_proper : forall g qs refs1 refs2 cfg,
-  Forall (fun q => Var.Map.find q refs1 = Var.Map.find q refs2) qs ->
-  Config.apply_gate g qs refs1 cfg
-  =
-  Config.apply_gate g qs refs2 cfg.
-Admitted.
-
-
 Lemma step_weakening_1 : forall Θ1 Θ1' Θ2 e Θ cfg e' Θ' cfg',
   step e Θ1 cfg e' Θ1' cfg' ->
   Var.Map.Partition Θ Θ1 Θ2 ->
@@ -1266,7 +1306,8 @@ Proof.
   intros Hstep.
   induction Hstep; intros Hpart HWS Hpart';
     try (constructor; auto; fail);
-    try (reflect_partition; constructor; auto; fail).
+    try (reflect_partition; constructor; auto; try reflexivity; fail).
+
   * (* new *)
     Var.simplify.
     inversion H; subst; clear H.
@@ -1275,33 +1316,40 @@ Proof.
     + reflect_partition.
       Var.solve.
 
-  * vsimpl.
+  * (* meas *)
+    Var.simplify.
     inversion H0; subst; clear H0.
-    reflect_partition; vsimpl.
+    reflect_partition.
     eapply MeasB.
-    + autorewrite with var_db; auto.
-    + unfold Config.measure, Config.find.
-      autorewrite with var_db.
+    2:{
+      reflect_partition.
+      unfold Config.measure, Config.find.
+      f_equal. f_equal.
       Var.reflect_find; auto.
-
-    + assert (~ Var.Map.In x Θ2).
-      { intros Hin. apply (Hdisj0 x). auto. }
-      Var.solve.
+    }
+    1:{ Var.simplify. }
+    1:{
+      Var.reflect_find; auto.
+      specialize (Hdisj0 x).
+      apply Classical_Prop.not_and_or in Hdisj0.
+      destruct Hdisj0; Var.solve.
+    }
 
   * reflect_partition.
-    apply UnitaryB1.
-    { Var.simplify. }
+    apply UnitaryB1; Var.simplify.
     subst.
-    apply apply_gate_proper.
-    repeat constructor.
+    unfold Config.apply_gate, Config.find.
+    f_equal. f_equal.
+    simpl.
     Var.solve.
 
   * reflect_partition.
     constructor; Var.simplify.
     subst.
-    apply apply_gate_proper.
-    repeat constructor;
-      Var.solve.
+    unfold Config.apply_gate, Config.find.
+    f_equal. f_equal.
+    simpl.
+    Var.solve.
 Qed.
 
 Lemma step_weakening_2 : forall Θ1 Θ2 Θ2' e Θ cfg e' Θ' cfg',
@@ -1317,11 +1365,21 @@ Proof.
   apply Var.Map.Properties.Partition_sym; auto.
 Qed.
 
+
+(* TODO: add to Base *)
+#[global] Hint Rewrite <- Config.WellScoped_concat : var_db.
+
+  Lemma WellScoped_empty : forall cfg,
+    Config.WellScoped (Var.Map.empty nat) cfg <-> True.
+Admitted.
+#[global] Hint Rewrite WellScoped_empty : var_db.
+
 Lemma step_inversion : forall e refs ρ e' refs' ρ',
   
   step e refs ρ e' refs' ρ' ->
 
   forall refs1 refs2 τ,
+  Config.WellScoped refs ρ ->
   WellTyped (Var.Map.empty _) (Var.Map.empty _) refs1 e τ ->
   Var.Map.Partition refs refs1 refs2 ->
   exists refs1', 
@@ -1331,11 +1389,15 @@ Lemma step_inversion : forall e refs ρ e' refs' ρ',
 Proof.
   intros ? ? ? ? ? ? Hstep.
   induction Hstep;
-    intros refs1 refs2 τ HWT Hpart;
+    intros refs1 refs2 τ HWS HWT Hpart;
     inversion HWT; subst; clear HWT;
 
-    try (eexists; split; eauto; constructor; auto; fail).
-  (* only the contextual rules and the quantum-specific rules are remaining *)
+    try (eexists;
+      split;
+      [ constructor; eauto; try reflexivity
+      | Var.simplify ];
+      fail).
+  (* only the contextual rules and the quantum-specific rules should remain *)
 
   * Var.simplify. 
     (* refs = refs1 + refs2 = Θ1 + Θ2 + refs2 *)
@@ -1343,8 +1405,8 @@ Proof.
     (* Θ1 |- e1 : τ0 *)
     (* IH: e1 / Θ1 -> e1' / Θ1'  and refs' = Θ1' + Θ2 + refs2 *)
 
-    destruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2) τ0 H2)
-      as [Θ1' [IH Hpart']]; Var.simplify.
+    destruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2) τ0)
+      as [Θ1' [IH Hpart']]; auto; Var.simplify.
     (* By weakening:
        e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
     *)
@@ -1355,14 +1417,14 @@ Proof.
     + apply LetC. eauto.
     + eauto.
     + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
+      reflect_partition.
+      Var.simplify.
     + Var.simplify.
-
 
   * Var.simplify.
 
-    destruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2) _ H2)
-      as [Θ1' [IH Hpart']]; Var.simplify.
+    edestruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2))
+      as [Θ1' [IH Hpart']]; eauto; Var.simplify.
     (* By weakening:
        e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
     *)
@@ -1371,7 +1433,7 @@ Proof.
     eapply step_weakening_1;
       [econstructor; eauto | | | ]; eauto; Var.simplify.
     { (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
+      reflect_partition. Var.simplify.
     }
 
   * (* IfC *)
@@ -1381,8 +1443,8 @@ Proof.
     (* e1 / refs -> e1' / refs' *)
     (* Θ1 |- e1 : τ0 *)
     (* IH: e1 / Θ1 -> e1' / Θ1'  and refs' = Θ1' + Θ2 + refs2 *)
-    destruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2) _ H2)
-      as [Θ1' [IH Hpart']]; Var.simplify.
+    edestruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2))
+      as [Θ1' [IH Hpart']]; eauto; Var.simplify.
     (* By weakening:
        e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
     *)
@@ -1390,9 +1452,9 @@ Proof.
     split; Var.simplify.
     eapply step_weakening_1.
     + apply IfC. eauto.
-    + eauto with extra_var_db.
+    + eauto.
     + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
+      reflect_partition. Var.simplify.
     + Var.simplify.
 
   * (* PairC1 *)
@@ -1402,19 +1464,17 @@ Proof.
     (* e1 / refs -> e1' / refs' *)
     (* Θ1 |- e1 : τ0 *)
     (* IH: e1 / Θ1 -> e1' / Θ1'  and refs' = Θ1' + Θ2 + refs2 *)
-    destruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2) _ H1)
-      as [Θ1' [IH Hpart']]; Var.simplify.
+    edestruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2))
+      as [Θ1' [IH Hpart']]; eauto; Var.simplify.
     (* By weakening:
        e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
     *)
     exists (Var.Map.concat Θ1' Θ2).
+    reflect_partition.
     split; Var.simplify.
     eapply step_weakening_1.
-    + apply PairC1. eauto.
-    + eauto with extra_var_db.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
-    + Var.simplify.
+    { apply PairC1; eauto. }
+    all:Var.simplify.
 
   * (* PairC2 *)
     Var.simplify.
@@ -1423,17 +1483,14 @@ Proof.
     (* e1 / refs -> e1' / refs' *)
     (* Θ1 |- e1 : τ0 *)
     (* IH: e1 / Θ1 -> e1' / Θ1'  and refs' = Θ1' + Θ2 + refs2 *)
-    destruct (IHHstep _ (Var.Map.concat Θ1 refs2) _ H3)
-      as [Θ2' [IH Hpart']]; Var.simplify.
+    edestruct (IHHstep Θ2 (Var.Map.concat Θ1 refs2))
+      as [Θ2' [IH Hpart']]; eauto; Var.simplify.
     exists (Var.Map.concat Θ1 Θ2').
     split; Var.simplify.
-    reflect_partition. Var.simplify.
+    reflect_partition.
     eapply step_weakening_1.
-    + apply PairC2; eauto.
-    + Var.simplify.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
-    + Var.simplify.
+    { apply PairC2; eauto. }
+    all: Var.simplify.
 
   * (* LetPair *)
     Var.simplify.
@@ -1442,19 +1499,17 @@ Proof.
     (* e1 / refs -> e1' / refs' *)
     (* Θ1 |- e1 : τ0 *)
     (* IH: e1 / Θ1 -> e1' / Θ1'  and refs' = Θ1' + Θ2 + refs2 *)
-    destruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2) _ H3)
-      as [Θ1' [IH Hpart']]; Var.simplify.
+    edestruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2))
+      as [Θ1' [IH Hpart']]; eauto; Var.simplify.
     (* By weakening:
        e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
     *)
     exists (Var.Map.concat Θ1' Θ2).
     split; Var.simplify.
+    reflect_partition.
     eapply step_weakening_1.
-    + apply LetPairC. eauto.
-    + eauto.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
-    + Var.simplify.
+    { apply LetPairC. eauto. }
+    all: Var.simplify.
 
   * (* AppC1 *)
     Var.simplify.
@@ -1463,19 +1518,17 @@ Proof.
     (* e1 / refs -> e1' / refs' *)
     (* Θ1 |- e1 : τ0 *)
     (* IH: e1 / Θ1 -> e1' / Θ1'  and refs' = Θ1' + Θ2 + refs2 *)
-    destruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2) _ H1)
-      as [Θ1' [IH Hpart']]; Var.simplify.
+    edestruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2))
+      as [Θ1' [IH Hpart']]; eauto; Var.simplify.
     (* By weakening:
        e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
     *)
     exists (Var.Map.concat Θ1' Θ2).
     split; Var.simplify.
+    reflect_partition.
     eapply step_weakening_1.
-    + apply AppC1. eauto.
-    + eauto.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
-    + Var.simplify.
+    { apply AppC1. eauto. }
+    all: Var.simplify.
 
   * (* AppC2 *)
     Var.simplify.
@@ -1484,100 +1537,125 @@ Proof.
     (* e1 / refs -> e1' / refs' *)
     (* Θ2 |- e2 : τ2 *)
     (* IH: e2 / Θ2 -> e2' / Θ2'  and refs' = Θ1 + Θ2' + refs2 *)
-    destruct (IHHstep Θ2 (Var.Map.concat Θ1 refs2) _ H3)
-      as [Θ2' [IH Hpart']]; Var.simplify.
+    edestruct (IHHstep Θ2 (Var.Map.concat Θ1 refs2))
+      as [Θ2' [IH Hpart']]; eauto; Var.simplify.
     (* By weakening:
        e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
     *)
     exists (Var.Map.concat Θ1 Θ2').
     split; Var.simplify.
+    reflect_partition.
     eapply step_weakening_1.
-    + apply AppC2; eauto.
-    + reflect_partition; eauto with extra_var_db.
-      apply Var.Map.Proofs.concat_sym; auto.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
-    + Var.simplify.
+    { apply AppC2; eauto. }
+    all: Var.simplify.
 
   * (* NewC *)  
-    destruct (IHHstep _ refs2 _ H3)
-      as [Θ1' [IH Hpart']]; auto.
+    edestruct (IHHstep refs1 refs2)
+      as [Θ1' [IH Hpart']]; eauto.
     exists Θ1'.
     split; Var.simplify.
+    reflect_partition.
     eapply step_weakening_1.
-    + apply NewC. eauto.
+    { apply NewC. eauto. }
     + apply Var.Map.Proofs.partition_empty_r.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      admit.
+    + Var.simplify.
     + apply Var.Map.Proofs.partition_empty_r.
 
   * (* NewB *)
     Var.simplify.
     inversion H; subst; clear H.
     exists (Var.Map.add (Config.dim cfg) (Config.dim cfg) refs1).
-    split; auto.
+    split.
     2:{
       apply Var.Map.Proofs.partition_add_l; auto.
-      admit (* true because of well-formedness *).
+      (* refs1 and refs2 are wellscoped *)
+      reflect_partition. Var.simplify.
+      intros Hin.
+      eapply Config.wf_qrefs in Hin; eauto.
+      lia.
     }
     econstructor; reflexivity.
 
-  * admit.
+  * (* MeasC *)
+    edestruct (IHHstep refs1 refs2)
+      as [Θ1' [IH Hpart']]; eauto.
+    exists Θ1'.
+    split; Var.simplify.
+    reflect_partition.
+    eapply step_weakening_1.
+    { apply MeasC. eauto. }
+    + apply Var.Map.Proofs.partition_empty_r.
+    + Var.simplify.
+    + apply Var.Map.Proofs.partition_empty_r.
 
   * (* MeasB *)
-    inversion H0; subst; clear H0.
-    inversion H6; subst; clear H6.
-    Var.simplify.
+    repeat match goal with
+    | [ H : _ = Config.measure _ _ _ _ |- _ ] =>
+      inversion H; subst; clear H
+    | [ H : WellTyped _ _ _ (QRef _) _ |- _ ] =>
+      inversion H; subst; clear H; Var.simplify
+    end.
 
     exists (Var.Map.empty nat).
+    reflect_partition; Var.simplify.
     split; Var.simplify.
+    2:{ reflect_partition; Var.solve. }
+    eapply MeasB.
     2:{
-      reflect_partition; auto with var_db.
-      Var.simplify.
-      Var.solve.
-    }
-    econstructor.
-    + autorewrite with var_db. auto.
-    +
       unfold Config.measure.
       f_equal. f_equal. 
       unfold Config.find.
-      reflect_partition. rewrite Heq.
+      rewrite Heq.
       Var.simplify.
-    + Var.solve.
+    }
+    all: Var.simplify.
 
-  * admit.
+  *
+    edestruct (IHHstep refs1 refs2)
+      as [Θ1' [IH Hpart']]; eauto.
+    exists Θ1'.
+    split; Var.simplify.
+    reflect_partition.
+    apply UnitaryC; auto.
 
   * (* UnitaryB1 *) 
-    inversion H8; subst; clear H8.
+    match goal with
+    | [ H : WellTyped _ _ _ (QRef _) _ |- _ ] =>
+      inversion H; subst; clear H
+    end.
     Var.simplify.
     exists (Var.Map.add q idx (Var.Map.empty nat)).
     split; auto.
     apply UnitaryB1.
-    + Var.simplify.
-    + apply apply_gate_proper.
-      repeat constructor.
+    2:{
+      unfold Config.apply_gate, Config.find.
+      f_equal. f_equal.
+      simpl.
       reflect_partition.
       Var.simplify.
+    }
+    all: Var.simplify.
 
   * (* UnitaryB2 *)
-    inversion H10; subst; clear H10.
-    inversion H5; subst; clear H5.
-    inversion H9; subst; clear H9.
+    repeat match goal with
+    | [ H : WellTyped _ _ _ (Pair _ _) _ |- _ ] =>
+      inversion H; subst; clear H
+    | [ H : WellTyped _ _ _ (QRef _) _ |- _ ] =>
+      inversion H; subst; clear H
+    end.
     Var.simplify.
     exists refs1.
     split; auto.
-
-
-    apply UnitaryB2; auto; Var.simplify.
-    { reflect_partition. Var.simplify. }
-    { reflect_partition. Var.simplify. }
-    
-    apply apply_gate_proper.
-    repeat constructor;
-      reflect_partition; Var.simplify.
-
-Admitted.
+    reflect_partition. Var.simplify.
+    apply UnitaryB2; auto.
+    3:{
+      unfold Config.apply_gate, Config.find.
+      f_equal. f_equal.
+      simpl.
+      Var.simplify.
+    }
+    all: Var.simplify.
+Qed.
 
 
 Ltac step_weakening_tac :=
