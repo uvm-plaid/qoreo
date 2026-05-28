@@ -486,7 +486,7 @@ Proof.
 
 Qed.
 
-(* It would be great to eliminate these next two Lemmas-- in Map tactics? *)
+(* It would be great to eliminate these Lemmas-- in Map tactics? *)
 Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
     ~ Actor.Map.Empty (ChorEnv.add A x tau D).
 Proof.
@@ -497,12 +497,24 @@ Lemma find_add : forall A Theta (T : ChorEnv.t nat),
 Proof.
 Admitted.
 
+Lemma addadd : forall A (T : ChorEnv.t nat) Theta1 Theta2,
+    (Actor.Map.add A Theta1 (Actor.Map.add A Theta2 T)) = (Actor.Map.add A Theta1 T).
+Proof.
+Admitted.
+
 Lemma esubst_lin : forall Gamma Delta e x v tau,
     (exists Theta tau', Expr.WellTyped Gamma Delta Theta e tau') -> 
     ~ Var.Map.In x Gamma -> 
     (exists Delta', ((Var.Map.add x tau Delta') = Delta) /\
                       ~(Var.Map.In x Delta'))
     \/ (~(Var.Map.MapsTo x tau Delta) /\ (Expr.subst x v e) = e).
+Proof.
+Admitted.
+
+Lemma csubst_lin : forall G D T C A x v,
+    WellTyped G D T C ->
+    ~ (Var.Map.In x (ChorEnv.find A D)) ->
+    (Choreography.subst A x v C) = C.
 Proof.
 Admitted.
 
@@ -534,13 +546,15 @@ Proof.
   - intros ThetaA1 ThetaA2 tau G D T A x v Hval Hv HC HinT HninG HninD.
     destruct I as [ A' e B' y | | | | ].
 
-    (* Case Send. *)
+    (* Case Send *)
     + inversion HC. subst.
 
       assert (A = A' \/ A <> A') as HCasesAeqA'.
       tauto.
 
       destruct HCasesAeqA' as [HCasesAeqA'L | HCasesAeqA'R].
+
+      (* Case A = A' *)
       {
         assert (HSendety : (exists Theta tau', Expr.WellTyped (ChorEnv.find A' G) DeltaA1 Theta e tau')).
         exists ThetaA0.
@@ -551,23 +565,30 @@ Proof.
         
         pose proof
           (esubst_lin (ChorEnv.find A' G) DeltaA1 e x v tau HSendety HninG) as HESL.
+
+        (* Case x in e *) 
         destruct HESL as [HxinDA | HxninDA].          
-          {
-            destruct HxinDA as [DeltaA1'].
-            destruct H as [HinDA HninDA'].
-            rewrite <- HinDA in H8.
-            pose proof
-              (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A' G) DeltaA1'
-                 (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
-                 Hval Hv H8) as HWTS.
-            pose proof (find_add A' ThetaA2 T) as HFA.
-            rewrite -> HCasesAeqA'L in H11.
-            rewrite -> HCasesAeqA'L in HinT.
-            rewrite -> HFA in H11.
-            pose proof
-              (partitioning (ChorEnv.find A' T) ThetaA0 ThetaA1 ThetaA2 ThetaA3 HinT H11)
-              as HPartition.
-            specialize (HWTS HPartition HninG HninDA').
+        {
+          (* prepare witness for expression e typing *)
+          destruct HxinDA as [DeltaA1'].
+          destruct H as [HinDA HninDA'].
+          rewrite <- HinDA in H8.
+          pose proof
+            (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A' G) DeltaA1'
+               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
+               Hval Hv H8) as HWTS.
+          pose proof (find_add A' ThetaA2 T) as HFA.
+          rewrite -> HCasesAeqA'L in H11.
+          rewrite -> HCasesAeqA'L in HinT.
+          rewrite -> HFA in H11.
+          pose proof
+            (partitioning (ChorEnv.find A' T) ThetaA0 ThetaA1 ThetaA2 ThetaA3 HinT H11)
+            as HPartition.
+          specialize (HWTS HPartition HninG HninDA').
+
+          (* prepare witness for choreography C typing *)
+          rewrite -> HCasesAeqA'L in H9.
+          rewrite -> (addadd A' T ThetaA3 ThetaA2) in H9.            
 
             - eapply Send.
 
@@ -578,6 +599,8 @@ Proof.
                 { contradiction. }
                 
               + fold Choreography.subst.
+                destruct (Insn.rebound_in A x) eqn:Heq.
+                {
 
 Admitted.
 
