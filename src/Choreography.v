@@ -59,6 +59,14 @@ Module Insn.
     Proof.
       intros. unfold bind_eq. tauto.
     Qed.
+
+    Lemma bind_eq_reflexive : forall Ax By, bind_eq Ax By -> bind_eq By Ax.
+    Proof.
+      intros (A,x) (B,y) H.
+      unfold bind_eq.
+      unfold bind_eq in H.
+      intuition.
+    Qed.
     
     Definition bind_eq_dec  (Ax : bindt) (By: bindt) : {bind_eq Ax By} + {~(bind_eq Ax By)} :=
       match ((Actor.eq_dec (fst Ax) (fst By)), (Var.eq_dec (snd Ax) (snd By))) with
@@ -71,7 +79,18 @@ Module Insn.
       match (bool_of_sumbool (bind_eq_dec Ax By)) with
       | exist _ x _ => x
       end.
-
+    
+    Lemma bind_eqb_reflexive : forall Ax By, bind_eqb Ax By = bind_eqb By Ax.
+    Proof.
+      intros (A,x) (B,y).
+      destruct (bind_eqb (A, x) (B, y)) eqn:H0.
+      unfold bind_eqb.
+      destruct bool_of_sumbool.
+      pose proof (bind_eq_reflexive (B, y) (A, x)) as Heqr.
+      (* Seems like the following should work, but it breaks. *)
+      (* rewrite -> Heqr in y0. *)
+    Admitted.
+    
     Definition rebound_in (A : Actor.t) (x : Var.t) (I : t) : bool :=
       match I with
       | Send B1 e B2 y => bind_eqb (A,x) (B2,y)    
@@ -93,17 +112,7 @@ Module Choreography.
       | [] => []
       | (Ins :: C') => (Insn.subst A x v Ins)::(if (Insn.rebound_in A x Ins)
                                                 then C' else (subst A x v C')) 
-      end. 
-
-    (* Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
-      match C with
-      | [] => []
-      | (Ins :: C') =>
-          if (List.existsb (Insn.bind_eqb (A,x)) (Insn.bindings (Ins))) then
-            (Insn.subst A x v Ins)::C'
-          else
-            (Insn.subst A x v Ins)::(subst A x v C') 
-      end.*)
+      end.
 End Choreography.
 
 Module Label.
@@ -216,14 +225,13 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
     WellTyped G (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)) T C ->
 
     ~ Var.Map.In x (ChorEnv.find A D) ->
-    ~ Var.Map.In y (ChorEnv.find A D) ->
+    ~ Var.Map.In y (ChorEnv.find B D) ->
 
     WellTyped G D T ((Insn.EPR A x B y)::C)
 
 | Send : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A e tau B y C,
     A <> B ->
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
-    (* ces changed ThetaA1 to ThetaA2 below-- correct? fix other cases? *)
     WellTyped (ChorEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
@@ -234,7 +242,7 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
 | LetBang : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
-    WellTyped (ChorEnv.add A x tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA1 T) C ->
+    WellTyped (ChorEnv.add A x tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
@@ -244,7 +252,7 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
 | LetIn : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e tau ->
-    WellTyped G (Actor.Map.add A (Var.Map.add x tau DeltaA2) D) (Actor.Map.add A ThetaA1 T) C ->
+    WellTyped G (Actor.Map.add A (Var.Map.add x tau DeltaA2) D) (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
@@ -255,7 +263,7 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
 | LetPair: forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x1 x2 tau1 tau2 e C,
 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) ->
-    WellTyped G (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D) (Actor.Map.add A ThetaA1 T) C ->
+    WellTyped G (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D) (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
@@ -264,7 +272,6 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
 
     WellTyped G D T ((Insn.LetPair A x1 x2 e)::C)
 .
-
 
 From Stdlib Require Import Morphisms. (* for Proper *)
 
@@ -564,6 +571,47 @@ Lemma addadd4 :  forall {X : Type} (CE : ChorEnv.t X) A MA B MB,
 Proof.
 Admitted.
 
+Lemma addadd5 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
+    Insn.bind_eqb (B, y) (A, x) = false ->
+    (ChorEnv.add A x taux (ChorEnv.add B y tauy CE)) = 
+      (ChorEnv.add B y tauy (ChorEnv.add A x taux CE)).
+Proof.
+Admitted.
+
+Lemma nbeqeq : forall A x y,
+    Insn.bind_eqb (A, x) (A, y) = false ->
+    x <> y.
+Proof.
+Admitted.
+
+Lemma nin_map : forall (M : Var.Map.t Expr.typ)  x y tau,
+    x <> y ->
+    ~ Var.Map.In x M ->
+    ~ Var.Map.In x (Var.Map.add y tau M).
+Proof.
+Admitted.
+      
+
+Lemma nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
+    ~ Var.Map.In y (ChorEnv.find B (ChorEnv.add A x tau CE)) ->
+    Insn.bind_eqb (A, x) (B, y) = false.
+Proof.
+Admitted.
+
+Lemma nin_nbeq_add1 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+    Insn.bind_eqb (A, x) (B, y) = false ->
+    ~ Var.Map.In x (ChorEnv.find A CE) ->
+      ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE)).
+Proof.
+Admitted.
+
+Lemma nin_nbeq_add2 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+    Insn.bind_eqb (A, x) (B, y) = false ->
+    ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE))->
+    ~ Var.Map.In x (ChorEnv.find A CE).
+Proof.
+Admitted.
+      
 (* This Lemma should be equivalent to Insn.nbeq, but annoying technical proof...
    perhaps should eliminate fancy Insn.bind.eq_dec to simplify? *)
 Lemma nbeq : forall A B x y,
@@ -638,7 +686,7 @@ Proof.
     
   (* Case C = I::C' *) 
   - intros ThetaA1 ThetaA2 tau G D T A x v Hval Hv HC HinT HninG HninD.
-    destruct I as [ A' e B y | A' y B z | | | ].
+    destruct I as [ A' e B y | A' y B z | A' y e | | ].
 
     (* Case Send *)
     + inversion HC. subst.
@@ -832,8 +880,127 @@ Proof.
 
     (* Case EPR *)
     + inversion HC. subst.
+      pose proof (nin_nbeq D A x tau A' y H9) as HninAA'.
+      pose proof (nin_nbeq D A x tau B z H10) as HninAB.
+      rewrite -> (addadd5 D A' y Expr.QUBIT A x tau HninAA') in H8.
+      rewrite -> (addadd5 (ChorEnv.add A' y Expr.QUBIT D) B z Expr.QUBIT A x tau HninAB) in H8.
       
-                            
+      pose proof (nin_nbeq_add1 D A x A' y Expr.QUBIT HninAA' HninD) as HaddAA'.
+      pose proof (nin_nbeq_add1 (ChorEnv.add A' y Expr.QUBIT D) A x B z Expr.QUBIT HninAB HaddAA') as HaddAB.
+
+      (* specialize and apply IH *)
+      specialize (IHC ThetaA1 ThetaA2 tau G
+                    (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A' y Expr.QUBIT D))
+                    T A x v Hval Hv H8 HinT HninG HaddAB).
+
+      eapply EPR; auto.
+
+      fold Choreography.subst.
+      destruct (Insn.rebound_in A x (Insn.EPR A' y B z)) eqn:Heq.      
+      {
+        simpl in Heq.
+        destruct (Insn.bind_eqb (A, x) (A', y)) eqn:H.
+        {
+          setoid_rewrite -> HninAA' in H.
+          discriminate.
+        }
+        {
+          simpl in Heq.
+          setoid_rewrite -> HninAB in Heq.
+          discriminate.
+        }
+      }
+
+      auto.
+      
+      setoid_rewrite <- (Insn.bind_eqb_reflexive (A', y) (A, x)) in HninAA'.
+      apply (nin_nbeq_add2 D A' y A x tau HninAA') in H9.
+      auto.
+      
+      setoid_rewrite <- (Insn.bind_eqb_reflexive (B, z) (A, x)) in HninAB.
+      apply (nin_nbeq_add2 D B z A x tau HninAB) in H10.
+      auto.
+
+    (* Case Let *)
+    + inversion HC; subst.
+
+      assert (A = A' \/ A <> A') as HCasesAeqA'.
+      tauto.
+
+      destruct HCasesAeqA' as [HCasesAeqA'L | HCasesAeqA'R].
+
+      (* Case A = A' *)
+      {
+        rewrite <- HCasesAeqA'L in *.
+        
+        assert (HSendety : (exists Theta tau', Expr.WellTyped (ChorEnv.find A G) DeltaA1 Theta e tau')).
+        exists ThetaA0.
+        exists tau0.
+        auto.
+        
+        pose proof
+          (esubst_lin (ChorEnv.find A G) DeltaA1 e x v tau HSendety HninG) as HESL.
+      
+        (* Case x in e *) 
+        destruct HESL as [HxinDA | HxninDA].          
+        {
+          (* prepare witness for expression e typing and partioning facts. *)
+          destruct HxinDA as [DeltaA1'].
+          destruct H as [HinDA HninDA'].
+          rewrite <- HinDA in H3.
+          pose proof
+            (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
+               (Var.Map.concat ThetaA1 ThetaA0) x v tau0
+               Hval Hv H3) as HWTS.
+          pose proof (find_add A ThetaA2 T) as HFA.
+          rewrite -> HFA in H9.
+          (* partioning facts. *)
+          pose proof
+            (partitioning (ChorEnv.find A T) ThetaA0 ThetaA1 ThetaA2 ThetaA3 HinT H9)
+            as HPartition.
+          destruct HPartition as [HPartitionA [HPartitionB [HPartitionC HPartitionD]]].
+          (* e typing witness. *)
+          specialize (HWTS HPartitionA HninG HninDA').
+
+          (* prepare witness for choreography C typing *)
+          rewrite -> (addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7. 
+          rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
+
+          (* prepare hypotheses for partitioning requirements *)
+          rewrite -> (add_find D A x tau) in H8.
+          pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau HinDA H8) as Hnin.
+          pose proof (csubst_lin
+                        G
+                        (Actor.Map.add A  (Var.Map.add y tau0 DeltaA2) D)
+                        (Actor.Map.add A ThetaA3 T)
+                        C
+                        A x v H7) as HCSL.
+          rewrite -> (find_add A (Var.Map.add y tau0 DeltaA2) D) in HCSL.
+          destruct Hnin as [HninA HninB].
+
+          (* prove main goal in subcases *)
+          - eapply LetIn.
+            
+            + destruct (Actor.FSet.MF.eq_dec A A) eqn:Heq.
+              { eauto. }
+              { contradiction. }
+              
+            + fold Choreography.subst.
+              destruct (Insn.rebound_in A x) eqn:Heq.
+              {
+                eauto.
+              }
+              {
+                unfold Insn.rebound_in in Heq.
+                specialize (HCSL (nin_map DeltaA2 x y tau0 (nbeqeq A x y Heq) HninA)).
+                rewrite -> HCSL.
+                eauto.
+              }
+              
+            + auto.
+              
+            + auto.
+          
 Admitted.
 
     
