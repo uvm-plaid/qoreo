@@ -4,6 +4,7 @@ From Qoreo Require Expr.
 From Stdlib Require Import Structures.Equalities.
 From Stdlib Require Import Program.Equality.
 From Stdlib Require Import Logic.
+From Stdlib Require Import Logic.Decidable.
 
 Module Insn.
     Inductive t : Type :=
@@ -258,6 +259,9 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
     ~ Var.Map.In x DeltaA2 ->
 
+    (* Leaving this here as the analogue of shadowing requirement in Expr.WellTyped, that
+       I argue is not necessary. *)
+    (* WellTyped (Actor.Map.add A (Var.Map.remove x (ChorEnv.find A G)) G) D T ((Insn.Let A x e)::C) *)
     WellTyped G D T ((Insn.Let A x e)::C)
 
 | LetPair: forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x1 x2 tau1 tau2 e C,
@@ -493,7 +497,10 @@ Proof.
 
 Qed.
 
-(* START Easily(?) proven facts *) 
+(* START Easily(?) proven facts *)
+(* Lemma fold_chorenv : forall {X : Type} (CE : ChorEnv.t X) A x tau,
+    (Actor.Map.add A () *)
+
 Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
     ~ Actor.Map.Empty (ChorEnv.add A x tau D).
 Proof.
@@ -554,7 +561,7 @@ Lemma addadd1 : forall A (D : ChorEnv.t Expr.typ) Delta x tau,
 Proof.
 Admitted.
 
-Lemma addadd2 : forall A (T : ChorEnv.t nat) Theta1 Theta2,
+Lemma addadd2 : forall {X : Type} A (T : ChorEnv.t X) Theta1 Theta2,
     (Actor.Map.add A Theta1 (Actor.Map.add A Theta2 T)) = (Actor.Map.add A Theta1 T).
 Proof.
 Admitted.
@@ -578,9 +585,31 @@ Lemma addadd5 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
 Proof.
 Admitted.
 
+(* this lemma may help prove the preceding lemma. *)
+Lemma addadd6 :  forall {X : Type} x taux y tauy (M : Var.Map.t X),
+    x <> y -> 
+    (Var.Map.add y tauy (Var.Map.add x taux M)) =
+      (Var.Map.add x taux (Var.Map.add y tauy M)).
+Proof.
+Admitted.
+
+Lemma addadd7 :  forall (CE : ChorEnv.t Expr.typ) A x tau1 y tau2 M,
+    x <> y -> 
+    Actor.Map.add A (Var.Map.add y tau2 M) (ChorEnv.add A x tau1 CE) =
+      ChorEnv.add A x tau1 (Actor.Map.add A (Var.Map.add y tau2 M) CE).
+Proof.
+Admitted.
+
 Lemma nbeqeq : forall A x y,
     Insn.bind_eqb (A, x) (A, y) = false ->
     x <> y.
+Proof.
+  
+Admitted.
+
+Lemma beqeq : forall A x y,
+    Insn.bind_eqb (A, x) (A, y) = true ->
+    x = y.
 Proof.
 Admitted.
 
@@ -588,6 +617,13 @@ Lemma nin_map : forall (M : Var.Map.t Expr.typ)  x y tau,
     x <> y ->
     ~ Var.Map.In x M ->
     ~ Var.Map.In x (Var.Map.add y tau M).
+Proof.
+Admitted.
+
+(* contrapositive of nin_map with mapsto rewrite *)
+Lemma map_in : forall (M : Var.Map.t Expr.typ)  x tau,
+    Var.Map.MapsTo x tau M ->
+    Var.Map.In x M.
 Proof.
 Admitted.
       
@@ -632,6 +668,13 @@ Lemma nin : forall (Delta : Var.Map.t Expr.typ) Delta1' Delta1 Delta2 x tau,
     ~ (Var.Map.In x Delta2) /\ Var.Map.Partition Delta Delta1' Delta2.
 Proof.
 Admitted.
+
+Lemma mapsto_destruct : forall {X : Type} x tau (M : Var.Map.t X) ,
+    Var.Map.MapsTo x tau M ->
+    (exists M', M = Var.Map.add x tau M' /\ ~ Var.Map.In x M').
+Proof.
+Admitted.
+    
 (* STOP Easily(?) proven facts *) 
 
 Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
@@ -1008,6 +1051,18 @@ Proof.
           destruct HxninDA as [HxninDAA HxninDAB].
           rewrite -> (add_find D A x tau) in H8.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H8 HxninDAA) as Hini.
+
+          (* (de)construct environment for typing C *)
+          pose proof (mapsto_destruct x tau DeltaA2 Hini) as HDA2.
+          destruct HDA2 as [DeltaA2'].
+          destruct H as [HDA2A HDA2B].
+
+          (* partioning facts. *)
+          rewrite -> (find_add A ThetaA2 T) in H9.
+          pose proof
+            (partitioning (ChorEnv.find A T) ThetaA0 ThetaA1 ThetaA2 ThetaA3 HinT H9) 
+            as HPartition.                
+          destruct HPartition as [HPartitionA [HPartitionB [HPartitionC HPartitionD]]].
           
           (* prove main goal in subcases *)
           - eapply LetIn.
@@ -1021,15 +1076,53 @@ Proof.
 
             + fold Choreography.subst.
               destruct (Insn.rebound_in A x (Insn.Let A y e)) eqn:Heq.
+              (* impossible case x = y *)
               {
-                (* ALERT: this shows that linear variables can be classically rebound *)
+                (* Note to ces: This case is provable constructively as follows, but instantiates
+                   existential variables that falsify the hypotheses for subsequent case. *)
+                (*
+                  rewrite -> (addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7.
+                  rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
+                  eauto.
+                 *)
+                pose proof (beqeq A x y Heq).
+                pose proof (map_in DeltaA2 x tau Hini).
+                rewrite <- H in H10.
+                contradiction.
+              }
+              (* case x <> y *)
+              {
                 rewrite -> (addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7.
-                rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
-                eauto.
-              }
-              {
+                rewrite -> HDA2A in H7.
+                unfold Insn.rebound_in in Heq.
+                rewrite -> (addadd6 x tau y tau0 DeltaA2') in H7.
+                                
                 
+                (* specialize and apply IH. *)
+                specialize (IHC ThetaA1 ThetaA3 tau
+                              G
+                              (Actor.Map.add A (Var.Map.add y tau0 DeltaA2') D)
+                              (Actor.Map.add A (Var.Map.concat ThetaA1 ThetaA3) T)
+                              A x v Hval Hv).
+                
+                unfold ChorEnv.add in IHC.
+                rewrite -> (find_add A (Var.Map.add y tau0 DeltaA2') D) in IHC.
+                rewrite -> (addadd2 A D (Var.Map.add x tau (Var.Map.add y tau0 DeltaA2'))) in IHC.
+                rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
+                rewrite -> (addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
+                specialize (IHC H7).
+
+                rewrite -> (find_add A (Var.Map.concat ThetaA1 ThetaA3) T) in IHC.
+                specialize (IHC HPartitionB HninG
+                              (nin_map DeltaA2' x y tau0 (nbeqeq A x y Heq) HDA2B)).                
+
+                eauto.
+
+                apply (nbeqeq A x y Heq).
               }
+              
+              + 
+
                
 Admitted.
 
