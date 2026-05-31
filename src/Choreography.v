@@ -1195,9 +1195,21 @@ Proof.
               eauto.
             }
 
-            +
+            + assert (A' <> A).
+              auto.
+              rewrite -> (find_ab_neq1 A' A x tau D H) in H8.
+              auto.
 
+            + assert (A' <> A).
+              auto.
+              rewrite -> (find_ab_neq2 A' A ThetaA2 T H) in H9.
+              auto.
 
+            + auto.
+      }
+
+    + 
+ 
               
 Admitted.
 
