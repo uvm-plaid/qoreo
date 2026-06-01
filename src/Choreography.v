@@ -282,6 +282,12 @@ From Stdlib Require Import Morphisms. (* for Proper *)
 Global Instance WellTypedProper : Proper (ChorEnv.Equal ==> ChorEnv.Equal ==> ChorEnv.Equal ==> eq ==> iff) WellTyped.
 Admitted.
 
+Lemma wt_disjoint : forall A G D T C,
+    WellTyped G D T C ->
+    Var.Map.Properties.Disjoint (ChorEnv.find A G) (ChorEnv.find A D).
+Proof.
+Admitted.
+    
 Lemma extension : forall A G x (tau : Expr.typ),
     ChorEnv.MapsTo A x tau G <-> Var.Map.MapsTo x tau (ChorEnv.find A G).
 Proof.
@@ -498,9 +504,14 @@ Proof.
 Qed.
 
 (* START Easily(?) proven facts *)
-(* Lemma fold_chorenv : forall {X : Type} (CE : ChorEnv.t X) A x tau,
-    (Actor.Map.add A () *)
 
+Lemma nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
+    Var.Map.Properties.Disjoint M1 M2 ->
+    Var.Map.In x M2 ->
+    ~ Var.Map.In x M1.
+Proof.
+Admitted.
+    
 Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
     ~ Actor.Map.Empty (ChorEnv.add A x tau D).
 Proof.
@@ -659,6 +670,13 @@ Lemma nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
 Proof.
 Admitted.
 
+(* this follows by contraposition of nin_nbeq, atm I am not sure how to
+   prove contrapositive. *)          
+Lemma in_beq : forall (CE : ChorEnv.t Expr.typ) A x tau,
+    Var.Map.In x (ChorEnv.find A (ChorEnv.add A x tau CE)).
+Proof.
+Admitted.
+
 Lemma nin_nbeq_add1 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
     Insn.bind_eqb (A, x) (B, y) = false ->
     ~ Var.Map.In x (ChorEnv.find A CE) ->
@@ -699,7 +717,7 @@ Lemma mapsto_destruct : forall {X : Type} x tau (M : Var.Map.t X) ,
     (exists M', M = Var.Map.add x tau M' /\ ~ Var.Map.In x M').
 Proof.
 Admitted.
-    
+
 (* STOP Easily(?) proven facts *) 
 
 Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
@@ -1210,9 +1228,8 @@ Proof.
             + auto.
       }
 
+    (* Case LetBang *)
     + inversion HC; subst.
-
-      
 
       assert (A = A' \/ A <> A') as HCasesAeqA'.
       tauto.
@@ -1222,6 +1239,9 @@ Proof.
       (* Case A = A' *)
       {
         rewrite <- HCasesAeqA'L in *.
+
+        rewrite -> (addadd1 A D DeltaA2 x tau) in H7.
+        rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
         
         assert (HSendety : (exists Theta tau', Expr.WellTyped (ChorEnv.find A G)
                                                  DeltaA1 Theta e tau')).
@@ -1235,7 +1255,58 @@ Proof.
         (* Case x in e *) 
         destruct HESL as [HxinDA | HxninDA].          
         {
-          admit.
+          (* prepare witness for expression e typing and partioning facts. *)
+          destruct HxinDA as [DeltaA1'].
+          destruct H as [HinDA HninDA'].
+
+          (* expression typing *)
+          rewrite <- HinDA in H6.
+          
+          (* partioning facts. *)
+          rewrite -> (find_add A ThetaA2 T) in H9.
+          pose proof
+            (partitioning (ChorEnv.find A T) ThetaA0 ThetaA1 ThetaA2 ThetaA3 HinT H9)
+            as HPartition.
+          destruct HPartition as [HPartitionA [HPartitionB [HPartitionC HPartitionD]]].
+          rewrite -> (add_find D A x tau) in H8.
+          pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau HinDA H8) as Hnin.
+          destruct Hnin as [HninA HninB].
+               
+          eapply LetBang.
+          
+          + destruct (Actor.FSet.MF.eq_dec A A) eqn:Heq.
+            {
+            
+              pose proof
+                (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
+                   (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
+                   Hval Hv H6 HPartitionA HninG HninDA') as HWTS.
+              eauto.
+            }
+            {
+              contradiction.
+            }
+
+          +  fold Choreography.subst.
+             destruct (Insn.rebound_in A x) eqn:Heq.
+             { eauto.}
+             {
+               pose proof (csubst_lin
+                             (ChorEnv.add A y tau0 G)
+                             (Actor.Map.add A DeltaA2 D)
+                             (Actor.Map.add A ThetaA3 T)
+                             C
+                             A x v H7) as HCSL.
+               rewrite -> (find_add A DeltaA2 D) in HCSL.
+                       
+               specialize (HCSL HninA).
+               rewrite -> HCSL.
+               eauto.
+             }
+             
+          + auto.
+
+          + auto.
         }
         (* case x not in e *)
         {
@@ -1254,14 +1325,30 @@ Proof.
               { auto. }
               
             + fold Choreography.subst.
+              (* impossible case due to env disjointness *)
               destruct (Insn.rebound_in A x (Insn.LetBang A y e)) eqn:Heq.
               {
                 unfold Insn.rebound_in in Heq.
                 pose proof (beqeq A x y Heq).
                 rewrite <- H in *.
+
+                pose proof (wt_disjoint A (ChorEnv.add A x tau0 G) (Actor.Map.add A DeltaA2 D)
+                              (Actor.Map.add A ThetaA3 T) C H7) as Hwtdj.
+                rewrite (find_add A DeltaA2 D) in Hwtdj.
+
+                (* This does not go through with tauto. 
+                   pose proof (nin_nbeq G A x tau0 A x).
+                   assert (Insn.bind_eqb (A, x) (A, x) = true ->
+                       Var.Map.In (elt:=Expr.typ) x (ChorEnv.find A (ChorEnv.add A x tau0 G))).
+                   tauto. *)
+
+                pose proof (nin_dj x (ChorEnv.find A (ChorEnv.add A x tau0 G)) DeltaA2
+                              Hwtdj (map_in DeltaA2 x tau Hini)) as Hcontra1.
+                pose proof (in_beq G A x tau0) as Hcontra2.
+                contradiction.
               }
-        
-      
+              { 
+                
 Admitted.
 
     
