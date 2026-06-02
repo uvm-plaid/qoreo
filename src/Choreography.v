@@ -1410,7 +1410,7 @@ Proof.
             { eauto. } 
             
           + fold Choreography.subst.
-            destruct (Insn.rebound_in A x (Insn.Let A' y e)) eqn:Heq.
+            destruct (Insn.rebound_in A x (Insn.LetBang A' y e)) eqn:Heq.
             {
               unfold Insn.rebound_in in Heq.
               pose proof (beq A A' x y).
@@ -1419,8 +1419,37 @@ Proof.
               destruct H.
               contradiction.
             }
-      
-                              
+            {
+              (* prepare C typing *)
+              rewrite -> (addadd4 T A ThetaA2 A' ThetaA3 HCasesAeqA'R) in H7.
+              rewrite -> (addadd3 D A x tau A' DeltaA2 HCasesAeqA'R) in H7.
+
+              (* specialize and apply IH *)
+              specialize (IHC ThetaA1 ThetaA2 tau
+                            (ChorEnv.add A' y tau0 G)
+                            (Actor.Map.add A' DeltaA2 D)
+                            (Actor.Map.add A' ThetaA3 T)
+                            A x v Hval Hv H7).
+              rewrite -> (find_ab_neq2 A A' ThetaA3 T HCasesAeqA'R) in IHC.
+              rewrite -> (find_ab_neq2 A A' DeltaA2 D HCasesAeqA'R) in IHC.
+              simpl in Heq.
+              pose proof (find_nbeq G A x A' y tau0 Heq HninG) as HninG'.
+              eapply (IHC HinT HninG' HninD).
+            }
+
+            + assert (A' <> A).
+              auto.
+              rewrite -> (find_ab_neq1 A' A x tau D H) in H8.
+              auto.
+
+            + assert (A' <> A).
+              auto.
+              rewrite -> (find_ab_neq2 A' A ThetaA2 T H) in H9.
+              auto.
+      }
+
+      (* Case LetPair *)
+    + 
                
 Admitted.
 
