@@ -65,12 +65,32 @@ Module Insn.
         { intros. unfold bind_eq. auto. }
       Qed.
         
-    Lemma nbeq : forall Ax By, ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) -> ~(bind_eq Ax By).
+    Lemma nbeq : forall Ax By, ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) <-> ~(bind_eq Ax By).
     Proof.
-      intros. unfold bind_eq. tauto.
+      intros.
+      split.
+      { intros. unfold bind_eq. tauto. }
+      { intros. unfold bind_eq in H. tauto. }
     Qed.
 
+    Lemma nbeqlr : forall Ax By, ((fst Ax) <> (fst By) \/ (snd Ax) <> (snd By)) -> ~(bind_eq Ax By).
+    Proof.
+      intros.
+      pose proof (nbeq Ax By) as Hnbeq.
+      destruct Hnbeq as [HnbeqA _].
+      apply HnbeqA.
+      auto.
+    Qed.
+           
     Lemma bind_eq_symmetric : forall Ax By, bind_eq Ax By -> bind_eq By Ax.
+    Proof.
+      intros (A,x) (B,y) H.
+      unfold bind_eq.
+      unfold bind_eq in H.
+      intuition.
+    Qed.
+           
+    Lemma bind_neq_symmetric : forall Ax By, ~ bind_eq Ax By -> ~ bind_eq By Ax.
     Proof.
       intros (A,x) (B,y) H.
       unfold bind_eq.
@@ -81,8 +101,8 @@ Module Insn.
     Definition bind_eq_dec  (Ax : bindt) (By: bindt) : {bind_eq Ax By} + {~(bind_eq Ax By)} :=
       match ((Actor.eq_dec (fst Ax) (fst By)), (Var.eq_dec (snd Ax) (snd By))) with
       | (left pt1, left pt2) => left (conj pt1 pt2)
-      | (right pt1, _) => right (nbeq Ax By (or_introl pt1))
-      | (_, right pt2) => right (nbeq Ax By (or_intror pt2))
+      | (right pt1, _) => right (nbeqlr Ax By (or_introl pt1))
+      | (_, right pt2) => right (nbeqlr Ax By (or_intror pt2))
       end.
 
     (* Unwieldy but leaving as advanced technical example. *)
@@ -122,16 +142,70 @@ Module Insn.
       }
     Qed.
 
+    Lemma bind_eqb_false : forall Ax By, 
+      bind_eqb Ax By = false <-> ~ bind_eq Ax By.
+    Proof.
+      intros.
+      split.
+      {
+        intros.
+        pose proof (nbeq Ax By) as Hnbeq.
+        destruct Hnbeq as [HnbeqA HnbeqB].
+        apply HnbeqA.
+        unfold bind_eqb in H.
+        (* NOTE destruction of dependent type with desired spec! *)
+        destruct (bind_eq_dec Ax By) in H.
+        { discriminate. }
+        {
+          apply HnbeqB in n.
+          auto.
+        }
+      }
+      {
+        intros.
+        unfold bind_eqb.
+        destruct (bind_eq_dec Ax By).
+        { contradiction. }
+        { reflexivity. }
+      }
+    Qed.
+
     Lemma bind_eqb_symmetric : forall Ax By, bind_eqb Ax By = bind_eqb By Ax.
     Proof.
-      intros (A,x) (B,y).  
-      destruct (bind_eqb (A, x) (B, y)) eqn:H0.
-      unfold bind_eqb.
-      destruct bool_of_sumbool.
-      pose proof (bind_eq_symmetric (B, y) (A, x)) as Heqr.
-      (* Seems like the following should work, but it breaks. *)
-      (* rewrite -> Heqr in y0.  *)
-    Admitted.
+      intros.
+      (* pose proof (bind_eqb_true Ax By) as Hbeqt.
+      destruct Hbeqt as [HbeqtA HbeqtB].
+      pose proof (bind_eqb_false Ax By) as Hbeqf.
+      destruct Hbeqf as [HbeqfA HbeqfB]. *)
+
+      pose proof (bind_eq_symmetric By Ax) as Hbeqs.
+      pose proof (bind_neq_symmetric By Ax) as Hbneqs.
+      
+      destruct (bind_eqb By Ax) eqn:Heqb.
+      {
+        pose proof (bind_eqb_true Ax By) as HbeqABt.
+        destruct HbeqABt as [HbeqABtA HbeqABtB].
+        pose proof (bind_eqb_true By Ax) as HbeqBAt.
+        destruct HbeqBAt as [HbeqBAtA HbeqBAtB].
+        
+        apply HbeqABtB.
+        specialize (HbeqBAtA Heqb).
+        specialize (Hbeqs HbeqBAtA).
+        auto.
+      }
+      {        
+        pose proof (bind_eqb_false Ax By) as HbeqABf.
+        destruct HbeqABf as [HbeqABfA HbeqABfB].
+        pose proof (bind_eqb_false By Ax) as HbeqBAf.
+        destruct HbeqBAf as [HbeqBAfA HbeqBAfB].
+        
+        apply HbeqABfB.        
+        specialize (HbeqBAfA Heqb).
+        specialize (Hbneqs HbeqBAfA).
+        auto.
+      }
+
+    Qed.
     
     Definition rebound_in (A : Actor.t) (x : Var.t) (I : t) : bool :=
       match I with
