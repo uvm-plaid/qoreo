@@ -618,6 +618,61 @@ Proof.
 
 Qed.
 
+(* Helpful Lemmas about binding equality based on Insn.beq *)
+Lemma nbeq : forall A B x y,
+    A <> B -> ~ ((Insn.bind_eqb (A,x) (B,y)) = true).
+Proof.
+  intros.
+  pose proof (Insn.bind_eqb_false (A,x) (B,y)).
+  destruct H0.
+  pose proof (not_true_iff_false (Insn.bind_eqb (A, x) (B, y))).
+  destruct H2.
+  apply H3.
+  apply H1.
+  pose proof (Insn.nbeq (A,x) (B,y)).
+  destruct H4.
+  apply H4.
+  simpl.
+  auto.
+Qed.
+
+Lemma beq : forall A B x y,
+    Insn.bind_eqb (A, x) (B, y) = true <-> (A = B /\ x = y).
+Proof.
+  intros.
+  pose proof (Insn.bind_eqb_true (A, x) (B, y)).
+  rewrite -> (Insn.beq (A, x) (B, y)) in H.
+  simpl in H.
+  auto.
+Qed.
+
+Lemma nbeqeq : forall A x y,
+    Insn.bind_eqb (A, x) (A, y) = false ->
+    x <> y.
+Proof.
+  intros.  
+  pose proof (Insn.bind_eqb_false (A, x) (A, y)).
+  destruct H0.
+  specialize (H0 H).
+  rewrite -> (Insn.beq (A, x) (A, y)) in H0.
+  simpl in H0.
+  auto.
+Qed.
+
+Lemma beqeq : forall A x y,
+    Insn.bind_eqb (A, x) (A, y) = true ->
+    x = y.
+Proof.
+  intros.
+  pose proof (Insn.bind_eqb_true (A, x) (A, y)).
+  destruct H0.
+  specialize (H0 H).
+  rewrite -> (Insn.beq (A, x) (A, y)) in H0.
+  simpl in H0.
+  destruct H0.
+  auto.
+Qed.  
+
 (* START Easily(?) proven facts *)
 
 Lemma nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
@@ -743,26 +798,6 @@ Lemma addadd8 :  forall (CE : ChorEnv.t Expr.typ) A x tau M,
 Proof.
 Admitted.
 
-(* next few lemmas should be derivable from this one-- it is analog of
-   Insn.nbeq, maybe should replace it. *)
-Lemma beq : forall A B x y,
-    Insn.bind_eqb (A, x) (B, y) = true <-> (A = B /\ x = y).
-Proof.
-Admitted.
-
-Lemma nbeqeq : forall A x y,
-    Insn.bind_eqb (A, x) (A, y) = false ->
-    x <> y.
-Proof.
-  
-Admitted.
-
-Lemma beqeq : forall A x y,
-    Insn.bind_eqb (A, x) (A, y) = true ->
-    x = y.
-Proof.
-Admitted.
-
 Lemma nin_mapl : forall (M : Var.Map.t Expr.typ)  x y tau,
     x <> y ->
     ~ Var.Map.In x M ->
@@ -824,13 +859,7 @@ Lemma nin_nbeq_add2 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
     ~ Var.Map.In x (ChorEnv.find A CE).
 Proof.
 Admitted.
-      
-(* This Lemma should be equivalent to Insn.nbeq, but annoying technical proof...
-   perhaps should eliminate fancy Insn.bind.eq_dec to simplify? *)
-Lemma nbeq : forall A B x y,
-    A <> B -> ~ ((Insn.bind_eqb (A,x) (B,y)) = true).
-Proof.
-Admitted.
+
 
 Lemma ini : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
     Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
