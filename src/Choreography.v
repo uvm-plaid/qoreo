@@ -618,12 +618,20 @@ Proof.
   intros.  
 Admitted.
 
-(* this follows by contraposition of nin_nbeq, atm I am not sure how to
-   prove contrapositive. *)          
 Lemma in_beq : forall (CE : ChorEnv.t Expr.typ) A x tau,
     Var.Map.In x (ChorEnv.find A (ChorEnv.add A x tau CE)).
 Proof.
-Admitted.
+  intros.
+  pose proof (contra_nin_nbeq CE A x tau A x).
+  destruct (Insn.bind_eqb_true (A, x) (A, x)).
+  destruct (Insn.beq (A,x) (A,x)).
+  assert (Insn.bind_eqb (A, x) (A, x) = true).
+  apply H1.
+  apply H3.
+  simpl.
+  auto.
+  apply (H H4). 
+Qed.
 
 Lemma nin_nbeq_add1 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
     Insn.bind_eqb (A, x) (B, y) = false ->
@@ -639,6 +647,12 @@ Lemma nin_nbeq_add2 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
 Proof.
 Admitted.
 
+Lemma nin_nbeq_add3 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
+    Insn.bind_eqb (A, x) (B, y) = false ->
+    ChorEnv.MapsTo A x taux CE ->
+    ChorEnv.MapsTo A x taux (ChorEnv.add B y tauy CE).
+Proof.
+Admitted.
 
 Lemma ini : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
     Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
@@ -682,15 +696,6 @@ Admitted.
 Lemma add_MapsTo : forall A x (tau : A) m,
   Var.Map.MapsTo x tau m ->
   Var.Map.Equal (Var.Map.add x tau m) m.
-Admitted.
-
-(* This is probably redundant. *)
-Lemma no_capture_add : forall A x (tau1 : Expr.typ) I G, 
-    (Insn.rebound_in A x I) = false ->
-    (forall B y tau2, (List.In (B,y) (Insn.bindings I)) ->
-                      ChorEnv.MapsTo A x tau1 G -> ChorEnv.MapsTo A x tau1 (ChorEnv.add B y tau2 G))
-.
-Proof.
 Admitted.
 
 (* STOP Easily(?) proven facts *)
@@ -814,13 +819,8 @@ Proof.
       { eapply HWT. }
       {
         apply IHHWT.
-        pose proof (no_capture_add A x tau (Insn.Send A0 e B y) G) as HNCA.
-        specialize (HNCA Heq B y tau0).
-        apply HNCA.
-        unfold Insn.bindings.
-        simpl.
-        auto.
-        auto.
+        unfold Insn.rebound_in in Heq.
+        apply (nin_nbeq_add3 G A x tau B y tau0 Heq HA).
       }
 
   - eapply LetBang; eauto.
@@ -843,13 +843,8 @@ Proof.
       { eapply HWT. }
       {
         apply IHHWT.
-        pose proof (no_capture_add A x tau (Insn.LetBang A0 x0 e) G) as HNCA.
-        specialize (HNCA Heq A0 x0 tau0).
-        apply HNCA.
-        unfold Insn.bindings.
-        simpl.
-        auto.
-        auto.
+        unfold Insn.rebound_in in Heq.
+        apply (nin_nbeq_add3 G A x tau A0 x0 tau0 Heq HA).
       }
 
   - eapply LetIn; eauto.
