@@ -461,7 +461,7 @@ Lemma nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
 Proof.
 Admitted.
 
-Lemma partitionm_refl : forall {X : Type} (M : Var.Map.t X) M1 M2,
+Lemma partition_sym : forall {X : Type} (M : Var.Map.t X) M1 M2,
     Var.Map.Partition M M1 M2 -> Var.Map.Partition M M2 M1.
 Proof.
 Admitted.
@@ -1540,10 +1540,10 @@ Proof.
               }
 
             +  assert (Var.Map.add x tau DeltaA2' = DeltaA2) as Hdel; auto.
-               pose proof (partitionm_refl (Var.Map.add x tau (ChorEnv.find A D)) DeltaA1 DeltaA2 H8) as Hpart.
+               pose proof (partition_sym (Var.Map.add x tau (ChorEnv.find A D)) DeltaA1 DeltaA2 H8) as Hpart.
                pose proof (nin (ChorEnv.find A D) DeltaA2' DeltaA2 DeltaA1 x tau Hdel Hpart) as Hnin.
                destruct Hnin as [HninA HninB].
-               pose proof (partitionm_refl (ChorEnv.find A D) DeltaA2' DeltaA1 HninB).
+               pose proof (partition_sym (ChorEnv.find A D) DeltaA2' DeltaA1 HninB).
                auto.
 
             + auto.
