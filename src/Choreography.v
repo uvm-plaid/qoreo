@@ -396,6 +396,16 @@ Global Instance WellTypedProper : Proper (ChorEnv.Equal ==> ChorEnv.Equal ==> Ch
 Admitted.
 
 (* Helpful Lemmas about binding equality based on Insn.beq *)
+Lemma beq : forall A B x y,
+    Insn.bind_eqb (A, x) (B, y) = true <-> (A = B /\ x = y).
+Proof.
+  intros.
+  pose proof (Insn.bind_eqb_true (A, x) (B, y)).
+  rewrite -> (Insn.beq (A, x) (B, y)) in H.
+  simpl in H.
+  auto.
+Qed.
+
 Lemma nbeq : forall A B x y,
     A <> B -> ~ ((Insn.bind_eqb (A,x) (B,y)) = true).
 Proof.
@@ -410,16 +420,6 @@ Proof.
   destruct H4.
   apply H4.
   simpl.
-  auto.
-Qed.
-
-Lemma beq : forall A B x y,
-    Insn.bind_eqb (A, x) (B, y) = true <-> (A = B /\ x = y).
-Proof.
-  intros.
-  pose proof (Insn.bind_eqb_true (A, x) (B, y)).
-  rewrite -> (Insn.beq (A, x) (B, y)) in H.
-  simpl in H.
   auto.
 Qed.
 
@@ -1504,12 +1504,6 @@ Proof.
                 pose proof (wt_disjoint A (ChorEnv.add A x tau0 G) (Actor.Map.add A DeltaA2 D)
                               (Actor.Map.add A ThetaA3 T) C H7) as Hwtdj.
                 rewrite (find_add A DeltaA2 D) in Hwtdj.
-
-                (* This does not go through with tauto. 
-                   pose proof (nin_nbeq G A x tau0 A x).
-                   assert (Insn.bind_eqb (A, x) (A, x) = true ->
-                       Var.Map.In (elt:=Expr.typ) x (ChorEnv.find A (ChorEnv.add A x tau0 G))).
-                   tauto. *)
 
                 pose proof (nin_dj x (ChorEnv.find A (ChorEnv.add A x tau0 G)) DeltaA2
                               Hwtdj (map_in DeltaA2 x tau Hini)) as Hcontra1.
