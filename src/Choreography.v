@@ -173,10 +173,6 @@ Module Insn.
     Lemma bind_eqb_symmetric : forall Ax By, bind_eqb Ax By = bind_eqb By Ax.
     Proof.
       intros.
-      (* pose proof (bind_eqb_true Ax By) as Hbeqt.
-      destruct Hbeqt as [HbeqtA HbeqtB].
-      pose proof (bind_eqb_false Ax By) as Hbeqf.
-      destruct Hbeqf as [HbeqfA HbeqfB]. *)
 
       pose proof (bind_eq_symmetric By Ax) as Hbeqs.
       pose proof (bind_neq_symmetric By Ax) as Hbneqs.
@@ -1791,11 +1787,70 @@ Proof.
       }
       (* Case A <> A' *)
       {
-        
-          
+        - eapply LetPair.
 
+          + destruct (Actor.FSet.MF.eq_dec A A') eqn:Heq.
+            { contradiction. }
+            { eauto. } 
+
+          + fold Choreography.subst.
+            destruct (Insn.rebound_in A x (Insn.LetPair A' y z e)) eqn:Heq.
+            {
+              unfold Insn.rebound_in in Heq.
+              rewrite orb_true_iff in Heq.
+              destruct Heq as [Heqxy | Heqxz].
+              {
+                pose proof (beq A A' x y).
+                destruct H as [HA HB].
+                specialize (HA Heqxy).
+                destruct HA.
+                contradiction.
+              }
+              {
+                pose proof (beq A A' x z).
+                destruct H as [HA HB].
+                specialize (HA Heqxz).
+                destruct HA.
+                contradiction.
+              }
+            }
+            { 
+              (* prepare C typing *)
+              Check addadd3.
+              Check addadd4.
+              rewrite -> (addadd3 D A x tau A'
+                            (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) HCasesAeqA'R) in H8.
+              rewrite -> (addadd4 T A ThetaA2 A' ThetaA3 HCasesAeqA'R) in H8.
               
-Admitted.
+              (* specialize and apply IH *)
+              specialize (IHC ThetaA1 ThetaA2 tau G
+                            (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
+                            (Actor.Map.add A' ThetaA3 T)
+                            A x v Hval Hv H8).
+ 
+              rewrite -> (find_ab_neq2 A A' ThetaA3 T HCasesAeqA'R) in IHC.
+              rewrite -> (find_ab_neq2 A A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2))
+                            D HCasesAeqA'R) in IHC.
+
+              specialize (IHC HinT HninG HninD).
+              eauto.
+            }
+
+          + assert (A' <> A).
+            auto.
+            rewrite -> (find_ab_neq1 A' A x tau D H) in H9.
+            auto.
+            
+          + assert (A' <> A).
+            auto.
+            rewrite -> (find_ab_neq2 A' A ThetaA2 T H) in H10.
+            auto.
+            
+          + auto.
+
+          + auto.
+      }
+Qed.
 
     
 (* placeholder for well-formedness definition *)
