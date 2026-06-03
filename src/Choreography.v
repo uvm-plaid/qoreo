@@ -881,8 +881,6 @@ Lemma mapsto_destruct : forall {X : Type} x tau (M : Var.Map.t X) ,
 Proof.
 Admitted.
 
-(* STOP Easily(?) proven facts *) 
-
 Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
     Var.Map.Partition M M1 M2 ->
     Var.Map.Partition M2 M0 M3 ->
@@ -892,6 +890,8 @@ Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
       Var.Map.Partition M M0 (Var.Map.concat M1 M3).
 Proof.
 Admitted.
+
+(* STOP Easily(?) proven facts *) 
 
 Lemma nri_lin : forall G A x tau D T I C G' D' T',
     WellTyped G (ChorEnv.add A x tau D) T (I::C) ->
@@ -1723,19 +1723,78 @@ Proof.
               destruct (Insn.rebound_in A x (Insn.LetPair A y z e)) eqn:Heq.
               (* impossible case x = y *)
               {
-                Check beqeq.
-                Check map_in.
                 unfold Insn.rebound_in in Heq.
 
                 (* NOTE: nice boolean eq rewrite Lemma from Bool.Bool *)
                 rewrite orb_true_iff in Heq.
+                destruct Heq as [HeqA | HeqB].
+                {
+                  pose proof (beqeq A x y HeqA).
+                  rewrite <- H in *.
+                  pose proof (map_in DeltaA2 x tau Hini).
+                  contradiction.
+                }
+                {
+                  pose proof (beqeq A x z HeqB).
+                  pose proof (map_in DeltaA2 x tau Hini).
+                  rewrite <- H in H12.
+                  contradiction.
+                }
+              }
+              (* case x <> y,z *)
+              {
+                unfold Insn.rebound_in in Heq.
+                rewrite orb_false_iff in Heq.
                 destruct Heq as [HeqA HeqB].
+                pose proof (nbeqeq A x y HeqA).
+                pose proof (nbeqeq A x z HeqB).
                 
-                pose proof (beqeq A x y Heq).
-                pose proof (map_in DeltaA2 x tau Hini).
-                rewrite <- H in H11.
-                contradiction.
+                (* prepare C typing. *)
+                rewrite -> HDA2A in H8.                
+                rewrite -> (addadd6 x tau z tau2 DeltaA2' H0) in H8.
+                rewrite -> (addadd6 x tau y tau1 (Var.Map.add z tau2 DeltaA2') H) in H8.
+                rewrite -> (addadd8 D A x tau (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2'))) in H8.
+
+                specialize (IHC ThetaA1 ThetaA3 tau
+                              G
+                              (Actor.Map.add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2')) D)
+                              (Actor.Map.add A (Var.Map.concat ThetaA1 ThetaA3) T)
+                              A x v Hval Hv).
+
+                rewrite -> (addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
+                rewrite -> (find_add A (Var.Map.concat ThetaA1 ThetaA3) T) in IHC.
+                rewrite -> (find_add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2')) D) in IHC.
+
                
+                pose proof (nin_mapl DeltaA2' x z tau2 H0 HDA2B) as Hninz.
+                pose proof (nin_mapl (Var.Map.add z tau2 DeltaA2') x y tau1 H Hninz) as Hniny.
+                
+                specialize (IHC H8 HPartitionB HninG Hniny).
+                eauto.
+              }
+
+            + pose proof (partition_remove (ChorEnv.find A D) DeltaA1 DeltaA2 x tau
+                            H9 HninD HxninDAA).
+              rewrite -> (remove_add x tau DeltaA2' DeltaA2 HDA2B HDA2A) in H.
+              auto.
+
+            + auto.
+
+            + rewrite -> HDA2A in H11.
+              pose proof (nin_mapr DeltaA2' y x tau (nin_nxeq DeltaA2' y x tau H11) H11).
+              auto.
+
+            + rewrite -> HDA2A in H12.
+              pose proof (nin_mapr DeltaA2' z x tau (nin_nxeq DeltaA2' z x tau H12) H12).
+              auto.
+        }
+      }
+      (* Case A <> A' *)
+      {
+        
+          
+
+              
 Admitted.
 
     
