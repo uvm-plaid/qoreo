@@ -875,7 +875,8 @@ Proof.
     + Actor.Map.Tactics.compare A A0; eauto.
     
       {
-        pose proof (Expr.wt_subst_bang tau (ChorEnv.find A G) DeltaA1 ThetaA1 x v e (Expr.Tensor tau1 tau2)) as HEWTS.
+        pose proof (Expr.wt_subst_bang tau (ChorEnv.find A G)
+                      DeltaA1 ThetaA1 x v e (Expr.Tensor tau1 tau2)) as HEWTS.
           eapply HEWTS.
         { auto. }
         { apply Expr.weakening; auto. }
