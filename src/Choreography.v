@@ -461,6 +461,14 @@ Lemma nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
 Proof.
 Admitted.
 
+
+Lemma nin_extension : forall  {X : Type} x tau (M1 : Var.Map.t X) M2,
+    Var.Map.Properties.Disjoint M1 M2 ->
+    ~ Var.Map.In x M1 -> 
+    Var.Map.Properties.Disjoint M1 (Var.Map.add x tau M2).
+Proof.
+Admitted.
+
 Lemma partition_sym : forall {X : Type} (M : Var.Map.t X) M1 M2,
     Var.Map.Partition M M1 M2 -> Var.Map.Partition M M2 M1.
 Proof.
@@ -684,15 +692,22 @@ Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
 Proof.
 Admitted.
 
-Lemma map_subset_add : forall G1 G2,
-    (forall A x (tau : Expr.typ), (ChorEnv.MapsTo A x tau G1 -> ChorEnv.MapsTo A x tau G2)) ->
-    (forall A x tau1 B y tau2,
+Lemma map_subset_add : forall G1 G2 A,
+    (forall x (tau : Expr.typ), (ChorEnv.MapsTo A x tau G1 -> ChorEnv.MapsTo A x tau G2)) ->
+    (forall x tau1 B y tau2,
         (ChorEnv.MapsTo A x tau1 (ChorEnv.add B y tau2 G1) ->
          ChorEnv.MapsTo A x tau1 (ChorEnv.add B y tau2 G2))).
 Proof.
   intros G1 G2 HMA1 A x tau1 B y tau2 HMA2. 
 Admitted.
 
+Lemma map_subset_partition : forall G G' A,
+    (forall (x : Var.t) (tau : Expr.typ),
+        ChorEnv.MapsTo A x tau G -> ChorEnv.MapsTo A x tau G') ->
+    (exists M0 , Var.Map.Partition
+                   (ChorEnv.find A G') (ChorEnv.find A G) M0).
+Admitted.
+  
 Lemma add_MapsTo : forall A x (tau : A) m,
   Var.Map.MapsTo x tau m ->
   Var.Map.Equal (Var.Map.add x tau m) m.
@@ -715,19 +730,39 @@ Lemma wt_disjoint : forall A G D T C,
 Proof.
 Admitted.
 
-Lemma weakening_gen : forall G D T C,
-    WellTyped G D T C -> forall G',
-      (forall A x tau, ChorEnv.MapsTo A x tau G -> ChorEnv.MapsTo A x tau G') ->
+Lemma weakening_gen' : forall G0,
+  forall G D T C,
+    WellTyped G D T C ->
+    forall G',
+      (forall A0,
+          (Var.Map.Partition (ChorEnv.find A0 G') (ChorEnv.find A0 G) (ChorEnv.find A0 G0)) ->
+          (Var.Map.Properties.Disjoint (ChorEnv.find A0 G0) (ChorEnv.find A0 D))) ->
       WellTyped G' D T C.
 Proof. 
-  intros G D T C HWT.
+  intros G0 G D T C HWT.
   induction HWT.
   
   - intros G' HW. apply Nil; auto. 
 
-  - intros G' HW. apply EPR; auto.
+  - intros G' HW.
+    apply EPR.    
+    auto.
 
-  - intros G' HW. eapply Send; auto.
+    specialize (IHHWT G').
+    
+    
+    
+    
+
+  - intros G' HW.
+    destruct (map_subset_partition G G' A (HW A)) as [Gamma0 Hmsp].
+    
+    eapply Send; auto.
+
+    pose proof (Expr.weakening_gen
+                  Gamma0 (ChorEnv.find A G) DeltaA1 ThetaA1
+                  e (Expr.BANG tau) H0 (ChorEnv.find A G') Hmsp).
+                                     
     eapply Expr.weakening_gen. eauto.
 
     intros x tau' HEW.
@@ -777,6 +812,89 @@ Proof.
     auto.
 Qed.
 
+Lemma weakening_gen' : forall G D T C,
+    WellTyped G D T C ->
+    forall G',
+      (forall A,
+          (forall x tau, ChorEnv.MapsTo A x tau G -> ChorEnv.MapsTo A x tau G') ->
+          (Var.Map.Properties.Disjoint (ChorEnv.find A G') (ChorEnv.find A D))) ->
+        WellTyped G' D T C.
+Proof. 
+  intros G D T C HWT.
+  induction HWT.
+  
+  - intros G' HW. apply Nil; auto. 
+
+  - intros G' HW.
+    apply EPR.    
+    auto.
+
+    specialize (IHHWT G').
+
+    
+    
+    
+
+  - intros G' HW.
+    destruct (map_subset_partition G G' A (HW A)) as [Gamma0 Hmsp].
+    
+    eapply Send; auto.
+
+    pose proof (Expr.weakening_gen
+                  Gamma0 (ChorEnv.find A G) DeltaA1 ThetaA1
+                  e (Expr.BANG tau) H0 (ChorEnv.find A G') Hmsp).
+                                     
+    eapply Expr.weakening_gen. eauto.
+
+    intros x tau' HEW.
+    rewrite <- extension.
+    apply extension in HEW.
+    apply (HW A x tau') in HEW.
+    auto.
+
+    specialize (IHHWT (ChorEnv.add B y tau G')).
+    apply IHHWT.
+    intros A0 x tau' HWB.
+    pose proof (map_subset_add G G' HW A0 x tau' B y tau) as HMA.
+    auto.
+
+    auto.
+    eauto.
+
+  - intros G' HW. eapply LetBang; eauto.
+
+    pose proof (Expr.weakening_gen
+                  (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) H (ChorEnv.find A G'))
+      as HEW.
+    apply HEW.
+    intros x' tau' HVM.
+    specialize (HW A x' tau').
+    rewrite -> extension in HW.
+    rewrite -> extension in HW.
+    auto.
+
+    specialize (IHHWT (ChorEnv.add A x tau G')).
+    apply IHHWT.
+    intros A0 x0 tau0 HE.
+    pose proof (map_subset_add G G' HW A0 x0 tau0 A x tau) as HMA.
+    auto.
+
+  - intros G' HW. eapply LetIn; eauto.
+    pose proof (Expr.weakening_gen (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H (ChorEnv.find A G'))
+      as HEW.
+    setoid_rewrite -> extension in HW.
+    auto.
+
+  - intros G' HW. eapply LetPair; eauto.
+    pose proof (Expr.weakening_gen (ChorEnv.find A G) DeltaA1 ThetaA1 e
+                  (Expr.Tensor tau1 tau2) H (ChorEnv.find A G'))
+      as HEW.
+    setoid_rewrite -> extension in HW.
+    auto.
+Qed.
+
+
+(*
 Lemma wt_subst_bang : forall tau G D T A x v C,
     WellTyped G D T C ->
     Expr.Val v ->
@@ -803,7 +921,8 @@ Proof.
       Var.Map.Tactics.vsimpl.
       destruct (Actor.FSet.MF.eq_dec A A0) eqn:Heq; subst; eauto.
       { (* A = A0 *)
-        eapply Expr.wt_subst_bang; eauto.
+        eapply Expr.wt_subst_bang.
+        eauto.
         setoid_replace (Var.Map.add x tau (ChorEnv.find A0 G))
                 with   (ChorEnv.find A0 G);
                 auto.
@@ -887,6 +1006,7 @@ Proof.
         eauto.
 
 Qed.
+ *)
 
 (* The following lemmas support reasoning in wt_subst_lin *)
 Lemma nri_lin : forall G A x tau D T I C G' D' T',
@@ -961,10 +1081,9 @@ Proof.
           destruct HxinDA as [DeltaA1'].
           destruct H as [HinDA HninDA'].
           rewrite <- HinDA in H8.
-          pose proof
+          pose proof 
             (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
-               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
-               Hval Hv H8) as HWTS.
+               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0) Hv H8) as HWTS.
           pose proof (find_add A ThetaA2 T) as HFA.
           rewrite -> HFA in H11.
           (* partioning facts. *)
@@ -1194,8 +1313,7 @@ Proof.
           rewrite <- HinDA in H3.
           pose proof
             (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
-               (Var.Map.concat ThetaA1 ThetaA0) x v tau0
-               Hval Hv H3) as HWTS.
+               (Var.Map.concat ThetaA1 ThetaA0) x v tau0 Hv H3) as HWTS.
           pose proof (find_add A ThetaA2 T) as HFA.
           rewrite -> HFA in H9.
           (* partioning facts. *)
@@ -1436,7 +1554,7 @@ Proof.
               pose proof
                 (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
                    (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
-                   Hval Hv H6 HPartitionA HninG HninDA') as HWTS.
+                   Hv H6 HPartitionA HninG HninDA') as HWTS.
               eauto.
             }
             {
@@ -1623,8 +1741,7 @@ Proof.
           rewrite <- HinDA in H4.
           pose proof
             (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
-               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.Tensor tau1 tau2)
-               Hval Hv H4) as HWTS.
+               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.Tensor tau1 tau2) Hv H4) as HWTS.
           pose proof (find_add A ThetaA2 T) as HFA.
           rewrite -> HFA in H10.
           (* partioning facts. *)
