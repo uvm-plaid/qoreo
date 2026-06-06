@@ -740,7 +740,6 @@ Lemma wt_disjoint : forall A G D T C,
 Proof.
 Admitted.
 
-(* 
 Lemma weakening_gen : forall C G D T G0,
     WellTyped G D T C ->
     forall G',
@@ -883,7 +882,7 @@ Proof.
     setoid_rewrite -> extension in HW.
     auto.
 Qed.
-*)
+
 
 (*
 Lemma wt_subst_bang : forall tau G D T A x v C,
