@@ -1072,56 +1072,6 @@ Proof.
 Qed.
  *)
 
-(* The following lemmas support reasoning in wt_subst_lin *)
-Lemma nri_lin : forall G A x tau D T I C G' D' T',
-    WellTyped G (ChorEnv.add A x tau D) T (I::C) ->
-    WellTyped G' (ChorEnv.add A x tau D') T' C ->
-    ~(Insn.rebound_in A x I = true).
-Proof.
-  intros G A x tau D T I C G' D' T' HWTIC HWTC.
-
-  destruct I as [ A' e B y | A' y B z | A' y e | A' y e | A' y z e ].
-
-  - inversion HWTIC; subst.
-    unfold Insn.rebound_in.
-    destruct (Insn.bind_eqb_false (A,x) (B,y)) as [HBEQA HBEQB].
-    destruct (not_true_iff_false (Insn.bind_eqb (A, x) (B, y))) as [HNTFA HNTFB].
-    apply HNTFB.
-    apply HBEQB.
-
-    pose proof (wt_disjoint A
-                  (ChorEnv.add B y tau0 G)
-                  (Actor.Map.add A' DeltaA2 (ChorEnv.add A x tau D))
-                  (Actor.Map.add A' ThetaA2 T) C H9) as HWTDJ.
-
-    assert (A = B \/ A <> B) as HCasesAeqB.
-    tauto.
-    
-    destruct HCasesAeqB as [HCasesAeqBL | HCasesAeqBR].
-    
-    {
-      rewrite <- HCasesAeqBL in *.
-      assert (A <> A'); auto.
-      rewrite -> (addadd3 D A x tau A' DeltaA2 H) in HWTDJ.
-      pose proof (nin_dj x
-                    (ChorEnv.find A (ChorEnv.add A y tau0 G))
-                    (ChorEnv.find A (ChorEnv.add A x tau (Actor.Map.add A' DeltaA2 D)))
-                    HWTDJ
-                    (in_beq (Actor.Map.add A' DeltaA2 D) A x tau)) as Hnindj.
-      rewrite -> (add_find G A y tau0) in Hnindj.
-      pose proof (nin_nxeq (ChorEnv.find A G) x y tau0 Hnindj).
-      apply (Insn.nbeqlr (A,x) (A,y)).
-      auto.
-    }
-    {
-      apply (Insn.nbeqlr (A,x) (B,y)).
-      auto.
-    }
-
-  -
-     
-Admitted.
-
 Lemma esubst_lin : forall Gamma Delta e x v tau,
     (exists Theta tau', Expr.WellTyped Gamma Delta Theta e tau') -> 
     ~ Var.Map.In x Gamma -> 
@@ -1319,11 +1269,44 @@ Proof.
             
             destruct (Insn.rebound_in A x (Insn.Send A' e B y)) eqn:Heq.
             {
-              pose proof (nri_lin G A x tau D (Actor.Map.add A ThetaA2 T) (Insn.Send A' e B y) C
+              assert  (~ Insn.rebound_in A x (Insn.Send A' e B y) = true).
+
+              unfold Insn.rebound_in.
+              destruct (Insn.bind_eqb_false (A,x) (B,y)) as [HBEQA HBEQB].
+              destruct (not_true_iff_false (Insn.bind_eqb (A, x) (B, y))) as [HNTFA HNTFB].
+              apply HNTFB.
+              apply HBEQB.
+
+              pose proof (wt_disjoint A
                             (ChorEnv.add B y tau0 G)
-                            (Actor.Map.add A' DeltaA2 D)
+                            (ChorEnv.add A x tau (Actor.Map.add A' DeltaA2 D))
                             (Actor.Map.add A' ThetaA3 (Actor.Map.add A ThetaA2 T))
-                            HC H9) as Hnri.
+                            C H9) as HWTDJ.
+
+              assert (A = B \/ A <> B) as HCasesAeqB.
+              tauto.
+              
+              destruct HCasesAeqB as [HCasesAeqBL | HCasesAeqBR].
+              
+              {
+                rewrite <- HCasesAeqBL in *.
+                assert (A <> A'); auto.
+                (* rewrite -> (addadd3 D A x tau A' DeltaA2 H) in HWTDJ. *)
+                pose proof (nin_dj x
+                              (ChorEnv.find A (ChorEnv.add A y tau0 G))
+                              (ChorEnv.find A (ChorEnv.add A x tau (Actor.Map.add A' DeltaA2 D)))
+                              HWTDJ
+                              (in_beq (Actor.Map.add A' DeltaA2 D) A x tau)) as Hnindj.
+                rewrite -> (add_find G A y tau0) in Hnindj.
+                pose proof (nin_nxeq (ChorEnv.find A G) x y tau0 Hnindj).
+                apply (Insn.nbeqlr (A,x) (A,y)).
+                auto.
+              }
+              {
+                apply (Insn.nbeqlr (A,x) (B,y)).
+                auto.
+              }
+
               contradiction.
             }
             {
@@ -2040,8 +2023,6 @@ Proof.
             }
             { 
               (* prepare C typing *)
-              Check addadd3.
-              Check addadd4.
               rewrite -> (addadd3 D A x tau A'
                             (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) HCasesAeqA'R) in H8.
               rewrite -> (addadd4 T A ThetaA2 A' ThetaA3 HCasesAeqA'R) in H8.
