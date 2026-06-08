@@ -1636,7 +1636,7 @@ Module Config.
   Record t := {
     dim : nat;
     (*qrefs : Var.Map.t nat;*)
-    qstate : Matrix dim dim
+    qstate : Matrix (Nat.pow 2 dim) (Nat.pow 2 dim)
   }.
 
   (*
@@ -1674,7 +1674,7 @@ Module Config.
   Definition measure (b : bool) (x : Var.t) refs (cfg : t)
     : Var.Map.t nat * t :=
     let q := find x refs in
-    let rho' := super (pad_u q (dim cfg) (bool_to_matrix b)) (qstate cfg) in
+    let rho' := super (pad_u (dim cfg) q (bool_to_matrix b)) (qstate cfg) in
     (Var.Map.remove x refs, {|
       dim := dim cfg;
       qstate := rho'
@@ -1684,7 +1684,7 @@ Module Config.
     (*let x := Var.fresh refs in*)
     let x := dim cfg in (* don't want x to depend on refs *)
     let q := dim cfg in
-    let rho' := kron (qstate cfg) (bool_to_ket b) in
+    let rho' := kron (qstate cfg) (bool_to_ket b × (bool_to_ket b)†) in
     (x, Var.Map.add x q refs, {|
       dim := 1 + dim cfg;
       qstate := rho'

@@ -1283,13 +1283,12 @@ Qed.
 Lemma step_weakening_1 : forall Θ1 Θ1' Θ2 e Θ cfg e' Θ' cfg',
   step e Θ1 cfg e' Θ1' cfg' ->
   Var.Map.Partition Θ Θ1 Θ2 ->
-  Config.WellScoped Θ2 cfg ->
   Var.Map.Partition Θ' Θ1' Θ2 ->
   step e Θ cfg e' Θ' cfg'.
 Proof.
   intros ? ? ? ? ? ? ? ? ?.
   intros Hstep.
-  induction Hstep; intros Hpart HWS Hpart';
+  induction Hstep; intros Hpart Hpart';
     try (constructor; auto; fail);
     try (reflect_partition; constructor; auto; try reflexivity; fail).
 
@@ -1340,14 +1339,13 @@ Qed.
 Lemma step_weakening_2 : forall Θ1 Θ2 Θ2' e Θ cfg e' Θ' cfg',
   step e Θ2 cfg e' Θ2' cfg' ->
   Var.Map.Partition Θ Θ1 Θ2 ->
-  Config.WellScoped Θ1 cfg ->
   Var.Map.Partition Θ' Θ1 Θ2' ->
   step e Θ cfg e' Θ' cfg'.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Hstep Hpart Hws Hpart'.
-  eapply step_weakening_1; [eauto | | eauto | ].
-  apply Var.Map.Properties.Partition_sym; auto.
-  apply Var.Map.Properties.Partition_sym; auto.
+  intros ? ? ? ? ? ? ? ? ? Hstep Hpart Hpart'.
+  eapply step_weakening_1; [eauto | | ].
+  apply Var.Map.Properties.Partition_sym; eauto.
+  apply Var.Map.Properties.Partition_sym; eauto.
 Qed.
 
 Lemma step_inversion : forall e refs ρ e' refs' ρ',
@@ -1392,9 +1390,6 @@ Proof.
     eapply step_weakening_1.
     + apply LetC. eauto.
     + eauto.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      reflect_partition.
-      Var.simplify.
     + Var.simplify.
 
   * Var.simplify.
@@ -1407,10 +1402,7 @@ Proof.
     exists (Var.Map.concat Θ1' Θ2).
     split; Var.simplify.
     eapply step_weakening_1;
-      [econstructor; eauto | | | ]; eauto; Var.simplify.
-    { (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      reflect_partition. Var.simplify.
-    }
+      [econstructor; eauto | | ]; eauto; Var.simplify.
 
   * (* IfC *)
     Var.simplify.
@@ -1429,8 +1421,6 @@ Proof.
     eapply step_weakening_1.
     + apply IfC. eauto.
     + eauto.
-    + (* Θ2 is well-scoped because refs1=Θ1 + Θ2 is well-scoped *)
-      reflect_partition. Var.simplify.
     + Var.simplify.
 
   * (* PairC1 *)
@@ -1534,8 +1524,6 @@ Proof.
     eapply step_weakening_1.
     { apply NewC. eauto. }
     + apply Var.Map.Proofs.partition_empty_r.
-    + apply Config.WellScoped_empty.
-      destruct HWS; auto.
     + apply Var.Map.Proofs.partition_empty_r.
 
   * (* NewB *)
@@ -1562,8 +1550,6 @@ Proof.
     eapply step_weakening_1.
     { apply MeasC. eauto. }
     + apply Var.Map.Proofs.partition_empty_r.
-    + apply Config.WellScoped_empty.
-      eapply Config.wf_qstate; eauto.
     + apply Var.Map.Proofs.partition_empty_r.
 
   * (* MeasB *)
@@ -1581,9 +1567,8 @@ Proof.
     eapply MeasB.
     2:{
       unfold Config.measure.
-      f_equal. f_equal. 
+      f_equal. f_equal. f_equal. f_equal.
       unfold Config.find.
-      rewrite Heq.
       Var.simplify.
     }
     all: Var.simplify.
@@ -1876,6 +1861,48 @@ Proof.
       eapply wt_subst_bang; eauto with var_db.
 Qed.
 
+Lemma well_scoped_preservation : forall e Θ ρ e' Θ' ρ',
+  step e Θ ρ e' Θ' ρ' ->
+  Config.WellScoped Θ ρ ->
+  Config.WellScoped Θ' ρ'.
+Proof.
+  intros ? ? ? ? ? ? Hstep.
+  induction Hstep; intros HWS; auto; Var.simplify.
+  * (* new *)
+    inversion H; subst; clear H.
+    destruct HWS.
+    split; simpl in *.
+    + auto with wf_db.
+    + intros x Hin.
+      Var.simplify.
+      destruct Hin as [? | Hin]; subst; [lia | ].
+      rewrite wf_qrefs; [ lia | auto].
+  * (* measure *) 
+    inversion H0; subst; clear H0.
+    destruct HWS.
+    split; simpl in *.
+    + unfold super. auto with wf_db.
+    + intros z Hin. Var.simplify.
+  * (* apply_gate *) 
+    subst.
+    unfold Config.apply_gate.
+    destruct HWS.
+    split; auto.
+    simpl. unfold Config.find.
+    Var.reflect_find.
+    unfold super.
+    destruct g; simpl; auto with wf_db.
+
+  * subst. unfold Config.apply_gate.
+    destruct HWS.
+    split; auto.
+    simpl. unfold Config.find.
+    Var.reflect_find.
+    unfold super.
+    destruct g; simpl; auto with wf_db.
+Qed.
+
+
 Lemma step_WellScoped_disjoint : forall Θ2 e Θ1 cfg e' Θ1' cfg',
   step e Θ1 cfg e' Θ1' cfg' ->
   Var.Map.Properties.Disjoint Θ1 Θ2 ->
@@ -2005,7 +2032,7 @@ Proof.
     { (* e2 can take a step *)
       right. eexists. eexists. eexists.
       apply PairC2; eauto.
-      eapply step_weakening_2; [eauto | eauto with var_db | | ];
+      eapply step_weakening_2; [eauto | eauto with var_db | ];
         auto.
       {
         reflect_partition; try reflexivity.
