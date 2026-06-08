@@ -47,18 +47,7 @@ Module Insn.
     end.
 
     Definition bindt : Type := Actor.t * Var.t.
-
-    (* 
-    Definition bindings (I : t) : list bindt :=
-      match I with
-      | Send B1 e B2 y => [(B2,y)]    
-      | EPR B1 y1 B2 y2 => [(B1,y1);(B2,y2)]
-      | Let B y e => [(B,y)]
-      | LetBang B y e => [(B,y)]
-      | LetPair B y1 y2 e => [(B,y1);(B,y2)]
-    end.
-    *)
-
+    
     Definition bind_eq  (Ax : bindt) (By: bindt) : Prop := (fst Ax) = (fst By) /\ (snd Ax) = (snd By).
 
     Lemma beq : forall Ax By, (bind_eq Ax By) <-> ((fst Ax) = (fst By) /\ (snd Ax) = (snd By)).
@@ -328,11 +317,12 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
     step (I::C) refs cfg l (I::C') refs' cfg'
 .
 
-(* This should go into ChoreEnv module. *)
+(* DISCUSS: This should go into ChoreEnv module. *)
 Definition CE_remove (A : Actor.t) (x : Var.t) (CE : ChorEnv.t Expr.typ) :  ChorEnv.t Expr.typ :=
   (Actor.Map.add A (Var.Map.remove x (ChorEnv.find A CE)) CE).
 
-Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
+Inductive WellTyped :
+  ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
   
 | Nil : forall G D T, 
     Actor.Map.Empty D ->
@@ -341,6 +331,7 @@ Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat 
                                 
 | EPR : forall G D T A x B y C,
     A <> B ->
+    (* DISCUSS: classical shadowing added to typing *)
     WellTyped (CE_remove B y (CE_remove A x G))
       (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)) T C ->
 
@@ -740,12 +731,6 @@ Lemma mapsto_destruct : forall {X : Type} x tau (M : Var.Map.t X) ,
 Proof.
 Admitted.
 
-Lemma mapin_destruct : forall {X : Type} x (M : Var.Map.t X) ,
-    Var.Map.In x M ->
-    (exists M' tau, Var.Map.add x tau M' = M /\ ~ Var.Map.In x M').
-Proof.
-Admitted.
-
 Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
     Var.Map.Partition M M1 M2 ->
     Var.Map.Partition M2 M0 M3 ->
@@ -1101,31 +1086,6 @@ Lemma esubst : forall Gamma Delta Theta e x v tau,
 Proof.
 Admitted.
 
-Lemma esubst_lin : forall Gamma Delta Theta e x v tau,
-    Expr.WellTyped Gamma Delta Theta e tau -> 
-    ~ Var.Map.In x Gamma -> 
-    (exists Delta' tau',
-        ((Var.Map.add x tau' Delta') = Delta) /\ ~ Var.Map.In x Delta')
-    \/ (~ Var.Map.In x Delta /\ (Expr.subst x v e) = e).
-Proof.
-  intros Gamma Delta Theta e x v tau HWT HninGamma.
-
-  assert (~ Var.Map.In x Delta \/ Var.Map.In x Delta).
-  tauto.
-  destruct H as [HninDelta | HinDelta].
-  {
-    pose proof (esubst Gamma Delta Theta e x v tau HWT HninGamma HninDelta).
-    auto.
-  }
-  {
-    assert (exists (Delta' : Var.Map.t Expr.typ) (tau' : Expr.typ),
-               Var.Map.add x tau' Delta' = Delta /\ ~ Var.Map.In (elt:=Expr.typ) x Delta').
-    pose proof (mapin_destruct x Delta HinDelta).
-    auto.
-    auto.
-  }
-Qed.
-
 Lemma csubst : forall G D T C A x v,
     WellTyped G D T C ->
     ~ (Var.Map.In x (ChorEnv.find A D)) ->
@@ -1170,8 +1130,8 @@ Proof.
         assert (Var.Map.In x DeltaA1 \/ ~ Var.Map.In x DeltaA1) as HESL.
         tauto.
 
-        (* Case x in e *) 
-        destruct HESL as [HinDA | HninDA].          
+        destruct HESL as [HinDA | HninDA]. 
+        (* Case x in e *)          
         {
           (* prepare witness for expression e typing and partioning facts. *)
           rewrite -> (add_find D A x tau) in H10.
@@ -1861,22 +1821,19 @@ Proof.
         rewrite -> (addadd1 A D (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) x tau) in H8.
         rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H8.
         
-        assert (HSendety : (exists Theta tau', Expr.WellTyped (ChorEnv.find A G)
-                                                 DeltaA1 Theta e tau')).
-        exists ThetaA0.
-        exists (Expr.Tensor tau1 tau2).
-        auto. 
-        
-        pose proof
-          (esubst_lin (ChorEnv.find A G) DeltaA1 e x v tau HSendety HninG) as HESL.
+        assert (Var.Map.In x DeltaA1 \/ ~ Var.Map.In x DeltaA1) as HESL.
+        tauto.
 
-        (* Case x in e *) 
-        destruct HESL as [HxinDA | HxninDA].          
+        destruct HESL as [HinDA | HninDA].
+        (* Case x in e *)
         {
           (* prepare witness for expression e typing and partioning facts. *)
-          destruct HxinDA as [DeltaA1'].
-          destruct H as [HinDA HninDA'].
-          rewrite <- HinDA in H4.
+          rewrite -> (add_find D A x tau) in H9.
+          pose proof (inin (ChorEnv.find A D) DeltaA1 DeltaA2
+                        x tau H9 HinDA) as Hinin.
+          destruct (mapsto_destruct x tau DeltaA1 Hinin) as [DeltaA1' HDA'].
+          destruct HDA' as [HDA'A HDA'B].
+          rewrite -> HDA'A in H4.
           pose proof
             (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
                (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.Tensor tau1 tau2) Hv H4) as HWTS.
@@ -1888,11 +1845,12 @@ Proof.
             as HPartition.
           destruct HPartition as [HPartitionA [HPartitionB [HPartitionC HPartitionD]]].
           (* e typing witness. *)
-          specialize (HWTS HPartitionA HninG HninDA').
+          specialize (HWTS HPartitionA HninG HDA'B).
 
           (* prepare hypotheses for partitioning requirements *)
-          rewrite -> (add_find D A x tau) in H9.
-          pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau HinDA H9) as Hnin.
+          assert (Var.Map.add x tau DeltaA1' = DeltaA1).
+          auto.
+          pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau H H9) as Hnin.
           pose proof (csubst
                         (CE_remove A y (CE_remove A z G))
                         (Actor.Map.add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
@@ -1939,9 +1897,10 @@ Proof.
         }
         (* case x not in e *)
         {
-          destruct HxninDA as [HxninDAA HxninDAB].
+          pose proof (esubst (ChorEnv.find A G) DeltaA1 ThetaA0 e x v (Expr.Tensor tau1 tau2)
+                        H4 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H9.
-          pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H9 HxninDAA) as Hini.
+          pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H9 HninDA) as Hini.
 
           (* (de)construct environment for typing C *)
           pose proof (mapsto_destruct x tau DeltaA2 Hini) as HDA2.
@@ -1960,7 +1919,7 @@ Proof.
             
             + destruct (Actor.FSet.MF.eq_dec A A) eqn:Heq.
               {
-                rewrite -> HxninDAB.
+                rewrite -> Hesubst.
                 eauto.
               }
               { auto. }
@@ -2020,7 +1979,7 @@ Proof.
               }
 
             + pose proof (partition_remove (ChorEnv.find A D) DeltaA1 DeltaA2 x tau
-                            H9 HninD HxninDAA).
+                            H9 HninD HninDA).
               rewrite -> (remove_add x tau DeltaA2' DeltaA2 HDA2B HDA2A) in H.
               auto.
 
