@@ -888,7 +888,14 @@ Proof.
                     Hrdj H9)).
       }
       {
-        
+        assert (A = B \/ A <> B) as HCasesAeqB.
+        tauto.
+              
+        destruct HCasesAeqB as [HCasesAeqBL | HCasesAeqBR].
+              
+        {
+          rewrite <- HCasesAeqBL in *.
+          
       
         
         
