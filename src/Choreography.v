@@ -458,7 +458,7 @@ Qed.
 
 (* A slew of Lemmas for manipulating environment mappings. *)
 
-(* START Jennifer to address with map tactics. *)
+(* START Jennifer to address with map tactics. DISCUSS *)
 
 Lemma extension : forall A G x (tau : Expr.typ),
     ChorEnv.MapsTo A x tau G <-> Var.Map.MapsTo x tau (ChorEnv.find A G).
@@ -672,6 +672,11 @@ Proof.
   intros.  
 Admitted.
 
+Lemma in_add : forall (M : Var.Map.t Expr.typ)  x tau,
+    Var.Map.In x (Var.Map.add x tau M).
+Proof.
+Admitted.
+    
 Lemma in_beq : forall (CE : ChorEnv.t Expr.typ) A x tau,
     Var.Map.In x (ChorEnv.find A (ChorEnv.add A x tau CE)).
 Proof.
@@ -715,6 +720,13 @@ Lemma ini : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
 Proof.
 Admitted.
 
+Lemma inin : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
+    Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
+    (Var.Map.In x Delta1) ->
+    (Var.Map.MapsTo x tau Delta1).
+Proof.
+Admitted.
+
 Lemma nin : forall (Delta : Var.Map.t Expr.typ) Delta1' Delta1 Delta2 x tau,
     Var.Map.add x tau Delta1' = Delta1 ->
     Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
@@ -725,6 +737,12 @@ Admitted.
 Lemma mapsto_destruct : forall {X : Type} x tau (M : Var.Map.t X) ,
     Var.Map.MapsTo x tau M ->
     (exists M', M = Var.Map.add x tau M' /\ ~ Var.Map.In x M').
+Proof.
+Admitted.
+
+Lemma mapin_destruct : forall {X : Type} x (M : Var.Map.t X) ,
+    Var.Map.In x M ->
+    (exists M' tau, Var.Map.add x tau M' = M /\ ~ Var.Map.In x M').
 Proof.
 Admitted.
 
@@ -958,6 +976,8 @@ Proof.
       { auto. }
 Qed.
 
+
+(* DISCUSS: Jennifer to retrofit? *)
 (*
 Lemma wt_subst_bang : forall tau G D T A x v C,
     WellTyped G D T C ->
@@ -1072,14 +1092,39 @@ Proof.
 Qed.
  *)
 
-Lemma esubst_lin : forall Gamma Delta e x v tau,
-    (exists Theta tau', Expr.WellTyped Gamma Delta Theta e tau') -> 
+(* DISCUSS: to add to Expr.v? *)
+Lemma esubst : forall Gamma Delta Theta e x v tau,
+    Expr.WellTyped Gamma Delta Theta e tau ->
     ~ Var.Map.In x Gamma -> 
-    (exists Delta', ((Var.Map.add x tau Delta') = Delta) /\
-                      ~(Var.Map.In x Delta'))
-    \/ (~(Var.Map.In x Delta) /\ (Expr.subst x v e) = e).
+    ~ Var.Map.In x Delta -> 
+    (Expr.subst x v e) = e.
 Proof.
 Admitted.
+
+Lemma esubst_lin : forall Gamma Delta Theta e x v tau,
+    Expr.WellTyped Gamma Delta Theta e tau -> 
+    ~ Var.Map.In x Gamma -> 
+    (exists Delta' tau',
+        ((Var.Map.add x tau' Delta') = Delta) /\ ~ Var.Map.In x Delta')
+    \/ (~ Var.Map.In x Delta /\ (Expr.subst x v e) = e).
+Proof.
+  intros Gamma Delta Theta e x v tau HWT HninGamma.
+
+  assert (~ Var.Map.In x Delta \/ Var.Map.In x Delta).
+  tauto.
+  destruct H as [HninDelta | HinDelta].
+  {
+    pose proof (esubst Gamma Delta Theta e x v tau HWT HninGamma HninDelta).
+    auto.
+  }
+  {
+    assert (exists (Delta' : Var.Map.t Expr.typ) (tau' : Expr.typ),
+               Var.Map.add x tau' Delta' = Delta /\ ~ Var.Map.In (elt:=Expr.typ) x Delta').
+    pose proof (mapin_destruct x Delta HinDelta).
+    auto.
+    auto.
+  }
+Qed.
 
 Lemma csubst_lin : forall G D T C A x v,
     WellTyped G D T C ->
@@ -1122,24 +1167,35 @@ Proof.
       {
         rewrite <- HCasesAeqA'L in *.
         
-        assert (HSendety : (exists Theta tau', Expr.WellTyped (ChorEnv.find A G)
+        (* assert (HSendety : (exists Theta tau', Expr.WellTyped (ChorEnv.find A G)
                                                  DeltaA1 Theta e tau')).
         exists ThetaA0.
         exists (Expr.BANG tau0).
-        auto.
+        auto. *)
         
         pose proof
-          (esubst_lin (ChorEnv.find A G) DeltaA1 e x v tau HSendety HninG) as HESL.
+          (esubst_lin (ChorEnv.find A G) DeltaA1 ThetaA0
+             e x v (Expr.BANG tau0) H8 HninG) as HESL.
         
         (* Case x in e *) 
         destruct HESL as [HxinDA | HxninDA].          
         {
           (* prepare witness for expression e typing and partioning facts. *)
-          destruct HxinDA as [DeltaA1'].
-          destruct H as [HinDA HninDA'].
-          rewrite <- HinDA in H8.
+          destruct HxinDA as [DeltaA1' H1].
+          destruct H1 as [tau' H2].
+          destruct H2 as [HinDA _].
+          pose proof (in_add DeltaA1' x tau').
+          rewrite -> HinDA in H.
+          rewrite -> (add_find D A x tau) in H10.
+          pose proof (inin (ChorEnv.find A D) DeltaA1 DeltaA2
+                        x tau H10 H).
+          pose proof (mapsto_destruct x tau DeltaA1 H0).
+          destruct H1 as [Delta'].
+          destruct H1.
+          rewrite -> H1 in H8.
+          (* REVISE above and esubst_lin? *)
           pose proof 
-            (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
+            (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) Delta'
                (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0) Hv H8) as HWTS.
           pose proof (find_add A ThetaA2 T) as HFA.
           rewrite -> HFA in H11.
@@ -1149,15 +1205,16 @@ Proof.
             as HPartition.
           destruct HPartition as [HPartitionA [HPartitionB [HPartitionC HPartitionD]]].
           (* e typing witness. *)
-          specialize (HWTS HPartitionA HninG HninDA').
+          specialize (HWTS HPartitionA HninG H2).
           
           (* prepare witness for choreography C typing *)
           rewrite -> (addadd1 A D DeltaA2 x tau) in H9.
           rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H9.
           
           (* prepare hypotheses for partitioning requirements *)
-          rewrite -> (add_find D A x tau) in H10.
-          pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau HinDA H10) as Hnin.
+          assert (Var.Map.add x tau Delta' = DeltaA1).
+          auto.
+          pose proof (nin (ChorEnv.find A D) Delta' DeltaA1 DeltaA2 x tau H3 H10) as Hnin.
           pose proof (csubst_lin
                         (ChorEnv.add B y tau0 G)
                         (Actor.Map.add A DeltaA2 D)
@@ -2064,6 +2121,7 @@ Qed.
 (* placeholder for well-formedness definition *)
 Definition  WellFormed (cfg : Config.t) (C : ChorEnv.t nat) : Prop := True.
 
+(* DISCUSS: well-formedness and presesvation of Expr.WellScoped? *)
 Theorem preservation : forall C1 T1 cfg1 l C2 T2 cfg2,
   step C1 T1 cfg1 l C2 T2 cfg2 ->
   WellFormed cfg1 T1 ->
