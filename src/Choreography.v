@@ -957,7 +957,7 @@ Proof.
                     (Actor.Map.add A' ThetaA2 T)
                     H7).
       
-    assert (A = A' \/ A <> A') as HCasesAeqA'.
+      assert (A = A' \/ A <> A') as HCasesAeqA'.
       tauto.
       
       destruct HCasesAeqA' as [HCasesAeqA'L | HCasesAeqA'R].
@@ -1027,8 +1027,67 @@ Proof.
           rewrite -> find_ab_neq2 in IHC; auto.
           rewrite -> find_ab_neq2 in IHC; auto.
         }
+
+      (* Case LetPair *)
+      + intros G D T HWT.
+        inversion HWT; subst.
+
+        specialize (IHC
+                      (CE_remove A' y (CE_remove A' z G))
+                      (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
+                      (Actor.Map.add A' ThetaA2 T) 
+                      H8).
         
-Admitted.
+        assert (A = A' \/ A <> A') as HCasesAeqA'.
+        tauto.
+        
+        destruct HCasesAeqA' as [HCasesAeqA'L | HCasesAeqA'R].
+        
+        (* Case A = A' *)
+        {
+          rewrite <- HCasesAeqA'L in *.
+          rewrite -> find_add in IHC; auto.
+
+          unfold CE_remove in IHC.
+          rewrite -> find_add in IHC; auto.
+          rewrite -> find_add in IHC; auto.
+
+          pose proof (dj_sym
+                        (Var.Map.remove y (Var.Map.remove z (ChorEnv.find A G)))
+                        (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) IHC) as Hdjsym.
+
+          pose proof (remove_dj
+                        (Var.Map.add z tau2 DeltaA2)
+                        (Var.Map.remove y (Var.Map.remove z (ChorEnv.find A G)))
+                        y tau1 Hdjsym) as HCwtdj1.
+          pose proof (remove_dj
+                        DeltaA2
+                        (Var.Map.remove y (Var.Map.remove z (ChorEnv.find A G)))
+                        z tau2 HCwtdj1) as HCwtdj2.
+          clear HCwtdj1.
+          pose proof (remove_nin_dj
+                        y DeltaA2 (Var.Map.remove z (ChorEnv.find A G))
+                        HCwtdj2 H11) as HCwtdj3.
+          clear HCwtdj2.
+          pose proof (remove_nin_dj
+                        z DeltaA2 (ChorEnv.find A G)
+                        HCwtdj3 H12) as HCwtdj.
+          
+          pose proof (Expr.wt_disjoint
+                        (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) H4) as Hewtdj.
+
+          apply (partition_concat_dj
+                   (ChorEnv.find A G) (ChorEnv.find A D) DeltaA1 DeltaA2
+                   H9 Hewtdj (dj_sym DeltaA2 (ChorEnv.find A G) HCwtdj)).
+        }          
+        {
+          
+          unfold CE_remove in IHC.
+          rewrite -> find_ab_neq2 in IHC; auto.
+          rewrite -> find_ab_neq2 in IHC; auto.
+          rewrite -> find_ab_neq2 in IHC; auto.
+        }
+Qed.
 
 Lemma weakening_gen : forall C G D T G0,
     WellTyped G D T C ->
@@ -1549,11 +1608,12 @@ Proof.
               apply HNTFB.
               apply HBEQB.
 
-              pose proof (wt_disjoint A
+              Check wt_disjoint.
+              pose proof (wt_disjoint C A
                             (ChorEnv.add B y tau0 G)
                             (ChorEnv.add A x tau (Actor.Map.add A' DeltaA2 D))
                             (Actor.Map.add A' ThetaA3 (Actor.Map.add A ThetaA2 T))
-                            C H9) as HWTDJ.
+                            H9) as HWTDJ.
 
               assert (A = B \/ A <> B) as HCasesAeqB.
               tauto.
@@ -1980,8 +2040,8 @@ Proof.
                 pose proof (beqeq A x y Heq).
                 rewrite <- H in *.
 
-                pose proof (wt_disjoint A (ChorEnv.add A x tau0 G) (Actor.Map.add A DeltaA2 D)
-                              (Actor.Map.add A ThetaA3 T) C H7) as Hwtdj.
+                pose proof (wt_disjoint C A (ChorEnv.add A x tau0 G) (Actor.Map.add A DeltaA2 D)
+                              (Actor.Map.add A ThetaA3 T) H7) as Hwtdj.
                 rewrite (find_add A DeltaA2 D) in Hwtdj.
 
                 pose proof (nin_dj x (ChorEnv.find A (ChorEnv.add A x tau0 G)) DeltaA2
