@@ -1180,7 +1180,7 @@ Proof.
           destruct (mapsto_destruct x tau DeltaA1 Hinin) as [DeltaA1' HDA'].
           destruct HDA' as [HDA'A HDA'B].
           rewrite -> HDA'A in H8.
-             pose proof 
+          pose proof 
             (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
                (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0) Hv H8) as HWTS.
           rewrite -> (find_add A ThetaA2 T) in H11.
@@ -1657,24 +1657,19 @@ Proof.
         rewrite -> (addadd1 A D DeltaA2 x tau) in H7.
         rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
         
-        assert (HSendety : (exists Theta tau', Expr.WellTyped (ChorEnv.find A G)
-                                                 DeltaA1 Theta e tau')).
-        exists ThetaA0.
-        exists (Expr.BANG tau0).
-        auto.
-        
-        pose proof
-          (esubst_lin (ChorEnv.find A G) DeltaA1 e x v tau HSendety HninG) as HESL.
-        
-        (* Case x in e *) 
-        destruct HESL as [HxinDA | HxninDA].          
-        {
-          (* prepare witness for expression e typing and partioning facts. *)
-          destruct HxinDA as [DeltaA1'].
-          destruct H as [HinDA HninDA'].
+        assert (Var.Map.In x DeltaA1 \/ ~ Var.Map.In x DeltaA1) as HESL.
+        tauto.
 
-          (* expression typing *)
-          rewrite <- HinDA in H6.
+        (* Case x in e *) 
+        destruct HESL as [HinDA | HninDA].   
+        {          
+          (* prepare witness for expression e typing and partioning facts. *)
+          rewrite -> (add_find D A x tau) in H8.
+          pose proof (inin (ChorEnv.find A D) DeltaA1 DeltaA2
+                        x tau H8 HinDA) as Hinin.
+          destruct (mapsto_destruct x tau DeltaA1 Hinin) as [DeltaA1' HDA'].
+          destruct HDA' as [HDA'A HDA'B].
+          rewrite -> HDA'A in H6.
           
           (* partioning facts. *)
           rewrite -> (find_add A ThetaA2 T) in H9.
@@ -1682,8 +1677,9 @@ Proof.
             (partitioning (ChorEnv.find A T) ThetaA0 ThetaA1 ThetaA2 ThetaA3 HinT H9)
             as HPartition.
           destruct HPartition as [HPartitionA [HPartitionB [HPartitionC HPartitionD]]].
-          rewrite -> (add_find D A x tau) in H8.
-          pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau HinDA H8) as Hnin.
+          assert (Var.Map.add x tau DeltaA1' = DeltaA1).
+          auto.
+          pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau H H8) as Hnin.
           destruct Hnin as [HninA HninB].
                
           eapply LetBang.
@@ -1694,7 +1690,7 @@ Proof.
               pose proof
                 (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
                    (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
-                   Hv H6 HPartitionA HninG HninDA') as HWTS.
+                   Hv H6 HPartitionA HninG HDA'B) as HWTS.
               eauto.
             }
             {
@@ -1723,10 +1719,10 @@ Proof.
         }
         (* case x not in e *)
         {
-          destruct HxninDA as [HxninDAA HxninDAB].
+          pose proof (esubst (ChorEnv.find A G) DeltaA1 ThetaA0 e x v (Expr.BANG tau0)
+                        H6 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H8.
-          pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H8 HxninDAA) as Hini.
-
+          pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H8 HninDA) as Hini.
           
           (* (de)construct environment for typing C *)
           pose proof (mapsto_destruct x tau DeltaA2 Hini) as HDA2.
@@ -1745,7 +1741,7 @@ Proof.
             
             + destruct (Actor.FSet.MF.eq_dec A A) eqn:Heq.
               {
-                rewrite -> HxninDAB.
+                rewrite -> Hesubst.
                 eauto.
               }
               { auto. }
@@ -1846,7 +1842,7 @@ Proof.
               rewrite -> (find_ab_neq2 A' A ThetaA2 T H) in H9.
               auto.
       }
-
+      
       (* Case LetPair *)
     + inversion HC; subst.
 
