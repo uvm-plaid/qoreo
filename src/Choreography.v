@@ -1286,15 +1286,14 @@ Proof.
       { auto. }
 Qed.
 
+Lemma wt_subst_bang : forall tau G D T A x v C,
+    WellTyped (ChorEnv.add A x tau G) D T C ->
+    Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) (Var.Map.empty _) v tau ->
+    WellTyped G D T (Choreography.subst A x v C).
+Proof.
+Admitted.
 
 (*
-Lemma wt_subst_bang : forall tau G D T A x v C,
-    WellTyped G D T C ->
-    Expr.Val v ->
-    Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) (Var.Map.empty _) v (Expr.BANG tau) ->
-    ChorEnv.MapsTo A x tau G ->
-               WellTyped G D T (Choreography.subst A x v C).
-Proof.
   intros tau G D T A x v C HWT HV HWTV HA.
   induction HWT.
 
@@ -1399,6 +1398,7 @@ Proof.
         eauto.
 
 Qed.
+
  *)
 
 (* replace with Expr.subst_not_in *)
