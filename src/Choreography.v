@@ -315,10 +315,6 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
     step (I::C) refs cfg l (I::C') refs' cfg'
 .
 
-(* DISCUSS: This should go into ChoreEnv module. *)
-Definition CE_remove (A : Actor.t) (x : Var.t) (CE : ChorEnv.t Expr.typ) :  ChorEnv.t Expr.typ :=
-  (Actor.Map.add A (Var.Map.remove x (ChorEnv.find A CE)) CE).
-
 Inductive WellTyped :
   ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
   
@@ -329,7 +325,7 @@ Inductive WellTyped :
                                 
 | EPR : forall G D T A x B y C,
     A <> B ->
-    WellTyped (CE_remove B y (CE_remove A x G))
+    WellTyped (ChorEnv.remove B y (ChorEnv.remove A x G))
       (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)) T C ->
 
     ~ Var.Map.In x (ChorEnv.find A D) ->
@@ -360,7 +356,7 @@ Inductive WellTyped :
 | LetIn : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e tau ->
-    WellTyped (CE_remove A x G) (Actor.Map.add A (Var.Map.add x tau DeltaA2) D)
+    WellTyped (ChorEnv.remove A x G) (Actor.Map.add A (Var.Map.add x tau DeltaA2) D)
       (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
@@ -371,7 +367,7 @@ Inductive WellTyped :
 | LetPair: forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x1 x2 tau1 tau2 e C,
 
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) ->
-    WellTyped (CE_remove A x1 (CE_remove A x2 G))
+    WellTyped (ChorEnv.remove A x1 (ChorEnv.remove A x2 G))
       (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D)
       (Actor.Map.add A ThetaA2 T) C ->
 
@@ -461,28 +457,47 @@ Lemma empty_dj : forall {X : Type} (CE1 : ChorEnv.t X) CE2 A,
     Actor.Map.Empty CE2 ->
     Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2).
 Proof.
-Admitted.
+  intros X CE1 CE2 A Hempty.
+  intros z [Hin1 Hin2].
+  unfold ChorEnv.find in Hin2.
+  rewrite Actor.Map.Proofs.Empty_find in Hempty.
+  rewrite Hempty in Hin2.
+  Var.simplify.
+Qed.
     
 Lemma nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
     Var.Map.Properties.Disjoint M1 M2 ->
     Var.Map.In x M2 ->
     ~ Var.Map.In x M1.
 Proof.
-Admitted.
+  intros X x M1 M2 Hdisj Hin1 Hin2.
+  apply (Hdisj x); auto.
+Qed.
 
 Lemma remove_nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
     Var.Map.Properties.Disjoint M1 (Var.Map.remove x M2) ->
     ~ Var.Map.In x M1 ->
     Var.Map.Properties.Disjoint M1 M2.
 Proof.
-Admitted.
+  intros X x M1 M2 Hdisj Hin.
+  intros z [Hin1 Hin2].
+  Var.Map.Tactics.compare x z.
+  {
+    apply (Hdisj z).
+    split; auto.
+    Var.simplify.
+  }
+Qed.
 
 Lemma partition_dj : forall  {X : Type} (M : Var.Map.t X) M1 M2 M3,
     Var.Map.Properties.Disjoint M M1 ->
     Var.Map.Partition M1 M2 M3  ->
     Var.Map.Properties.Disjoint M M2.
 Proof.
-Admitted.
+  intros X M M1 M2 M3 Hdisj Hpart.
+  Var.Map.Tactics.reflect_partition.
+  Var.simplify.
+Qed.
 
 Lemma partition_concat_dj : forall  {X : Type} (M : Var.Map.t X) M1 M2 M3,
     Var.Map.Partition M1 M2 M3  ->
@@ -490,7 +505,10 @@ Lemma partition_concat_dj : forall  {X : Type} (M : Var.Map.t X) M1 M2 M3,
     Var.Map.Properties.Disjoint M M3 ->
     Var.Map.Properties.Disjoint M M1.
 Proof.
-Admitted.
+  intros.
+  Var.Map.Tactics.reflect_partition.
+  Var.simplify.
+Qed.
 
 (* follows by partition_dj in case A = B, immediate otherwise *)
 Lemma partition_dj_env : forall  {X : Type} A B (CE1 : ChorEnv.t X) CE2 M1 M2,
@@ -499,40 +517,51 @@ Lemma partition_dj_env : forall  {X : Type} A B (CE1 : ChorEnv.t X) CE2 M1 M2,
     Var.Map.Properties.Disjoint (ChorEnv.find A CE1)
       (ChorEnv.find A (Actor.Map.add B M2 CE2)).
 Proof.
-Admitted.
+  intros X A B CE1 CE2 M1 M2 Hdisj Hpart.
+  Var.Map.Tactics.reflect_partition.
+  Var.simplify.
+  Actor.Map.Tactics.compare A B; auto.
+  rewrite Heq in Hdisj.
+  Var.simplify.
+Qed.
 
 Lemma remove_dj : forall  (M1 : Var.Map.t Expr.typ) M2 x tau,
     Var.Map.Properties.Disjoint (Var.Map.add x tau M1) M2 -> 
     Var.Map.Properties.Disjoint M1 M2.
 Proof.
-Admitted.
+  intros M1 M2 x tau Hdisj.
+  Var.simplify.
+Qed.
 
-Lemma remove_add_dj_env : forall CE1 CE2 A B x tau,
+Lemma remove_add_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x tau,
     Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) ->
     Var.Map.Properties.Disjoint
-      (ChorEnv.find A (CE_remove B x CE1))
+      (ChorEnv.find A (ChorEnv.remove B x CE1))
       (ChorEnv.find A (ChorEnv.add B x tau CE2)).
 Proof.
-Admitted.
-      
-Lemma partition_sym : forall {X : Type} (M : Var.Map.t X) M1 M2,
-    Var.Map.Partition M M1 M2 -> Var.Map.Partition M M2 M1.
-Proof.
-Admitted.
-      
-Lemma dj_sym : forall {X : Type} (M1 : Var.Map.t X) M2,
-    Var.Map.Properties.Disjoint M1 M2 -> Var.Map.Properties.Disjoint M2 M1.
-Proof.
-Admitted.
-    
+  intros.
+  Var.simplify.
+  Actor.Map.Tactics.compare A B; auto.
+  {
+    intros z [Hin1 Hin2].
+    Var.simplify.
+    destruct Hin2 as [? | Hin2]; [contradiction | ].
+    apply (H z); auto.
+  }
+Qed.
+
 Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
     ~ Actor.Map.Empty (ChorEnv.add A x tau D).
 Proof.
-Admitted.
+  intros. intros Hempty.
+  unfold ChorEnv.add in Hempty.
+  Actor.simplify.
+Qed.
 
 Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
     (ChorEnv.find A (Actor.Map.add A M CE)) = M.
 Proof.
+  intros.
 Admitted.
 
 Lemma find_ab_neq1 : forall {X : Type} A B x tau (CE : ChorEnv.t X),
@@ -560,7 +589,7 @@ Proof.
 Admitted.
 
 Lemma remove_find : forall (CE : ChorEnv.t Expr.typ) A x,
-    (ChorEnv.find A (CE_remove A x CE)) = (Var.Map.remove x (ChorEnv.find A CE)).
+    (ChorEnv.find A (ChorEnv.remove A x CE)) = (Var.Map.remove x (ChorEnv.find A CE)).
 Proof.
 Admitted.
 
@@ -579,15 +608,15 @@ Admitted.
 (* This is needed for dealing with classical variable shadowing *)
 Lemma nin_remove_ce : forall (CE : ChorEnv.t Expr.typ) A x B y,
     ~ (Var.Map.In x (ChorEnv.find A CE)) ->
-    ~ (Var.Map.In x (ChorEnv.find A (CE_remove B y CE))).
+    ~ (Var.Map.In x (ChorEnv.find A (ChorEnv.remove B y CE))).
 Proof.
 Admitted.
 
 Lemma partition_remove_all : forall (CE1 : ChorEnv.t Expr.typ) CE2 CE3 A B x,
     Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
-    Var.Map.Partition (ChorEnv.find A (CE_remove B x CE1))
-      (ChorEnv.find A (CE_remove B x CE2))
-      (ChorEnv.find A (CE_remove B x CE3)).
+    Var.Map.Partition (ChorEnv.find A (ChorEnv.remove B x CE1))
+      (ChorEnv.find A (ChorEnv.remove B x CE2))
+      (ChorEnv.find A (ChorEnv.remove B x CE3)).
 Proof.
 Admitted.
   
@@ -852,7 +881,7 @@ Proof.
     + intros G D T HWT.
       inversion HWT; subst.
       specialize (IHC
-                    (CE_remove B z (CE_remove A' y G))
+                    (ChorEnv.remove B z (ChorEnv.remove A' y G))
                     (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A' y Expr.QUBIT D))
                     T H8).
       
@@ -865,16 +894,16 @@ Proof.
       {
         rewrite <- HCasesAeqA'L in *.
         rewrite -> (find_ab_neq1 A B z Expr.QUBIT (ChorEnv.add A y Expr.QUBIT D) H6) in IHC.
-        unfold CE_remove in IHC at 1.
+        unfold ChorEnv.remove in IHC at 1.
         
         rewrite -> 
           (find_ab_neq2 A B
-             (Var.Map.remove z (ChorEnv.find B (CE_remove A y G)))
-             (CE_remove A y G) H6)
+             (Var.Map.remove z (ChorEnv.find B (ChorEnv.remove A y G)))
+             (ChorEnv.remove A y G) H6)
           in IHC.
 
-        pose proof (dj_sym
-                      (ChorEnv.find A (CE_remove A y G))
+        pose proof (Var.Map.Proofs.disjoint_sym
+                      (ChorEnv.find A (ChorEnv.remove A y G))
                       (ChorEnv.find A (ChorEnv.add A y Expr.QUBIT D))
                       IHC) as Hdjsym.
 
@@ -882,10 +911,10 @@ Proof.
         rewrite (find_add A (Var.Map.add y Expr.QUBIT (ChorEnv.find A D)) D) in Hdjsym.
         pose proof (remove_dj
                       (ChorEnv.find A D)
-                      (ChorEnv.find A (CE_remove A y G))
+                      (ChorEnv.find A (ChorEnv.remove A y G))
                       y Expr.QUBIT Hdjsym) as Hrdj.
         rewrite -> (remove_find G A y) in Hrdj.
-        apply (dj_sym (ChorEnv.find A D) (ChorEnv.find A G)
+        apply (Var.Map.Proofs.disjoint_sym (ChorEnv.find A D) (ChorEnv.find A G)
                  (remove_nin_dj 
                     y (ChorEnv.find A D) (ChorEnv.find A G)
                     Hrdj H9)).
@@ -899,15 +928,15 @@ Proof.
         {
           rewrite <- HCasesAeqBL in *.
           
-          unfold CE_remove in IHC at 1.
+          unfold ChorEnv.remove in IHC at 1.
           
           rewrite (find_add A
-                     (Var.Map.remove (elt:=Expr.typ) z (ChorEnv.find A (CE_remove A' y G)))
-                     (CE_remove A' y G)) in IHC. 
+                     (Var.Map.remove (elt:=Expr.typ) z (ChorEnv.find A (ChorEnv.remove A' y G)))
+                     (ChorEnv.remove A' y G)) in IHC. 
           rewrite (add_find
                      (ChorEnv.add A' y Expr.QUBIT D)
                      A z Expr.QUBIT) in IHC. 
-          unfold CE_remove in IHC.
+          unfold ChorEnv.remove in IHC.
           assert (A <> A'); auto.
           
           rewrite -> (find_ab_neq2 A A'
@@ -920,7 +949,7 @@ Proof.
                         (Var.Map.add y Expr.QUBIT (ChorEnv.find A' D))
                         D H) in IHC.
 
-          pose proof (dj_sym
+          pose proof (Var.Map.Proofs.disjoint_sym
                         (Var.Map.remove (elt:=Expr.typ) z (ChorEnv.find A G))
                         (Var.Map.add z Expr.QUBIT (ChorEnv.find A D))
                         IHC) as HIHCsym.
@@ -930,7 +959,7 @@ Proof.
                         (Var.Map.remove (elt:=Expr.typ) z (ChorEnv.find A G))
                         z Expr.QUBIT HIHCsym) as Hrdj.
 
-          apply (dj_sym (ChorEnv.find A D) (ChorEnv.find A G)
+          apply (Var.Map.Proofs.disjoint_sym (ChorEnv.find A D) (ChorEnv.find A G)
                    (remove_nin_dj z (ChorEnv.find A D) (ChorEnv.find A G) Hrdj H10)).
         }
         {
@@ -940,7 +969,7 @@ Proof.
                         HCasesAeqBR)  in IHC.
           rewrite -> (find_ab_neq1 A A' y Expr.QUBIT D HCasesAeqA'R) in IHC.
 
-          unfold CE_remove in IHC.
+          unfold ChorEnv.remove in IHC.
 
           rewrite -> find_ab_neq2 in IHC; auto.
           rewrite -> find_ab_neq2 in IHC; auto.
@@ -952,7 +981,7 @@ Proof.
       inversion HWT; subst.
 
       specialize (IHC
-                    (CE_remove A' y G)
+                    (ChorEnv.remove A' y G)
                     (Actor.Map.add A' (Var.Map.add y tau DeltaA2) D)
                     (Actor.Map.add A' ThetaA2 T)
                     H7).
@@ -966,11 +995,11 @@ Proof.
       {
         rewrite <- HCasesAeqA'L in *.
         rewrite -> find_add in IHC; auto.
-        pose proof (dj_sym
-                      (ChorEnv.find A (CE_remove A y G))
+        pose proof (Var.Map.Proofs.disjoint_sym
+                      (ChorEnv.find A (ChorEnv.remove A y G))
                       (Var.Map.add y tau DeltaA2) IHC) as Hdjsym.
-        pose proof (remove_dj DeltaA2 (ChorEnv.find A (CE_remove A y G)) y tau Hdjsym) as Hrdj.
-        unfold CE_remove in Hrdj.
+        pose proof (remove_dj DeltaA2 (ChorEnv.find A (ChorEnv.remove A y G)) y tau Hdjsym) as Hrdj.
+        unfold ChorEnv.remove in Hrdj.
         rewrite -> find_add in Hrdj.        
         pose proof (remove_nin_dj y DeltaA2 
                       (ChorEnv.find A G)
@@ -981,11 +1010,11 @@ Proof.
 
         apply (partition_concat_dj
                  (ChorEnv.find A G) (ChorEnv.find A D) DeltaA1 DeltaA2
-                 H8 Hewtdj (dj_sym DeltaA2 (ChorEnv.find A G) HCwtdj)).
+                 H8 Hewtdj (Var.Map.Proofs.disjoint_sym DeltaA2 (ChorEnv.find A G) HCwtdj)).
       }
       (* Case A <> A' *)
       {
-        unfold CE_remove in IHC.
+        unfold ChorEnv.remove in IHC.
         rewrite -> find_ab_neq2 in IHC; auto.
         rewrite -> find_ab_neq2 in IHC; auto.
       }
@@ -1033,7 +1062,7 @@ Proof.
         inversion HWT; subst.
 
         specialize (IHC
-                      (CE_remove A' y (CE_remove A' z G))
+                      (ChorEnv.remove A' y (ChorEnv.remove A' z G))
                       (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                       (Actor.Map.add A' ThetaA2 T) 
                       H8).
@@ -1048,11 +1077,11 @@ Proof.
           rewrite <- HCasesAeqA'L in *.
           rewrite -> find_add in IHC; auto.
 
-          unfold CE_remove in IHC.
+          unfold ChorEnv.remove in IHC.
           rewrite -> find_add in IHC; auto.
           rewrite -> find_add in IHC; auto.
 
-          pose proof (dj_sym
+          pose proof (Var.Map.Proofs.disjoint_sym
                         (Var.Map.remove y (Var.Map.remove z (ChorEnv.find A G)))
                         (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) IHC) as Hdjsym.
 
@@ -1078,11 +1107,11 @@ Proof.
 
           apply (partition_concat_dj
                    (ChorEnv.find A G) (ChorEnv.find A D) DeltaA1 DeltaA2
-                   H9 Hewtdj (dj_sym DeltaA2 (ChorEnv.find A G) HCwtdj)).
+                   H9 Hewtdj (Var.Map.Proofs.disjoint_sym DeltaA2 (ChorEnv.find A G) HCwtdj)).
         }          
         {
           
-          unfold CE_remove in IHC.
+          unfold ChorEnv.remove in IHC.
           rewrite -> find_ab_neq2 in IHC; auto.
           rewrite -> find_ab_neq2 in IHC; auto.
           rewrite -> find_ab_neq2 in IHC; auto.
@@ -1142,24 +1171,24 @@ Proof.
       eapply EPR.
       { auto. }
       { 
-        apply (IHC (CE_remove B z (CE_remove A y G))
+        apply (IHC (ChorEnv.remove B z (ChorEnv.remove A y G))
                  (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A y Expr.QUBIT D))
-                 T (CE_remove B z (CE_remove A y G0)) H8
-                 (CE_remove B z (CE_remove A y G'))).
+                 T (ChorEnv.remove B z (ChorEnv.remove A y G0)) H8
+                 (ChorEnv.remove B z (ChorEnv.remove A y G'))).
         intros A0.
         destruct (HE A0) as [HEA0A HEA0B].
         split.
         { 
           pose proof (partition_remove_all G' G G0 A0 A y HEA0A) as HEA0Ay.
           apply (partition_remove_all
-                   (CE_remove A y G')
-                   (CE_remove A y G)
-                   (CE_remove A y G0)
+                   (ChorEnv.remove A y G')
+                   (ChorEnv.remove A y G)
+                   (ChorEnv.remove A y G0)
                    A0 B z HEA0Ay).
         }
         {
           pose proof (remove_add_dj_env G0 D A0 A y (Expr.QUBIT) HEA0B) as HEA0By.
-          apply (remove_add_dj_env (CE_remove A y G0) (ChorEnv.add A y Expr.QUBIT D)
+          apply (remove_add_dj_env (ChorEnv.remove A y G0) (ChorEnv.add A y Expr.QUBIT D)
                    A0 B z (Expr.QUBIT) HEA0By).
         }
       }
@@ -1184,11 +1213,11 @@ Proof.
                   HEAA Hpdj).
       }
       {
-        eapply (IHC (CE_remove A y G)
+        eapply (IHC (ChorEnv.remove A y G)
                       (Actor.Map.add A (Var.Map.add y tau DeltaA2) D)
                       (Actor.Map.add A ThetaA2 T)
-                      (CE_remove A y G0) H7
-                      (CE_remove A y G')).
+                      (ChorEnv.remove A y G0) H7
+                      (ChorEnv.remove A y G')).
 
         intros A0.
         destruct (HE A0) as [HEA0A HEA0B].
@@ -1252,11 +1281,11 @@ Proof.
                   HEAA Hpdj).
       }
       {
-        eapply (IHC (CE_remove A y (CE_remove A z G))
+        eapply (IHC (ChorEnv.remove A y (ChorEnv.remove A z G))
                       (Actor.Map.add A  (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D) 
                       (Actor.Map.add A ThetaA2 T)
-                      (CE_remove A y (CE_remove A z G0)) H8
-                      (CE_remove A y (CE_remove A z G'))).
+                      (ChorEnv.remove A y (ChorEnv.remove A z G0)) H8
+                      (ChorEnv.remove A y (ChorEnv.remove A z G'))).
 
         intros A0.
         destruct (HE A0) as [HEA0A HEA0B].
@@ -1264,9 +1293,9 @@ Proof.
         {
           pose proof (partition_remove_all G' G G0 A0 A z HEA0A) as HEA0Az.
           apply (partition_remove_all
-                   (CE_remove A z G')
-                   (CE_remove A z G)
-                   (CE_remove A z G0)
+                   (ChorEnv.remove A z G')
+                   (ChorEnv.remove A z G)
+                   (ChorEnv.remove A z G0)
                    A0 A y HEA0Az). 
         }
         {  
@@ -1275,7 +1304,7 @@ Proof.
           pose proof (partition_dj_env A0 A G0 D DeltaA1 DeltaA2 HEA0B H9) as Hpdje.
           pose proof (remove_add_dj_env G0 (Actor.Map.add A DeltaA2 D) A0 A z tau2 Hpdje) as Hpdjez.
           apply (remove_add_dj_env
-                        (CE_remove A z G0)
+                        (ChorEnv.remove A z G0)
                         (ChorEnv.add A z tau2 (Actor.Map.add A DeltaA2 D))
                         A0 A y tau1 Hpdjez).
         }
@@ -1671,10 +1700,10 @@ Proof.
                     Expr.QUBIT HninAB HaddAA') as HaddAB.
 
       pose proof (nin_remove_ce G A x A' y HninG) as HninGy.
-      pose proof (nin_remove_ce (CE_remove A' y G) A x B z HninGy) as HninGyz.
+      pose proof (nin_remove_ce (ChorEnv.remove A' y G) A x B z HninGy) as HninGyz.
 
       (* specialize and apply IH *)
-      specialize (IHC ThetaA1 ThetaA2 tau (CE_remove B z (CE_remove A' y G))
+      specialize (IHC ThetaA1 ThetaA2 tau (ChorEnv.remove B z (ChorEnv.remove A' y G))
                     (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A' y Expr.QUBIT D))
                     T A x v Hval Hv H8 HinT HninGyz HaddAB).
 
@@ -1755,7 +1784,7 @@ Proof.
           auto.
           pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau H H8) as Hnin.
           pose proof (csubst
-                        (CE_remove A y G)
+                        (ChorEnv.remove A y G)
                         (Actor.Map.add A  (Var.Map.add y tau0 DeltaA2) D)
                         (Actor.Map.add A ThetaA3 T)
                         C
@@ -1846,7 +1875,7 @@ Proof.
                                
                 (* specialize and apply IH. *)
                 specialize (IHC ThetaA1 ThetaA3 tau
-                              (CE_remove A y G)
+                              (ChorEnv.remove A y G)
                               (Actor.Map.add A (Var.Map.add y tau0 DeltaA2') D)
                               (Actor.Map.add A (Var.Map.concat ThetaA1 ThetaA3) T)
                               A x v Hval Hv).
@@ -1903,7 +1932,7 @@ Proof.
               rewrite -> (addadd4 T A ThetaA2 A' ThetaA3 HCasesAeqA'R) in H7.
               
               (* specialize and apply IH *)
-              specialize (IHC ThetaA1 ThetaA2 tau (CE_remove A' y G)
+              specialize (IHC ThetaA1 ThetaA2 tau (ChorEnv.remove A' y G)
                             (Actor.Map.add A' (Var.Map.add y tau0 DeltaA2) D)
                             (Actor.Map.add A' ThetaA3 T)
                             A x v Hval Hv H7).
@@ -1984,7 +2013,7 @@ Proof.
 
           +  fold Choreography.subst.
              destruct (Insn.rebound_in A x) eqn:Heq.
-             { eauto.}
+             { eauto. }
              {
                pose proof (csubst
                              (ChorEnv.add A y tau0 G)
@@ -2072,10 +2101,10 @@ Proof.
               }
 
             +  assert (Var.Map.add x tau DeltaA2' = DeltaA2) as Hdel; auto.
-               pose proof (partition_sym (Var.Map.add x tau (ChorEnv.find A D)) DeltaA1 DeltaA2 H8) as Hpart.
+               pose proof (@Var.Map.Properties.Partition_sym _ (Var.Map.add x tau (ChorEnv.find A D)) DeltaA1 DeltaA2 H8) as Hpart.
                pose proof (nin (ChorEnv.find A D) DeltaA2' DeltaA2 DeltaA1 x tau Hdel Hpart) as Hnin.
                destruct Hnin as [HninA HninB].
-               pose proof (partition_sym (ChorEnv.find A D) DeltaA2' DeltaA1 HninB).
+               pose proof (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A D) DeltaA2' DeltaA1 HninB).
                auto.
 
             + auto.
@@ -2132,7 +2161,7 @@ Proof.
     + inversion HC; subst.
 
       pose proof (nin_remove_ce G A x A' z HninG) as HninGz.
-      pose proof (nin_remove_ce (CE_remove A' z G) A x A' y HninGz) as HninGzy.
+      pose proof (nin_remove_ce (ChorEnv.remove A' z G) A x A' y HninGz) as HninGzy.
       
       assert (A = A' \/ A <> A') as HCasesAeqA'.
       tauto.
@@ -2177,7 +2206,7 @@ Proof.
           auto.
           pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau H H9) as Hnin.
           pose proof (csubst
-                        (CE_remove A y (CE_remove A z G))
+                        (ChorEnv.remove A y (ChorEnv.remove A z G))
                         (Actor.Map.add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                         (Actor.Map.add A ThetaA3 T)
                         C
@@ -2286,7 +2315,7 @@ Proof.
                 rewrite -> (addadd8 D A x tau (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2'))) in H8.
 
                 specialize (IHC ThetaA1 ThetaA3 tau
-                              (CE_remove A y (CE_remove A z G))
+                              (ChorEnv.remove A y (ChorEnv.remove A z G))
                               (Actor.Map.add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2')) D)
                               (Actor.Map.add A (Var.Map.concat ThetaA1 ThetaA3) T)
                               A x v Hval Hv).
@@ -2355,7 +2384,7 @@ Proof.
               rewrite -> (addadd4 T A ThetaA2 A' ThetaA3 HCasesAeqA'R) in H8.
               
               (* specialize and apply IH *)
-              specialize (IHC ThetaA1 ThetaA2 tau (CE_remove A' y (CE_remove A' z G))
+              specialize (IHC ThetaA1 ThetaA2 tau (ChorEnv.remove A' y (ChorEnv.remove A' z G))
                             (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                             (Actor.Map.add A' ThetaA3 T)
                             A x v Hval Hv H8).

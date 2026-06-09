@@ -2033,6 +2033,10 @@ Module ChorEnv.
         let D := find A G in
         Actor.Map.add A (Var.Map.add x tau D) G.
 
+
+    Definition remove {T} (A : Actor.t) (x : Var.t) (CE : t T) :  t T :=
+        (Actor.Map.add A (Var.Map.remove x (find A CE)) CE).
+
     Definition MapsTo {T} (A : Actor.t) (x : Var.t) (tau : T) (G : t T) : Prop :=
       Var.Map.MapsTo x tau (find A G).
 
@@ -2076,8 +2080,6 @@ Module ChorEnv.
           inversion Ha1; subst; reflexivity.
     Qed.
 
-
-
     Lemma find_add : forall T A B x (a : T) G,
       Var.Map.Equal
         (ChorEnv.find A (ChorEnv.add B x a G))
@@ -2091,4 +2093,24 @@ Module ChorEnv.
       + destruct (Actor.Map.find B G); try reflexivity.
     Qed.
     #[global] Hint Rewrite find_add : var_db.
+
+
+
+    Lemma find_add' : forall {T} A B M (M' : t T),
+      Var.Map.Equal (find A (Actor.Map.add B M M'))
+                    (if Actor.eq_dec A B then M else find A M').
+    Admitted.
+    #[global] Hint Rewrite @find_add' : var_db.
+
+    Lemma find_remove : forall {T} A B x (G : t T),
+      Var.Map.Equal
+        (ChorEnv.find A (ChorEnv.remove B x G))
+        (if Actor.eq_dec A B then Var.Map.remove x (find B G) else find A G).
+    Proof.
+      intros.
+      unfold find. unfold remove.
+      Actor.simplify.
+      repeat Actor.Map.Tactics.reduce_eq_dec; try reflexivity.
+    Qed.
+    #[global] Hint Rewrite @find_remove : var_db.
 End ChorEnv.
