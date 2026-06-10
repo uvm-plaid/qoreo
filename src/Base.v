@@ -2223,4 +2223,21 @@ Module ChorEnv.
       intros T ? A ? D1 D2 HD T1 T2 HT; subst.
     Admitted.
 
+    Lemma actor_map_Equal : forall T (M1 M2 : t T),
+      Actor.Map.Equal M1 M2 -> Equal M1 M2.
+    Admitted.
+
+
+    Lemma actor_map_Equal' : forall T (M1 M2 N1 N2 : t T),
+      Actor.Map.Equal M1 M2 -> Actor.Map.Equal N1 N2 -> Equal M1 N1 -> Equal M2 N2.
+    Admitted.
+
+    Global Instance Equal_Proper : forall T, Proper (Actor.Map.Equal ==> Actor.Map.Equal ==> iff) (@Equal T).
+    Proof.
+      intros T M1 M2 HM N1 N2 HN.
+      split; intros.
+      eapply actor_map_Equal'; eauto.
+      eapply actor_map_Equal'; eauto; symmetry; auto.
+    Qed.
+
 End ChorEnv.
