@@ -2345,8 +2345,79 @@ Proof.
       }
 
       setoid_rewrite HgoalC; auto.
+
+      (* Case Let *)
+    + inversion HWTC; subst.
+      unfold Choreography.subst.
+      fold Choreography.subst.
+      unfold Insn.subst.
       
-  
+      assert
+        ((if Actor.FSet.MF.eq_dec A A' then Expr.subst x v e else e) = e) as Hgoale.
+      {
+        destruct (Actor.FSet.MF.eq_dec A A') eqn:Heq.
+        {
+          subst.
+
+          apply(Expr.subst_not_in e x v 
+                  (ChorEnv.find A' G) DeltaA1 ThetaA1 tau
+                  H3 HninG
+                  (nin_partition x (ChorEnv.find A' D) DeltaA1 DeltaA2 HninD H8)).
+        }
+        { auto. }
+      }
+
+      assert
+        ((if Insn.rebound_in A x (Insn.Let A' y e) then C else Choreography.subst A x v C) = C) as HgoalC.
+      {
+        unfold Insn.rebound_in.
+        destruct (Insn.bind_eqb (A, x) (A', y)) eqn:Hbeq.
+        {
+          setoid_rewrite Hbeq.
+          auto.
+        }
+        {
+          setoid_rewrite Hbeq.
+
+          specialize (IHC
+                        (ChorEnv.remove A' y G)
+                        (Actor.Map.add A' (Var.Map.add y tau DeltaA2) D) 
+                        (Actor.Map.add A' ThetaA2 T)
+                        H7).
+
+          pose proof (nin_remove_ce G A x A' y HninG) as Hnbeq.
+
+          assert (~ Var.Map.In x (ChorEnv.find A (Actor.Map.add A' (Var.Map.add y tau DeltaA2) D)))
+            as HninDadd.
+          {
+            assert (A = A' \/ A <> A') as HAA'eq.
+            tauto.
+            destruct HAA'eq as [HAA'eqL |  HAA'eqR].
+            {
+              rewrite <- HAA'eqL in *.
+              rewrite find_add; auto.
+
+              
+              pose proof (@Var.Map.Properties.Partition_sym _
+                            (ChorEnv.find A D) DeltaA1 DeltaA2 H8) as Hpart.
+              
+              apply (nin_mapl DeltaA2 x y tau (nbeqeq A x y Hbeq)
+                       (nin_partition x (ChorEnv.find A D) DeltaA2 DeltaA1 HninD Hpart)).
+            }
+            {
+              rewrite (find_ab_neq2 A A' (Var.Map.add y tau DeltaA2) D HAA'eqR).
+              auto.
+            }
+          }
+
+          apply (IHC HninDadd Hnbeq).
+        }
+      }
+
+      setoid_rewrite Hgoale.
+      setoid_rewrite HgoalC.
+      auto.
+      
 Admitted.
 
 Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
