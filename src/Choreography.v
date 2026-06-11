@@ -2220,16 +2220,7 @@ Proof.
          }
 Qed.        
 
-(* replace with Expr.subst_not_in *)
-Lemma esubst : forall Gamma Delta Theta e x v tau,
-    Expr.WellTyped Gamma Delta Theta e tau ->
-    ~ Var.Map.In x Gamma -> 
-    ~ Var.Map.In x Delta -> 
-    (Expr.subst x v e) = e.
-Proof.
-Admitted.
-
-Lemma csubst : forall G D T C A x v,
+Lemma subst_not_in : forall G D T C A x v,
     WellTyped G D T C ->
     ~ (Var.Map.In x (ChorEnv.find A D)) ->
     ~ (Var.Map.In x (ChorEnv.find A G)) ->
@@ -2303,7 +2294,7 @@ Proof.
           assert (H : Var.Map.Equal (Var.Map.add x tau DeltaA1') DeltaA1).
           { symmetry. auto. }
           pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau H H10 HninD HDA'B) as Hnin.
-          pose proof (csubst
+          pose proof (subst_not_in
                         (ChorEnv.add B y tau0 G)
                         (Actor.Map.add A DeltaA2 D)
                         (Actor.Map.add A ThetaA3 T)
@@ -2342,8 +2333,9 @@ Proof.
         }
         (* case x not in e *)
         {
-          pose proof (esubst (ChorEnv.find A G) DeltaA1 ThetaA0 e x v (Expr.BANG tau0)
-                             H8 HninG HninDA) as Hesubst.
+          pose proof (Expr.subst_not_in e x v
+                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.BANG tau0)
+                        H8 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H10.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H10 HninDA) as Hini.
 
@@ -2581,7 +2573,7 @@ Proof.
           assert (Var.Map.Equal (Var.Map.add x tau DeltaA1') DeltaA1).
           { symmetry. auto. }
           pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau H H8 HninD HDA'B) as Hnin.
-          pose proof (csubst
+          pose proof (subst_not_in
                         (ChorEnv.remove A y G)
                         (Actor.Map.add A  (Var.Map.add y tau0 DeltaA2) D)
                         (Actor.Map.add A ThetaA3 T)
@@ -2619,7 +2611,8 @@ Proof.
         }
         (* case x not in e *)
         {
-          pose proof (esubst (ChorEnv.find A G) DeltaA1 ThetaA0 e x v tau0
+          pose proof (Expr.subst_not_in e x v
+                        (ChorEnv.find A G) DeltaA1 ThetaA0 tau0
                         H3 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H8.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H8 HninDA) as Hini.
@@ -2813,7 +2806,7 @@ Proof.
              destruct (Insn.rebound_in A x) eqn:Heq.
              { eauto. }
              {
-               pose proof (csubst
+               pose proof (subst_not_in
                              (ChorEnv.add A y tau0 G)
                              (Actor.Map.add A DeltaA2 D)
                              (Actor.Map.add A ThetaA3 T)
@@ -2831,7 +2824,8 @@ Proof.
         }
         (* case x not in e *)
         {
-          pose proof (esubst (ChorEnv.find A G) DeltaA1 ThetaA0 e x v (Expr.BANG tau0)
+          pose proof (Expr.subst_not_in e x v 
+                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.BANG tau0)
                         H6 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H8.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H8 HninDA) as Hini.
@@ -3004,7 +2998,7 @@ Proof.
           assert (Var.Map.Equal (Var.Map.add x tau DeltaA1') DeltaA1).
           { symmetry. auto. }
           pose proof (nin (ChorEnv.find A D) DeltaA1' DeltaA1 DeltaA2 x tau H H9 HninD HDA'B) as Hnin.
-          pose proof (csubst
+          pose proof (subst_not_in
                         (ChorEnv.remove A y (ChorEnv.remove A z G))
                         (Actor.Map.add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                         (Actor.Map.add A ThetaA3 T)
@@ -3050,7 +3044,8 @@ Proof.
         }
         (* case x not in e *)
         {
-          pose proof (esubst (ChorEnv.find A G) DeltaA1 ThetaA0 e x v (Expr.Tensor tau1 tau2)
+          pose proof (Expr.subst_not_in e x v
+                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.Tensor tau1 tau2)
                         H4 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H9.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H9 HninDA) as Hini.
