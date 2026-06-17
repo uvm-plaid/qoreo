@@ -320,7 +320,8 @@ Inductive WFChoreography : Choreography.t -> Prop :=
 | WFCons : forall I C,
   WFInsn I -> WFChoreography C -> WFChoreography (I :: C).
 
-  Lemma add_ok_inversion : forall A ls,
+(*
+Lemma add_ok_inversion : forall A ls,
   Actor.FSet.MSet.Raw.Ok (A :: ls) ->
   ~ SetoidList.InA eq A ls /\ Actor.FSet.MSet.Raw.Ok ls.
 Proof.
@@ -338,37 +339,6 @@ Proof.
 Qed.
 
 
-Fixpoint fset_of_elems (ls : list Actor.t) : Actor.FSet.t :=
-  match ls with
-  | [] => Actor.FSet.empty
-  | A :: ls' => Actor.FSet.add A (fset_of_elems ls')
-  end.
-
-Lemma elems_fset_of_elems : forall ls,
-  Actor.FSet.MSet.Raw.Ok ls ->
-  Actor.FSet.elements (fset_of_elems ls) = ls.
-Admitted.
-
-(* relies on being a list implementation of fset *)
-Lemma fset_reflect : forall (X : Actor.FSet.t),
-  Actor.FSet.Equal X (fset_of_elems (Actor.FSet.elements X)).
-Proof.
-  intros [ls Hls]. simpl.
-  intros A. rewrite Actor.Map.FSetProperties.elements_iff at 1. simpl. 
-
-  induction ls as [ | B ls].
-  { simpl. reflexivity. }
-  simpl. Actor.simplify.
-  rewrite SetoidList.InA_cons.
-  rewrite IHls; auto.
-  2:{
-    apply add_ok_inversion in Hls.
-    destruct Hls; auto.
-  }
-  intuition.
-Qed.
-
-
 Lemma forallb_true : forall A (ls : list A) f,
     (forall x, List.In x ls -> f x = true) ->
     List.forallb f ls = true.
@@ -383,114 +353,8 @@ Lemma lts_not_in : forall A B ls,
   OrderedTypeEx.String_as_OT.lts A B ->
   ~ List.In A ls.
 Admitted.
+*)
 
-
-Lemma elements_remove : forall (X : Actor.FSet.t) A,
-  Actor.FSet.elements (Actor.FSet.remove A X)
-  = @SetoidList.removeA _ eq Actor.eq_dec A (Actor.FSet.elements X).
-Proof.
-  intros X.
-  remember (Actor.FSet.elements X) as ls eqn:Hls.
-  revert X Hls.
-  induction ls as [ | B ls]; intros X Hls A.
-  { destruct X as [X Hok]. simpl in Hls.
-    inversion Hls; subst; auto.
-  }
-  simpl.
-
-  destruct X as [X Hok]. simpl in *.
-  inversion Hls; subst.
-  specialize (IHls (fset_of_elems ls)).
-  simpl.
-  destruct (Actor.Map.E.compare A B) eqn:Hcmp.
-
-  + compare A B.
-    {
-      exfalso. subst.
-      eapply (Actor.Map.Raw.MX.lt_antirefl); eauto.
-    }
-    f_equal.
-    rewrite removeA_not_in; auto.
-    eapply lts_not_in; eauto.
-    
-  + (* A = B *)
-
-    simpl. subst.
-    Actor.simplify.
-    rewrite SetoidList.removeA_filter.
-    rewrite List.forallb_filter_id; auto.
-    apply Actor.FSet.MSet.Raw.elements_spec2w in Hok.
-    unfold Actor.FSet.MSet.Raw.elements in Hok.
-    apply forallb_true.
-    intros D Hin.
-    compare B D; auto.
-    inversion Hok; subst; clear Hok.
-    exfalso. apply H2.
-    rewrite SetoidList.InA_alt.
-    exists B; split; auto.
-
-  + compare A B.
-    {
-      exfalso. subst.
-      eapply (Actor.Map.Raw.MX.lt_antirefl); eauto.
-    }
-    f_equal.
-    apply add_ok_inversion in Hok.
-    destruct Hok; auto.
-    rewrite <- IHls; auto.
-    2:{ rewrite elems_fset_of_elems; auto. }
-    rewrite elems_fset_of_elems; auto.
-Qed.
-
-Lemma elements_cons_in : forall X B ls,
-  Actor.FSet.elements X = B :: ls ->
-  ~ List.In B ls.
-Proof.
-  intros X B ls H.
-      destruct X. simpl in *.
-      inversion H; subst.
-      apply add_ok_inversion in is_ok.
-      destruct is_ok as [Hnin _].
-      intros Hin; apply Hnin.
-      apply SetoidList.In_InA; auto.
-Qed.
-
-Lemma elements_cons_remove : forall X B ls,
-  Actor.FSet.elements X = B :: ls ->
-  Actor.FSet.elements (Actor.FSet.remove B X) = ls.
-Proof.
-  intros X B ls H.
-  rewrite elements_remove. rewrite H.
-  simpl. Actor.simplify.
-  rewrite removeA_not_in; auto.
-  eapply elements_cons_in; eauto.
-Qed.
-
-#[global] Hint Rewrite Actor.Map.FSetProperties.add_iff : actor_db.
-#[global] Hint Rewrite Actor.Map.FSetProperties.remove_iff : actor_db.
-
-
-
-Lemma dec_In : forall x X, 
-  { Actor.FSet.In x X } + { ~ Actor.FSet.In x X }.
-Proof.
-  intros x X. remember (Actor.FSet.elements X) as ls eqn:Hls.
-  revert X Hls.
-  induction ls as [ | B ls]; intros X Hls.
-  * right.
-    rewrite Actor.Map.MProofs.FSetProperties.elements_iff.
-    rewrite <- Hls. inversion 1.
-  * destruct (IHls (Actor.FSet.remove B X)) as [Hin | Hin].
-    { erewrite elements_cons_remove; eauto. }
-    { Actor.simplify. }
-    Actor.simplify.
-    compare B x.
-    {
-      left. rewrite Actor.Map.MProofs.FSetProperties.elements_iff.
-      rewrite <- Hls. constructor; auto.
-    }
-    right. intuition.
-Qed.
 
 
 Lemma EPP_cons : forall A I C PA,
@@ -506,7 +370,7 @@ Proof.
     rewrite eppI_disjoint; auto. simpl.
     eexists. split; eauto.
   * intros [PA' [? HEPPA]]; subst.
-    destruct (dec_In A (Choreography.Insn.actors I))
+    destruct (Actor.Map.FSetProofs.in_dec A (Choreography.Insn.actors I))
       as [Hin | Hin].
     2:{
       rewrite eppI_disjoint; auto.
@@ -520,7 +384,7 @@ Proof.
     destruct Hin; subst; try contradiction.
 Qed.
 
-
+(*
 Lemma in_map_dec : forall {T} (A : Actor.t) (M : Actor.Map.t T),
   { Actor.Map.In A M } + { ~ Actor.Map.In A M }.
 Admitted.
@@ -528,6 +392,7 @@ Admitted.
 Lemma mapsto_dec : forall {T} (A : Actor.t) (M : Actor.Map.t T),
   { v : T & Actor.Map.MapsTo A v M } + { ~ Actor.Map.In A M }.
 Admitted.
+*)
 
 
 
@@ -827,7 +692,7 @@ Proof.
   * intros [HA HC].
     rewrite EPP_N_spec in *.
     intros D PD Hmapsto.
-    destruct (dec_In D (Choreography.Insn.actors I))
+    destruct (Actor.Map.FSetProofs.in_dec D (Choreography.Insn.actors I))
       as [Hin | Hin].
     + apply HA; auto.
     + apply EPP_disjoint; auto.
@@ -1921,7 +1786,7 @@ Qed.
   (*Actor.FSet.MSet.Raw.elements_spec2w*)
   (*Actor.Map.S.MSet.Raw.isok_iff*)
 
-
+(*
 (* relies on being a list implementation of fset *)
 Lemma fset_induction :
   forall (P : Actor.FSet.t -> Prop),
@@ -1962,6 +1827,7 @@ Proof.
   apply add_ok_inversion in Hok.
   destruct Hok; auto.
 Qed.
+*)
 
 Global Instance fold_proper : Proper (eq ==> Actor.FSet.Equal ==> Actor.Map.Equal ==> Actor.Map.Equal) (@Actor.FSet.fold Network.t).
 Admitted.
@@ -1973,8 +1839,13 @@ Lemma fold_uncons_mapsto_neq : forall X A PA N,
 Proof.
   intros X A PA N Hin. rewrite Actor.FSet.fold_1.
   remember (Actor.FSet.elements X) as ls eqn:Hls.
-  revert X Hls N Hin.
-  induction ls as [ | B ls]; intros X Hls N Hin.
+  assert (Hls' : SetoidList.equivlistA eq ls (Actor.FSet.elements X)).
+  { rewrite Hls. reflexivity. }
+  assert (Hdup : SetoidList.NoDupA eq ls).
+  { rewrite Hls. apply Actor.FSet.elements_3w. }
+  clear Hls.
+  revert X Hls' Hdup N Hin.
+  induction ls as [ | B ls]; intros X Hls Hdup N Hin.
   { reflexivity. }
   simpl.
 
@@ -1989,11 +1860,31 @@ Proof.
 
   rewrite (IHls (Actor.FSet.remove B X)).
   2:{
-    erewrite elements_cons_remove; eauto.
+    erewrite Actor.Map.FSetProofs.elements_cons_remove; eauto.
+    { reflexivity. }
+    { inversion Hdup; auto. }
+    { symmetry. auto. }
   }
+  2:{ inversion Hdup; auto. }
   2:{ Actor.simplify. }
   apply uncons_neq; auto.
 Qed.
+
+
+Lemma actor_equivlistA_eq : forall (ls1 ls2 : list Actor.t),
+  Sorted.Sorted OrderedTypeEx.String_as_OT.lts ls1 ->
+  Sorted.Sorted OrderedTypeEx.String_as_OT.lts ls2 ->
+  SetoidList.NoDupA eq ls1 ->
+  SetoidList.NoDupA eq ls2 ->
+  SetoidList.equivlistA eq ls1 ls2 <-> ls1 = ls2.
+Proof.
+  intros ls1 ls2 Hsorted1 Hsorted2 Hdup1 Hdup2.
+  split.
+  * intros Heq. unfold SetoidList.equivlistA in Heq.
+    admit.
+  * intros. subst. reflexivity.
+Admitted.
+
 
 Lemma fold_uncons_mapsto_eq : forall N A PA X,
   Actor.FSet.In A X ->
@@ -2003,6 +1894,14 @@ Proof.
   intros N A PA X Hin.
   rewrite Actor.FSet.fold_1.
   remember (Actor.FSet.elements X) as ls eqn:Hls.
+
+  (*
+  assert (Hls' : SetoidList.equivlistA eq ls (Actor.FSet.elements X)).
+  { rewrite Hls. reflexivity. }
+  assert (Hdup : SetoidList.NoDupA eq ls).
+  { rewrite Hls. apply Actor.FSet.elements_3w. }
+  clear Hls.
+  *)
   revert X Hls Hin N.
   induction ls as [ | B ls]; intros X Hls Hin N.
   {
@@ -2013,12 +1912,32 @@ Proof.
   }
   simpl.
   symmetry in Hls.
+
+  
+
+  (*assert (Hremove : SetoidList.equivlistA eq (Actor.FSet.elements (Actor.FSet.remove B X)) ls).*)
   assert (Hremove : Actor.FSet.elements (Actor.FSet.remove B X) = ls).
-  { apply elements_cons_remove; auto. }
+  {
+    set (Hsort := Actor.FSet.elements_3 X).
+    rewrite Hls in Hsort.
+    inversion Hsort; subst; clear Hsort.
+    set (Hdup := Actor.FSet.elements_3w X).
+    rewrite Hls in Hdup.
+    inversion Hdup; subst; clear Hdup.
+
+    apply actor_equivlistA_eq; auto.
+    { apply Actor.FSet.elements_3. }
+    { apply Actor.FSet.elements_3w. }
+
+    apply Actor.Map.FSetProofs.elements_cons_remove; auto.
+    rewrite Hls.
+    reflexivity.
+  }
   compare A B.
   {
     set (Hyp := fold_uncons_mapsto_neq (Actor.FSet.remove A X) A PA (uncons A N)).
     rewrite Actor.FSet.fold_1 in Hyp.
+
     rewrite Hremove in Hyp.
     rewrite Hyp.
     2:{ Actor.simplify. }
@@ -2067,7 +1986,7 @@ Proof.
   intros I C N HN.
   rewrite EPP_N_spec in *.
   intros D PD HD.
-  destruct (dec_In D (Choreography.Insn.actors I)) as [Hin | Hin].
+  destruct (Actor.Map.FSetProofs.in_dec D (Choreography.Insn.actors I)) as [Hin | Hin].
   * rewrite fold_uncons_mapsto_eq in HD; auto.
     destruct HD as [I0 HD].
     apply HN in HD.
@@ -2107,8 +2026,8 @@ Proof.
      /\ ~ Actor.FSet.In B (Choreography.Insn.actors I))).
   {
     EPP_N_cons.
-    destruct (dec_In A (Choreography.Insn.actors I)) as [HinA | HinA];
-    destruct (dec_In B (Choreography.Insn.actors I)) as [HinB | HinB].
+    destruct (Actor.Map.FSetProofs.in_dec A (Choreography.Insn.actors I)) as [HinA | HinA];
+    destruct (Actor.Map.FSetProofs.in_dec B (Choreography.Insn.actors I)) as [HinB | HinB].
     2:{
       (* contradiction *)
       set (HinA' := H0 _ (Insn.Send v B :: PA) HinA HA).
@@ -2191,7 +2110,7 @@ Proof.
       apply EPP_disjoint; auto.
       apply IHEPP_N. Actor.simplify.
     }
-    destruct (dec_In D (Choreography.Insn.actors I)) as [Hin | Hin].
+    destruct (Actor.Map.FSetProofs.in_dec D (Choreography.Insn.actors I)) as [Hin | Hin].
     2:{ 
       apply EPP_disjoint; auto.
       apply IHEPP_N. Actor.simplify.
