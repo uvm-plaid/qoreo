@@ -34,6 +34,10 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   Definition domain {A} (m : M.t A) : FSet.t :=
       let f := fun x _ s => FSet.add x s in
       M.fold f m FSet.empty.
+
+  Definition setminus {T} (S : FSet.t) (N : M.t T) : M.t T :=
+    FSet.fold (fun x N' => M.remove x N') S N.
+
   Definition Partition {A} := @Properties.Partition A.
 
   (* Rewrite/auto databases *)
@@ -69,6 +73,7 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       | [ |- context[E.eq_dec ?x ?y] ] => compare x y
       | [ H : context[E.eq_dec ?x ?y] |- _ ] => compare x y
       end.
+
 
     #[local] Instance singletonProper : forall A,
       Proper (E.eq ==> @eq A ==> @M.Equal A ==> iff) (@Singleton A).
@@ -145,6 +150,45 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
         intros z.
         autorewrite with qoreo_db.
         destruct (M.find z m1); auto.
+    Qed.
+
+    (** setminus and remove *)
+
+
+    Lemma setminus_mapsto_iff : forall {A} x (a : A) X m,
+      M.MapsTo x a (setminus X m)
+      <->
+      ~ FSet.In x X /\ M.MapsTo x a m.
+    Admitted.
+    (*TODO*) #[global] Hint Rewrite @setminus_mapsto_iff : actor_db.
+
+    Global Instance setminusProper : forall T, Proper (FSet.Equal ==> @M.Equal T ==> @M.Equal T) setminus.
+    Admitted.
+
+
+    Lemma setminus_add : forall T A X (N: M.t T),
+      M.Equal
+        (setminus (FSet.add A X) N)
+        (setminus X (M.remove A N)).
+    Admitted.
+    (*TODO*) #[global] Hint Rewrite setminus_add : actor_db.
+    Lemma setminus_singleton : forall T A (N : M.t T),
+      M.Equal
+        (setminus (FSet.singleton A) N)
+        (M.remove A N).
+    Admitted.
+    (*TODO*) #[global] Hint Rewrite setminus_singleton : actor_db.
+
+
+
+    Lemma remove_remove : forall T A (m : t T),
+      Equal
+        (M.remove A (M.remove A m))
+        (M.remove A m).
+    Proof.
+      intros T A m B.
+      autorewrite with qoreo_db.
+      compare A B; auto.
     Qed.
 
     (** Domain *)
@@ -1718,6 +1762,39 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
     Qed.
     *)
 
+
+
+    (** Add *)
+
+
+    Lemma add_mem_iff : forall x y s,
+      FSet.mem x (FSet.add y s)
+      =
+      if E.eq_dec x y then true else FSet.mem x s.
+    Proof.
+      intros.
+      rewrite FSetProperties.add_b.
+      unfold FSetProperties.eqb.
+      Proofs.compare y x; simpl;
+        Proofs.compare x y; auto.
+      { exfalso. apply Heq0. symmetry. auto. }
+    Qed.
+    (*TODO*) #[global] Hint Rewrite add_mem_iff : var_db.
+
+
+    Lemma singleton_mem_iff : forall x y,
+      FSet.mem y (FSet.singleton x)
+      =
+      if E.eq_dec x y then true else false.
+    Proof.
+      intros.
+      rewrite FSetProperties.singleton_b.
+      auto.
+    Qed.
+    (*TODO*) #[global] Hint Rewrite singleton_mem_iff : var_db.
+
+
+
   End FSetProofs.
 
   Module Tactics.
@@ -1828,6 +1905,7 @@ Module Var.
   #[global] Hint Rewrite Map.Proofs.add_remove_eq : var_db.
   #[global] Hint Rewrite Map.Proofs.add_add_eq : var_db.
   #[global] Hint Rewrite Map.Proofs.singleton_empty : var_db.
+  #[global] Hint Rewrite Map.Proofs.remove_remove : var_db.
 
   (* separate out more expensive resolves into extra_var_db *)
   #[global] Hint Resolve Map.empty_1 : var_db.  
@@ -2227,6 +2305,7 @@ Module Actor.
   #[global] Hint Rewrite Map.Proofs.add_remove_eq : actor_db.
   #[global] Hint Rewrite Map.Proofs.add_add_eq : actor_db.
   #[global] Hint Rewrite Map.Proofs.singleton_empty : actor_db.
+  #[global] Hint Rewrite Map.Proofs.remove_remove : actor_db.
 
   #[global] Hint Resolve Map.Proofs.add_mapsto : actor_db.
   #[global] Hint Resolve Map.Proofs.disjoint_empty_1 Map.Proofs.disjoint_empty_2 : actor_db.
