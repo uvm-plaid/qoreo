@@ -152,34 +152,7 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
         destruct (M.find z m1); auto.
     Qed.
 
-    (** setminus and remove *)
-
-
-    Lemma setminus_mapsto_iff : forall {A} x (a : A) X m,
-      M.MapsTo x a (setminus X m)
-      <->
-      ~ FSet.In x X /\ M.MapsTo x a m.
-    Admitted.
-    (*TODO*) #[global] Hint Rewrite @setminus_mapsto_iff : actor_db.
-
-    Global Instance setminusProper : forall T, Proper (FSet.Equal ==> @M.Equal T ==> @M.Equal T) setminus.
-    Admitted.
-
-
-    Lemma setminus_add : forall T A X (N: M.t T),
-      M.Equal
-        (setminus (FSet.add A X) N)
-        (setminus X (M.remove A N)).
-    Admitted.
-    (*TODO*) #[global] Hint Rewrite setminus_add : actor_db.
-    Lemma setminus_singleton : forall T A (N : M.t T),
-      M.Equal
-        (setminus (FSet.singleton A) N)
-        (M.remove A N).
-    Admitted.
-    (*TODO*) #[global] Hint Rewrite setminus_singleton : actor_db.
-
-
+    (* remove *)
 
     Lemma remove_remove : forall T A (m : t T),
       Equal
@@ -1585,6 +1558,21 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       all: apply FSetProperties.E_ST.
     Qed.
 
+  Lemma elements_discriminate : forall X1 X2 A ls2,
+      SetoidList.eqlistA E.eq (FSet.elements X1) [] ->
+      SetoidList.eqlistA E.eq (FSet.elements X2) (A :: ls2) ->
+      ~ FSet.Equal X1 X2.
+  Proof.
+    intros X1 X2 A ls2 H1 H2 HX.
+      apply elements_Proper in HX.
+      rewrite H1 in HX.
+      rewrite H2 in HX.
+      unfold SetoidList.equivlistA in HX.
+      absurd (SetoidList.InA E.eq A []).
+      { inversion 1. }
+      rewrite HX. constructor. reflexivity.
+  Qed.
+
 
     Lemma elements_cons_in : forall X B ls,
       FSet.elements X = B :: ls ->
@@ -1646,7 +1634,34 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
         right. auto. 
     Qed.
 
+    Module E_facts := OrderedType.OrderedTypeFacts E.
 
+    #[local] Instance ltProper : Proper (E.eq ==> E.eq ==> iff) E.lt.
+      apply E_facts.lt_compat.
+    Qed.
+    Lemma ltStrict : StrictOrder E.lt.
+    Proof.
+      apply E_facts.lt_strorder.
+    Qed.
+
+    Lemma elements_Proper' : forall X1 X2,
+      FSet.Equal X1 X2 ->
+      SetoidList.eqlistA E.eq (FSet.elements X1) (FSet.elements X2).
+    Proof.
+      intros.
+      assert (Sorted.Sorted E.lt (FSet.elements X1)).
+      { apply FSet.elements_3. }
+      assert (Sorted.Sorted E.lt (FSet.elements X2)).
+      { apply FSet.elements_3. }
+      assert (Equivalence E.eq).
+      { apply FSetProperties.E_ST. }
+      assert (StrictOrder E.lt).
+      { apply ltStrict. } 
+      eapply SetoidList.SortA_equivlistA_eqlistA; eauto.
+      2:{ apply elements_Proper; auto. }
+      { apply ltProper. }
+    Qed.
+  
 
     Lemma in_dec : forall x X, 
       { FSet.In x X } + { ~ FSet.In x X }.
@@ -1683,6 +1698,330 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
         right. intros Hin'. apply Hin. split; auto.
         intros Heq'. apply Heq. symmetry. auto.
     Qed.
+
+
+    (** setminus *)
+
+
+    Lemma foldProper'' : forall ls1 ls2,
+      SetoidList.eqlistA E.eq ls1 ls2 ->
+
+      forall  T f (b1 b2 : M.t T),
+      Equal b1 b2 ->
+      Proper (Equal ==> E.eq ==> Equal) f ->
+
+      M.Equal (fold_left f ls1 b1)
+              (fold_left f ls2 b2).
+    Proof.
+      
+      intros ls1 ls2 Hls;
+      induction Hls; intros T f b1 b2 Hb Hf;
+        simpl; auto.
+      apply IHHls; auto.
+      rewrite Hb. rewrite H.
+      reflexivity.
+    Qed.
+
+    Instance fset_of_elems_Proper : Proper (SetoidList.eqlistA E.eq ==> FSet.Equal) fset_of_elems.
+      intros ls1; induction ls1 as [ | A1 ls1];
+        intros [ | A2 ls2] Heq; simpl.
+      * reflexivity.
+      * inversion Heq.
+      * inversion Heq.
+      * inversion Heq; subst; clear Heq.
+        rewrite H2. rewrite (IHls1 ls2); auto.
+        reflexivity. 
+    Qed.
+
+    Lemma foldProper' : forall ls1 ls2,
+      SetoidList.eqlistA E.eq ls1 ls2 ->
+      forall  T f (b1 b2 : M.t T),
+      Equal b1 b2 ->
+      Proper (E.eq ==> Equal ==>  Equal) f ->
+      M.Equal (FSet.fold f (fset_of_elems ls1) b1)
+              (FSet.fold f (fset_of_elems ls2) b2).
+    Proof.
+      intros.
+      repeat rewrite FSet.fold_1.
+      apply foldProper''; auto.
+      + apply elements_Proper'.
+        rewrite H.
+        reflexivity.
+      + clear ls1 ls2 H b1 b2 H0.
+        intros ? ? Heq ? ? Heq'.
+        rewrite Heq, Heq'.
+        reflexivity.
+    Qed.
+
+    #[local] Instance foldProper : forall T f, 
+      Proper (E.eq ==> Equal ==> Equal) f ->
+      Proper (FSet.Equal ==> @M.Equal T ==> @M.Equal T) (@FSet.fold (M.t T) f).
+    Proof.
+      intros T f Hf X1 X2 HX M1 M2 HM.
+      repeat rewrite FSet.fold_1.
+      apply foldProper''; auto.
+      2:{
+        intros ? ? Heq ? ? Heq'. rewrite Heq, Heq'. reflexivity.
+      }
+      apply elements_Proper'; auto.
+    Qed.
+
+    #[local] Instance setminusProper : forall T, Proper (FSet.Equal ==> @M.Equal T ==> @M.Equal T) setminus.
+    Proof.
+      intros T X1 X2 HX M1 M2 HM.
+      unfold setminus.
+      apply foldProper; auto.
+      clear M1 M2 HM X1 X2 HX.
+      intros A1 A2 HA M1 M2 HM.
+      rewrite HA. rewrite HM. reflexivity.
+    Qed.
+
+    Lemma mapsto_fset_fold_iff : forall T ls x a (m : t T),
+      MapsTo x a (fold_left (fun n x => remove x n) ls m)
+      <->
+      ~ SetoidList.InA E.eq x ls /\ M.MapsTo x a m.
+    Proof.
+      intros T ls.
+      induction ls as [ | D ls]; intros x a m; simpl.
+      * intuition. inversion H0.
+      * rewrite SetoidList.InA_cons.
+        rewrite IHls.
+        Search MapsTo remove.
+        rewrite F.remove_mapsto_iff.
+        intuition.
+    Qed.
+
+    Lemma setminus_mapsto_iff : forall {A} x (a : A) X m,
+      M.MapsTo x a (setminus X m)
+      <->
+      ~ FSet.In x X /\ M.MapsTo x a m.
+    Proof.
+      intros. unfold setminus.
+      rewrite FSet.fold_1.
+      rewrite mapsto_fset_fold_iff.
+      rewrite FSetProperties.elements_iff.
+      reflexivity.
+    Qed.
+    (*TODO*) #[global] Hint Rewrite @setminus_mapsto_iff : actor_db.
+
+
+    Lemma removeA_eqlistA : forall ls A,
+      ~ SetoidList.InA E.eq A ls ->
+      SetoidList.eqlistA E.eq (SetoidList.removeA E.eq_dec A ls) ls.
+    Proof.
+      induction ls as [ | B ls]; intros A Hin; simpl.
+      { constructor. }
+      Proofs.compare A B.
+      {
+        exfalso. apply Hin. constructor; auto.
+      }
+      constructor; [reflexivity | ].
+      apply IHls.
+      {
+        intros Hin0; apply Hin.
+        apply SetoidList.InA_cons_tl; auto.
+      }
+    Qed.
+
+    Lemma setminus_in_remove' : forall ls T A (m : t T),
+      SetoidList.InA E.eq A ls ->
+      SetoidList.NoDupA E.eq ls ->
+      M.Equal
+        (fold_left (fun n x => remove x n) ls m)
+        (fold_left (fun n x => remove x n) (SetoidList.removeA E.eq_dec A ls) (remove A m)).
+    Proof.
+      induction ls as [ | B ls]; intros T A m Hin Hdup.
+      * simpl. inversion Hin.
+      * simpl. inversion Hdup; subst; clear Hdup.
+        Proofs.compare A B.
+        + (* A = B *)
+          apply foldProper''.
+          2:{ rewrite Heq. reflexivity. }
+          2:{ intros ? ? Heq0 ? ? Heq0'.
+              rewrite Heq0, Heq0'. reflexivity.
+          }
+          rewrite removeA_eqlistA.
+          { reflexivity. }
+          { rewrite Heq. auto. }
+        + (* A <> B *)
+          inversion Hin; subst; clear Hin;
+            try contradiction.
+          simpl.
+          Search (remove _ (remove _ _)).
+          rewrite IHls; eauto.
+          Search Equal fold_left.
+          apply foldProper''; try reflexivity.
+          2:{
+            intros ? ? Heq0 ? ? Heq0';
+            rewrite Heq0, Heq0'; reflexivity.
+          }
+          apply Proofs.remove_swap.
+    Qed.
+
+
+    Lemma hdrel_tail : forall l A B,
+      Sorted.Sorted E.lt (B :: l) ->
+      Sorted.HdRel E.lt A (B :: l) ->
+      Sorted.HdRel E.lt A l.
+    Proof.
+      intros l A B Hsort Hhd.
+      inversion Hhd; subst; clear Hhd.
+      inversion Hsort; subst; clear Hsort.
+      inversion H3; subst; clear H3; auto.
+      constructor. rewrite H0; auto.
+    Qed.
+
+    Lemma hdrel_removeA : forall l A B,
+      Sorted.Sorted E.lt l ->
+      Sorted.HdRel E.lt A l ->
+      Sorted.HdRel E.lt A (SetoidList.removeA F.eq_dec B l).
+    Proof.
+      induction l as [ | D l];
+        intros A B Hsort Hhd; simpl; auto.
+      inversion Hsort; subst.
+      Proofs.compare B D.
+      * apply IHl; auto. apply hdrel_tail in Hhd; auto.
+      * inversion Hhd; subst; clear Hhd.
+        constructor; auto.
+    Qed.
+
+    Lemma removeA_sorted : forall ls A,
+      Sorted.Sorted E.lt ls ->
+      Sorted.Sorted E.lt (SetoidList.removeA F.eq_dec A ls).
+    Proof.
+      intros ls A Hsort.
+      induction Hsort; simpl.
+      { constructor. }
+      Proofs.compare A a; auto.
+      constructor; auto.
+      apply hdrel_removeA; auto.
+    Qed.
+
+    Lemma elements_remove : forall A X,
+      SetoidList.eqlistA E.eq
+        (FSet.elements (FSet.remove A X))
+        (SetoidList.removeA E.eq_dec A (FSet.elements X)).
+    Proof.
+      intros.
+      eapply SetoidList.SortA_equivlistA_eqlistA; auto.
+      { apply FSetProperties.E_ST. }
+      { apply ltStrict. }
+      { apply ltProper. }
+      { apply FSet.elements_3. }
+      {
+        apply removeA_sorted.
+        apply FSet.elements_3.
+      }
+
+      intros D.
+      rewrite SetoidList.removeA_InA.
+      2:{ apply FSetProperties.E_ST. }
+
+      repeat rewrite <- FSetProperties.elements_iff.
+      rewrite FSetProperties.remove_iff.
+      reflexivity.
+  Qed.
+
+
+  Lemma remove_add : forall A B X,
+      FSet.Equal
+        (FSet.remove A (FSet.add B X))
+        (if E.eq_dec A B
+          then FSet.remove A X
+          else FSet.add B (FSet.remove A X)).
+    Proof.
+      intros.
+      intros D.
+      Proofs.compare A B.
+      {
+        repeat rewrite FSetProperties.remove_iff.
+        repeat rewrite FSetProperties.add_iff.
+        intuition.
+      }
+      {
+        repeat rewrite FSetProperties.remove_iff.
+        repeat rewrite FSetProperties.add_iff.
+        repeat rewrite FSetProperties.remove_iff.
+        intuition.
+        apply Heq. rewrite H; symmetry; auto.
+      }
+    Qed.
+
+    Lemma setminus_add : forall T A X (N: M.t T),
+      M.Equal
+        (setminus (FSet.add A X) N)
+        (setminus (FSet.remove A X) (M.remove A N)).
+    Proof.
+      intros. 
+
+      unfold setminus.
+      repeat rewrite FSet.fold_1.
+
+      rewrite (setminus_in_remove'  _ _ A).
+      2:{
+        rewrite <- FSetProperties.elements_iff.
+        rewrite FSetProperties.add_iff.
+        left. reflexivity.
+      }
+      2:{ apply FSet.elements_3w. }
+      
+      apply foldProper''; try reflexivity.
+      2:{
+        intros ? ? Heq ? ? Heq';
+        rewrite Heq, Heq'; reflexivity.
+      }
+
+      rewrite <- elements_remove.
+      apply elements_Proper'.
+      rewrite remove_add.
+      Proofs.compare A A.
+      reflexivity.
+    Qed.
+    (*TODO*) #[global] Hint Rewrite setminus_add : actor_db.
+
+
+    Lemma setminus_empty : forall T (M : t T),
+      Equal (setminus FSet.empty M) M.
+    Proof.
+      intros T M.
+      unfold setminus.
+      rewrite FSet.fold_1.
+      rewrite elements_empty.
+      simpl.
+      reflexivity.
+    Qed.
+
+    Lemma setminus_singleton : forall T A (N : M.t T),
+      M.Equal
+        (setminus (FSet.singleton A) N)
+        (M.remove A N).
+    Proof.
+      intros. Search FSet.singleton.
+      setoid_replace (FSet.singleton A)
+        with (FSet.add A FSet.empty).
+      2:{
+        intros D.
+        rewrite FSetProperties.add_iff.
+        rewrite FSetProperties.singleton_iff.
+        rewrite FSetProperties.empty_iff.
+        intuition.
+      }
+      rewrite setminus_add.
+      Search FSet.remove FSet.empty.
+      setoid_replace (FSet.remove A FSet.empty)
+        with FSet.empty.
+      2:{
+        intros D.
+        rewrite FSetProperties.remove_iff.
+        rewrite FSetProperties.empty_iff.
+        intuition.
+      }
+      rewrite setminus_empty.
+      reflexivity.
+    Qed.
+    (*TODO*) #[global] Hint Rewrite setminus_singleton : actor_db.
+
+
 
 
     (*
@@ -1889,6 +2228,7 @@ Module Var.
   #[global] Existing Instance Map.Proofs.singletonProper.
   #[global] Existing Instance Map.Proofs.concatProper.
   #[global] Existing Instance Map.Proofs.domainProper.
+  #[global] Existing Instance Map.Proofs.setminusProper.
 
   #[global] Hint Rewrite Map.Proofs.concat_find : var_db.
   #[global] Hint Rewrite Map.Proofs.concat_in : var_db.
@@ -2288,6 +2628,7 @@ Module Actor.
   #[global] Existing Instance Map.Proofs.singletonProper.
   #[global] Existing Instance Map.Proofs.concatProper.
   #[global] Existing Instance Map.Proofs.domainProper.
+  #[global] Existing Instance Map.Proofs.setminusProper.
 
   #[global] Hint Rewrite Map.Proofs.concat_find : actor_db.
   #[global] Hint Rewrite Map.Proofs.concat_in : actor_db.
