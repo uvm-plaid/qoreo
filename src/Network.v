@@ -996,54 +996,7 @@ Proof.
   Actor.simplify.
 Qed.
 
-Lemma expr_subst_comm : forall e x y v v',
-  x <> y ->
-  Expr.subst x v (Expr.subst y v' e)
-  = Expr.subst y v' (Expr.subst x v e).
-Admitted.
 
-Lemma insn_subst_comm : forall I A B x y v v',
-  A <> B \/ x <> y ->
-  Choreography.Insn.subst A x v (Choreography.Insn.subst B y v' I)
-  = Choreography.Insn.subst B y v' (Choreography.Insn.subst A x v I).
-Proof.
-  intros.
-  destruct I; simpl; auto.
-  * Actor.simplify.
-    rewrite expr_subst_comm; auto.
-    destruct H; auto; try contradiction.
-  * Actor.simplify.
-    rewrite expr_subst_comm; auto.
-    destruct H; auto; try contradiction.
-  * Actor.simplify.
-    rewrite expr_subst_comm; auto.
-    destruct H; auto; try contradiction.
-  * Actor.simplify.
-    rewrite expr_subst_comm; auto.
-    destruct H; auto; try contradiction.
-Qed.
-
-Lemma rebound_in_subst : forall A x B y v' I,
-  Choreography.Insn.rebound_in A x (Choreography.Insn.subst B y v' I)
-  = Choreography.Insn.rebound_in A x I.
-Proof.
-  intros.
-  destruct I; simpl; auto.
-Qed.
-
-Lemma subst_comm : forall C A B x y v v',
-  A <> B \/ x <> y ->
-  Choreography.subst A x v (Choreography.subst B y v' C)
-  = Choreography.subst B y v' (Choreography.subst A x v C).
-Proof.
-  induction C as [ | I C]; intros; simpl; auto.
-  rewrite insn_subst_comm; auto.
-  repeat rewrite rebound_in_subst; auto.
-  destruct (Choreography.Insn.rebound_in A x I);
-    destruct (Choreography.Insn.rebound_in B y I);
-    auto.
-  rewrite IHC; auto.
-Qed.
 Require Import Setoid.
 
 (** uncons *)
