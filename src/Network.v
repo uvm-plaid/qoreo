@@ -1054,6 +1054,16 @@ Proof.
 Qed.
 
 
+Instance fold_left_Proper : forall f,
+  Proper (Actor.Map.Equal ==> eq ==> Actor.Map.Equal) f ->
+  Proper (SetoidList.eqlistA (@eq Actor.t) ==> Actor.Map.Equal ==> @Actor.Map.Equal Actor.t) (List.fold_left f).
+Proof.
+  intros f Hf ls1 ls2 Hls M1 M2 HM.
+  apply Actor.Map.FSetProofs.foldProper''; auto.
+Qed.
+Instance unconsProper : Proper (eq ==> Actor.Map.Equal ==> Actor.Map.Equal) uncons.
+Admitted.
+
 Lemma fold_uncons_mapsto_eq : forall N A PA X,
   Actor.FSet.In A X ->
   Actor.Map.MapsTo A PA (Actor.FSet.fold uncons X N) <->
@@ -1062,6 +1072,8 @@ Proof.
   intros N A PA X Hin.
   rewrite Actor.FSet.fold_1.
   remember (Actor.FSet.elements X) as ls eqn:Hls.
+  assert (Hls' : SetoidList.eqlistA eq ls (Actor.FSet.elements X)) by (subst; reflexivity).
+  clear Hls.
 
   (*
   assert (Hls' : SetoidList.equivlistA eq ls (Actor.FSet.elements X)).
@@ -1070,7 +1082,7 @@ Proof.
   { rewrite Hls. apply Actor.FSet.elements_3w. }
   clear Hls.
   *)
-  revert X Hls Hin N.
+  revert X Hls' Hin N.
   induction ls as [ | B ls]; intros X Hls Hin N.
   {
     exfalso.
@@ -1085,20 +1097,22 @@ Proof.
   assert (Hremove : SetoidList.eqlistA eq (Actor.FSet.elements (Actor.FSet.remove B X)) ls).
   {
     set (Hsort := Actor.FSet.elements_3 X).
-    rewrite Hls in Hsort.
     inversion Hsort; subst; clear Hsort.
+    { rewrite <- H0 in Hls. inversion Hls. }
     set (Hdup := Actor.FSet.elements_3w X).
-    rewrite Hls in Hdup.
     inversion Hdup; subst; clear Hdup.
+    { rewrite <- H3 in *. discriminate. }
+    rewrite <- H2 in *.
+    inversion H; subst; clear H.
+    inversion Hls; subst; clear Hls.
+    rewrite <- H9.
 
     eapply SetoidList.SortA_equivlistA_eqlistA; eauto.
     { apply Actor.FSet.MSet.E.lt_strorder. }
     { apply Actor.FSet.MSet.E.lt_compat. }
-
     { apply Actor.FSet.elements_3. }
-
     apply Actor.Map.FSetProofs.elements_cons_remove; auto.
-    rewrite Hls.
+    rewrite <- H2.
     reflexivity.
   }
 
@@ -1106,8 +1120,15 @@ Proof.
   {
     set (Hyp := fold_uncons_mapsto_neq (Actor.FSet.remove A X) A PA (uncons A N)).
     rewrite Actor.FSet.fold_1 in Hyp.
-
-    rewrite Hremove in Hyp.
+    setoid_replace (Actor.FSet.fold uncons (Actor.FSet.remove A X) (uncons A N))
+      with (List.fold_left (fun a e => uncons e a) ls (uncons A N))
+      in Hyp.
+    2:{
+      repeat rewrite Actor.FSet.fold_1.
+      apply Actor.Map.FSetProofs.foldProper''; auto; try reflexivity.
+      { intros ? ? Heq ? ? Heq'; subst. rewrite Heq. reflexivity. }
+    }
+    
     rewrite Hyp.
     2:{ Actor.simplify. }
     clear Hyp.
@@ -1142,7 +1163,8 @@ Proof.
   {
     (* A <> B, so A ∈ ls *)
     rewrite (IHls (Actor.FSet.remove B X)); auto.
-    2:{ Actor.simplify. }
+    3:{ Actor.simplify. }
+    2:{ symmetry; auto. }
     split; intros [I H]; exists I;
       rewrite uncons_neq in *; auto.
   }
