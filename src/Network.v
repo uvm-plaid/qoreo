@@ -873,8 +873,31 @@ Qed.
 Lemma chor_epr_eq : forall T2 T1 T1' A B cfg cfg' q1 q2,
   ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') ->
   ChorEnv.Equal T1 T2 ->
-  exists T2', ChorEnv.Equal T2' T1' /\ ChorEnv.epr A B T2 cfg = (q1, q2, T2', cfg').
-Admitted.
+  exists T2', ChorEnv.epr A B T2 cfg = (q1, q2, T2', cfg') /\ ChorEnv.Equal T2' T1'.
+Proof.
+  intros ? ? ? ? ? ? ? ? ? Hepr Heq.
+  unfold ChorEnv.epr.
+  unfold ChorEnv.epr in Hepr.
+  destruct (Config.epr_cfg cfg) as [[q1' q2'] cfg''] eqn:Hcfg.
+  inversion Hepr; subst; clear Hepr.
+  eexists.
+  
+  split.
+  + f_equal.
+    replace (Var.fresh (ChorEnv.find A T2))
+      with (Var.fresh (ChorEnv.find A T1)).
+    2:{
+      rewrite Heq. reflexivity.
+    }
+    replace (Var.fresh (ChorEnv.find B (ChorEnv.add A (Var.fresh (ChorEnv.find A T1)) q1' T2)))
+      with (Var.fresh (ChorEnv.find B (ChorEnv.add A (Var.fresh (ChorEnv.find A T1)) q1' T1))).
+    2:{
+      rewrite Heq.
+      reflexivity.
+    }
+    reflexivity.
+  + rewrite Heq. reflexivity.
+Qed.
 
 (* TODO: move to Choreography.v *)
 Lemma epr_Proper : Proper (eq ==> eq ==> ChorEnv.Equal ==> eq ==> RelationPairs.RelProd (RelationPairs.RelProd eq ChorEnv.Equal) eq) ChorEnv.epr.
@@ -905,14 +928,14 @@ Proof.
     destruct H as [T0' [Heq'' H]].
 
     apply (Choreography.EPRB q1 q2 T0'); auto.
-    { rewrite H0. rewrite Heq''. reflexivity. }
+    { rewrite H; auto. }
 
   * apply (chor_epr_eq Θ2) in H; auto.
     destruct H as [T0' [Heq'' H]].
 
     apply (Choreography.EPRB' q1 q2 T0'); auto.
     {
-      rewrite H0. rewrite Heq''. reflexivity.
+      rewrite H; auto.
     }
 Qed.
 
@@ -1061,8 +1084,15 @@ Proof.
   intros f Hf ls1 ls2 Hls M1 M2 HM.
   apply Actor.Map.FSetProofs.foldProper''; auto.
 Qed.
+
 Instance unconsProper : Proper (eq ==> Actor.Map.Equal ==> Actor.Map.Equal) uncons.
-Admitted.
+Proof.
+  intros ? x ? M1 M2 HM; subst.
+  unfold uncons.
+  rewrite HM.
+  destruct (Actor.Map.find x M2) as [ [ | P] | ];
+    rewrite HM; reflexivity.
+Qed.
 
 Lemma fold_uncons_mapsto_eq : forall N A PA X,
   Actor.FSet.In A X ->
