@@ -870,6 +870,12 @@ Proof.
   intuition.
 Qed.
 
+Lemma chor_epr_eq : forall T2 T1 T1' A B cfg cfg' q1 q2,
+  ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') ->
+  ChorEnv.Equal T1 T2 ->
+  exists T2', ChorEnv.Equal T2' T1' /\ ChorEnv.epr A B T2 cfg = (q1, q2, T2', cfg').
+Admitted.
+
 (* TODO: move to Choreography.v *)
 Lemma epr_Proper : Proper (eq ==> eq ==> ChorEnv.Equal ==> eq ==> RelationPairs.RelProd (RelationPairs.RelProd eq ChorEnv.Equal) eq) ChorEnv.epr.
 Proof.
@@ -888,82 +894,26 @@ Lemma chor_step_Proper' : forall C Θ1 cfg l C' Θ1' cfg',
     Choreography.step C Θ2 cfg l C' Θ2' cfg'.
 Proof.
   intros ? ? ? ? ? ? ? Hstep.
-  induction Hstep; intros Θ2 Θ2' Heq Heq'.
-  * econstructor; eauto;
-    try rewrite <- Heq;
-    try rewrite <- Heq'; eauto.
-  * econstructor; eauto;
-    try rewrite <- Heq;
-    try rewrite <- Heq'; eauto.
-  * 
-    rewrite Heq' in H0. clear refs' Heq'.
+  induction Hstep; intros Θ2 Θ2' Heq Heq';
+    try rewrite Heq in *;
+    try rewrite Heq' in *;
+    try (econstructor; eauto; fail).
+  (* only EPR cases left *)
+  * subst.
 
-    inversion H; subst; clear H.
-    eapply Choreography.EPRB.
-    3:{ eauto. }
-    + unfold ChorEnv.epr.
-      destruct (Config.epr_cfg cfg) as [[pA pB] cfg'] eqn:Hcfg.
-      unfold Config.epr_cfg in Hcfg.
-      inversion Hcfg; subst; clear Hcfg.
-      f_equal.
-      match goal with
-      | [ |- (?e1, ?e2) = (?e1', ?e2') ] =>
-        replace e1 with e1';
-        [replace e2 with e2'; try reflexivity | ]
-      end.
-      rewrite <- Heq.
-      reflexivity.
+    apply (chor_epr_eq Θ2) in H; auto.
+    destruct H as [T0' [Heq'' H]].
 
-    + rewrite <- Heq.
-      auto.
+    apply (Choreography.EPRB q1 q2 T0'); auto.
+    { rewrite H0. rewrite Heq''. reflexivity. }
 
-  *
-    rewrite Heq' in H0. clear refs' Heq'.
+  * apply (chor_epr_eq Θ2) in H; auto.
+    destruct H as [T0' [Heq'' H]].
 
-    inversion H; subst; clear H.
-    eapply Choreography.EPRB'.
-    3:{ eauto. }
-    + unfold ChorEnv.epr.
-      destruct (Config.epr_cfg cfg) as [[pA pB] cfg'] eqn:Hcfg.
-      unfold Config.epr_cfg in Hcfg.
-      inversion Hcfg; subst; clear Hcfg.
-      f_equal.
-      match goal with
-      | [ |- (?e1, ?e2) = (?e1', ?e2') ] =>
-        replace e1 with e1';
-        [replace e2 with e2'; try reflexivity | ]
-      end.
-      rewrite <- Heq.
-      reflexivity.
-
-    + rewrite <- Heq.
-      auto.
-
-  * rewrite Heq in *.
-    rewrite Heq' in *.
-    econstructor; eauto.
-
-  * rewrite Heq in *.
-    rewrite Heq' in *.
-    econstructor; eauto.
-
-  * rewrite Heq in *.
-    rewrite Heq' in *.
-    econstructor; eauto.
-
-  * rewrite Heq in *.
-    rewrite Heq' in *.
-    econstructor; eauto.
-
-  * rewrite Heq in *.
-    rewrite Heq' in *.
-    econstructor; eauto.
-
-  * rewrite Heq in *.
-    rewrite Heq' in *.
-    econstructor; eauto.
-
-  * econstructor; eauto.
+    apply (Choreography.EPRB' q1 q2 T0'); auto.
+    {
+      rewrite H0. rewrite Heq''. reflexivity.
+    }
 Qed.
 
 Global Instance chor_step_Proper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.step).
@@ -1104,6 +1054,16 @@ Proof.
 Qed.
 
 
+Instance fold_left_Proper : forall f,
+  Proper (Actor.Map.Equal ==> eq ==> Actor.Map.Equal) f ->
+  Proper (SetoidList.eqlistA (@eq Actor.t) ==> Actor.Map.Equal ==> @Actor.Map.Equal Actor.t) (List.fold_left f).
+Proof.
+  intros f Hf ls1 ls2 Hls M1 M2 HM.
+  apply Actor.Map.FSetProofs.foldProper''; auto.
+Qed.
+Instance unconsProper : Proper (eq ==> Actor.Map.Equal ==> Actor.Map.Equal) uncons.
+Admitted.
+
 Lemma fold_uncons_mapsto_eq : forall N A PA X,
   Actor.FSet.In A X ->
   Actor.Map.MapsTo A PA (Actor.FSet.fold uncons X N) <->
@@ -1112,6 +1072,8 @@ Proof.
   intros N A PA X Hin.
   rewrite Actor.FSet.fold_1.
   remember (Actor.FSet.elements X) as ls eqn:Hls.
+  assert (Hls' : SetoidList.eqlistA eq ls (Actor.FSet.elements X)) by (subst; reflexivity).
+  clear Hls.
 
   (*
   assert (Hls' : SetoidList.equivlistA eq ls (Actor.FSet.elements X)).
@@ -1120,7 +1082,7 @@ Proof.
   { rewrite Hls. apply Actor.FSet.elements_3w. }
   clear Hls.
   *)
-  revert X Hls Hin N.
+  revert X Hls' Hin N.
   induction ls as [ | B ls]; intros X Hls Hin N.
   {
     exfalso.
@@ -1135,28 +1097,38 @@ Proof.
   assert (Hremove : SetoidList.eqlistA eq (Actor.FSet.elements (Actor.FSet.remove B X)) ls).
   {
     set (Hsort := Actor.FSet.elements_3 X).
-    rewrite Hls in Hsort.
     inversion Hsort; subst; clear Hsort.
+    { rewrite <- H0 in Hls. inversion Hls. }
     set (Hdup := Actor.FSet.elements_3w X).
-    rewrite Hls in Hdup.
     inversion Hdup; subst; clear Hdup.
+    { rewrite <- H3 in *. discriminate. }
+    rewrite <- H2 in *.
+    inversion H; subst; clear H.
+    inversion Hls; subst; clear Hls.
+    rewrite <- H9.
 
     eapply SetoidList.SortA_equivlistA_eqlistA; eauto.
     { apply Actor.FSet.MSet.E.lt_strorder. }
     { apply Actor.FSet.MSet.E.lt_compat. }
-
     { apply Actor.FSet.elements_3. }
-
     apply Actor.Map.FSetProofs.elements_cons_remove; auto.
-    rewrite Hls.
+    rewrite <- H2.
     reflexivity.
   }
+
   compare A B.
   {
     set (Hyp := fold_uncons_mapsto_neq (Actor.FSet.remove A X) A PA (uncons A N)).
     rewrite Actor.FSet.fold_1 in Hyp.
-
-    rewrite Hremove in Hyp.
+    setoid_replace (Actor.FSet.fold uncons (Actor.FSet.remove A X) (uncons A N))
+      with (List.fold_left (fun a e => uncons e a) ls (uncons A N))
+      in Hyp.
+    2:{
+      repeat rewrite Actor.FSet.fold_1.
+      apply Actor.Map.FSetProofs.foldProper''; auto; try reflexivity.
+      { intros ? ? Heq ? ? Heq'; subst. rewrite Heq. reflexivity. }
+    }
+    
     rewrite Hyp.
     2:{ Actor.simplify. }
     clear Hyp.
@@ -1191,7 +1163,8 @@ Proof.
   {
     (* A <> B, so A ∈ ls *)
     rewrite (IHls (Actor.FSet.remove B X)); auto.
-    2:{ Actor.simplify. }
+    3:{ Actor.simplify. }
+    2:{ symmetry; auto. }
     split; intros [I H]; exists I;
       rewrite uncons_neq in *; auto.
   }

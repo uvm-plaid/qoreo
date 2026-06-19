@@ -119,6 +119,7 @@ Module Insn.
         apply HbeqB.
         unfold bind_eqb in H.
         (* NOTE destruction of dependent type with desired spec! *)
+        Check bind_eq_dec.
         destruct (bind_eq_dec Ax By) in H.
         {
           specialize (HbeqA b).
@@ -243,12 +244,12 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
                  Label.t ->
                  Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
 
-| SendC : forall refsA' A e B x C refs cfg e' refs' cfg',
-    Expr.step e (ChorEnv.find A refs) cfg e' refsA' cfg' ->
-    ChorEnv.Equal refs' (Actor.Map.add A refsA' refs) ->
-    step  (Insn.Send A e B x :: C) refs cfg
+| SendC : forall TA' A e B x C T cfg e' T' cfg',
+    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+    step  (Insn.Send A e B x :: C) T cfg
           (Label.Loc A)
-          (Insn.Send A e' B x :: C) refs' cfg'
+          (Insn.Send A e' B x :: C) T' cfg'
 
 | SendB : forall A v B x C refs refs' cfg C',
     Expr.Val v ->
@@ -258,34 +259,34 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.Send A v B)
           C' refs' cfg
 
-| EPRB : forall q1 q2 A x B y C refs cfg C' refs' refs0 cfg',
-    ChorEnv.epr A B refs cfg = (q1, q2, refs0, cfg') ->
-    ChorEnv.Equal refs' refs0 ->
+| EPRB : forall q1 q2 T0 A x B y C T cfg C' T' cfg',
+    ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+    ChorEnv.Equal T' T0 ->
 
     C' = Choreography.subst A x (Expr.Var q1) (Choreography.subst B y (Expr.Var q2) C) ->
 
-    step  (Insn.EPR A x B y :: C) refs cfg
+    step  (Insn.EPR A x B y :: C) T cfg
           (Label.EPR A B) 
-          C' refs' cfg'
+          C' T' cfg'
 
-| EPRB' : forall q1 q2 A x B y C refs cfg C' refs' refs0 cfg',
-    ChorEnv.epr B A refs cfg = (q2, q1, refs0, cfg') ->
-    ChorEnv.Equal refs' refs0 ->
+| EPRB' : forall q1 q2 T0 A x B y C T cfg C' T' cfg',
+    ChorEnv.epr B A T cfg = (q2, q1, T0, cfg') ->
+    ChorEnv.Equal T' T0 ->
 
     C' = Choreography.subst A x (Expr.Var q1) (Choreography.subst B y (Expr.Var q2) C) ->
 
-    step  (Insn.EPR A x B y :: C) refs cfg
+    step  (Insn.EPR A x B y :: C) T cfg
           (Label.EPR B A) 
-          C' refs' cfg'
+          C' T' cfg'
 
-| LetC : forall refsA' A x e C refs cfg e' refs' cfg',
-    Expr.step e (ChorEnv.find A refs) cfg e' refsA' cfg' ->
+| LetC : forall TA' A x e C T cfg e' T' cfg',
+    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
     
-    ChorEnv.Equal refs' (Actor.Map.add A refsA' refs) ->
+    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
-    step  (Insn.Let A x e :: C) refs cfg
+    step  (Insn.Let A x e :: C) T cfg
           (Label.Loc A)
-          (Insn.Let A x e' :: C) refs' cfg'
+          (Insn.Let A x e' :: C) T' cfg'
 
 | LetB : forall A x v C refs refs' cfg C',
     Expr.Val v ->
@@ -295,12 +296,12 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.Loc A)
           C' refs' cfg
 
-| LetBangC : forall refsA' A x e C refs cfg e' refs' cfg',
-    Expr.step e (ChorEnv.find A refs) cfg e' refsA' cfg' ->
-    ChorEnv.Equal refs' (Actor.Map.add A refsA' refs) ->
-    step  (Insn.LetBang A x e :: C) refs cfg
+| LetBangC : forall TA' A x e C T cfg e' T' cfg',
+    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+    step  (Insn.LetBang A x e :: C) T cfg
           (Label.Loc A)
-          (Insn.LetBang A x e' :: C) refs' cfg'
+          (Insn.LetBang A x e' :: C) T' cfg'
 
 | LetBangB : forall A x e0 C refs refs' cfg C',
     C' = Choreography.subst A x e0 C ->
@@ -309,13 +310,13 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.Loc A)
           C' refs' cfg
 
-| LetPairC : forall refsA' A x1 x2 e C refs cfg e' refs' cfg',
-    Expr.step e (ChorEnv.find A refs) cfg e' refsA' cfg' ->
-    ChorEnv.Equal refs' (Actor.Map.add A refsA' refs) ->
+| LetPairC : forall TA' A x1 x2 e C T cfg e' T' cfg',
+    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
-    step  (Insn.LetPair A x1 x2 e :: C) refs cfg
+    step  (Insn.LetPair A x1 x2 e :: C) T cfg
           (Label.Loc A)
-          (Insn.LetPair A x1 x2 e' :: C) refs' cfg'
+          (Insn.LetPair A x1 x2 e' :: C) T' cfg'
 
 | LetPairB : forall A x1 x2 v1 v2 C refs refs' cfg C',
     Expr.Val v1 -> Expr.Val v2 ->
@@ -326,10 +327,10 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           C' refs' cfg
 
 (* delay *)
-| Delay : forall I C refs cfg C' refs' cfg' l,
-    step C refs cfg l C' refs' cfg' ->
+| Delay : forall I C T cfg C' T' cfg' l,
+    step C T cfg l C' T' cfg' ->
     Actor.FSet.Empty (Actor.FSet.inter (Label.actors l) (Insn.actors I)) ->
-    step (I::C) refs cfg l (I::C') refs' cfg'
+    step (I::C) T cfg l (I::C') T' cfg'
 .
 
 Inductive WellTyped :
@@ -666,6 +667,18 @@ Proof.
   unfold ChorEnv.add in Hempty.
   Actor.simplify.
 Qed.
+
+Lemma empty_is_empty : forall {X : Type} A,
+    Var.Map.Empty (ChorEnv.find A (Actor.Map.empty (Var.Map.t X))).
+Proof.
+Admitted.
+
+Lemma empty_partition : forall (M M1 M2 : Var.Map.t Expr.typ),
+    Var.Map.Empty M ->
+    Var.Map.Partition M M1 M2 ->
+    Var.Map.Empty M1.
+Proof.
+Admitted.
 
 Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
     ChorEnv.find A (Actor.Map.add A M CE) = M.
@@ -3568,13 +3581,52 @@ Proof.
       }
 Qed.
 
-Definition  WellScoped (T : ChorEnv.t nat) (cfg : Config.t) : Prop :=
+Definition WellScoped (T : ChorEnv.t nat) (cfg : Config.t) : Prop :=
   forall A, Config.WellScoped (ChorEnv.find A T) cfg.
 
+Lemma ws_partition : forall M M1 M2 cfg,
+    Config.WellScoped M cfg ->
+    Var.Map.Partition M M1 M2 ->
+    Config.WellScoped M1 cfg.
+Proof.
+Admitted.
+
+Lemma nilnostep : forall T1 cfg1 l C2 T2 cfg2,
+    ~ step [] T1 cfg1 l C2 T2 cfg2.
+Proof.
+Admitted.
+
 Theorem preservation : forall C1 T1 cfg1 l C2 T2 cfg2,
-    WellTyped (Actor.Map.empty _) (Actor.Map.empty _) T1 C1 ->
     step C1 T1 cfg1 l C2 T2 cfg2 ->
+    WellTyped (Actor.Map.empty _) (Actor.Map.empty _) T1 C1 ->
     WellScoped T1 cfg1 ->
     WellTyped (Actor.Map.empty _) (Actor.Map.empty _) T2 C2.
 Proof.
+  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
+
+  induction Hstep.
+
+   - intros HWT Hscoped.
+
+    inversion HWT; subst.
+
+    eapply Send.
+    { auto. }
+    { 
+      eapply Expr.preservation.
+      { eauto. }
+      { apply empty_is_empty. }
+      {
+        apply (empty_partition (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
+                 DeltaA1 DeltaA2).
+        apply empty_is_empty.
+        auto.
+      }
+      {
+        unfold WellScoped in Hscoped.
+        specialize (Hscoped A).
+        apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H13).
+      }
+      { 
+
 Admitted.
