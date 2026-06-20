@@ -898,6 +898,12 @@ Lemma remrem :  forall (CE : ChorEnv.t Expr.typ) A x y,
       (ChorEnv.remove A x (ChorEnv.remove A y CE))
       (ChorEnv.remove A y (ChorEnv.remove A x CE)).      
 Proof.
+  intros.
+  unfold ChorEnv.remove.
+  repeat (Var.simplify; Actor.simplify).
+  (* should work but strange typing issues here... 
+  rewrite
+    (Actor.Map.Proofs.remove_swap (Expr.typ) x y (ChorEnv.find A CE)).*)
 Admitted.
 
 Lemma rmadd1 : forall (CE : ChorEnv.t Expr.typ) A x tau,
