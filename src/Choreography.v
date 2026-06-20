@@ -119,7 +119,6 @@ Module Insn.
         apply HbeqB.
         unfold bind_eqb in H.
         (* NOTE destruction of dependent type with desired spec! *)
-        Check bind_eq_dec.
         destruct (bind_eq_dec Ax By) in H.
         {
           specialize (HbeqA b).
@@ -654,14 +653,19 @@ Qed.
 Lemma empty_is_empty : forall {X : Type} A,
     Var.Map.Empty (ChorEnv.find A (Actor.Map.empty (Var.Map.t X))).
 Proof.
-Admitted.
+  intros.
+  unfold ChorEnv.find.
+  Actor.simplify.
+  Var.simplify.
+Qed.  
 
 Lemma empty_partition : forall (M M1 M2 : Var.Map.t Expr.typ),
     Var.Map.Empty M ->
     Var.Map.Partition M M1 M2 ->
     Var.Map.Empty M1.
 Proof.
-Admitted.
+  intros; Var.simplify.
+Qed.
 
 Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
     ChorEnv.find A (Actor.Map.add A M CE) = M.
@@ -3574,11 +3578,6 @@ Lemma ws_partition : forall M M1 M2 cfg,
 Proof.
 Admitted.
 
-Lemma nilnostep : forall T1 cfg1 l C2 T2 cfg2,
-    ~ step [] T1 cfg1 l C2 T2 cfg2.
-Proof.
-Admitted.
-
 Theorem preservation : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
     WellTyped (Actor.Map.empty _) (Actor.Map.empty _) T1 C1 ->
@@ -3589,27 +3588,57 @@ Proof.
 
   induction Hstep.
 
+  (* Case SendC *)
    - intros HWT Hscoped.
 
     inversion HWT; subst.
 
+    unfold  WellScoped in Hscoped.
+    specialize (Hscoped A).
+
+    rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
+               (empty_is_empty (X:=Expr.typ) A)) in H12.
+
+    assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+    Var.simplify.
+    
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H12) as Hdp.
+    rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
+               (empty_is_empty (X:=Expr.typ) A)) in H10.
+    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H10.
+    
+    pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg e' TA' cfg' H 
+                  ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H10 H13) as Hsi.
+
+    destruct Hsi as [ThetaA1' Hsi].
+    destruct Hsi as [HsiA HsiB].
+    
     eapply Send.
     { auto. }
     { 
       eapply Expr.preservation.
       { eauto. }
       { apply empty_is_empty. }
-      {
-        apply (empty_partition (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
-                 DeltaA1 DeltaA2).
-        apply empty_is_empty.
-        auto.
-      }
-      {
-        unfold WellScoped in Hscoped.
-        specialize (Hscoped A).
-        apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H13).
-      }
-      { 
+      { Var.simplify. }
+      { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H13). }
+      { eauto. }
+    }
+    {
+      rewrite H0.
+      rewrite addadd2.
+      eauto.
+    }
+    { 
+      unfold ChorEnv.find.
+      Actor.simplify.
+      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H12.
+      auto.
+    }
+    {
+      rewrite H0.
+      rewrite find_add; auto.
+    }
 
+   (* Case SendB *)
+   - 
 Admitted.
