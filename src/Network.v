@@ -1996,6 +1996,12 @@ Lemma step_send_neq : forall C refs cfg A v B C' refs' cfg',
 Proof.
 Admitted (* currently we allow self-send? *).
 
+Lemma EPP_cons_in_inversion : forall I C D PD,
+  EPP D (I :: C) PD ->
+  Actor.FSet.In D (Choreography.Insn.actors I) ->
+  exists I' PD', eppI D I = [I'] /\ PD = I' :: PD'.
+Admitted.
+
 Lemma soundness_send : forall C refs cfg A v B C' refs' cfg',
   Choreography.step C refs cfg (Choreography.Label.Send A v B) C' refs' cfg' ->
   forall N,
@@ -2068,10 +2074,56 @@ Proof.
     2:{ admit. (* true *) }
     2:{ admit (* true *). }
     destruct IH as [N' [Hstep' HEPP_N']].
+    inversion Hstep'; subst; clear Hstep'.
+    rename H4 into HA'', H5 into HB'', H10 into Heq.
+    rewrite fold_uncons_mapsto_neq in HA''; auto.
+    rewrite fold_uncons_mapsto_neq in HB''; auto.
+
     eexists.
     split.
+    + 
+      econstructor; eauto.
+      reflexivity.
+    + rewrite EPP_N_spec.
+      intros D PD HD.
+      Actor.simplify.
+      rewrite EPP_N_spec in HEPP_N'.
+      destruct HD as [[? ?] | [? HD]]; subst.
+      {
+        apply EPP_disjoint; auto.
+        apply HEPP_N'.
+        rewrite Heq.
+        Actor.simplify.
+      }
+      destruct HD as [[? ?] | [? HD]]; subst.
+      {
+        apply EPP_disjoint; auto.
+        apply HEPP_N'.
+        rewrite Heq.
+        Actor.simplify.
+      }
+      destruct (Actor.Map.FSetProofs.in_dec D (Choreography.Insn.actors I)) as [Hin | Hin].
+      2:{
+        apply EPP_disjoint; auto.
+        apply HEPP_N'.
+        rewrite Heq.
+        Actor.simplify.
+        right. split; auto. right. split; auto.
+        rewrite fold_uncons_mapsto_neq; auto.
+      }
 
-  admit.
+      destruct (EPP_cons_in_inversion I C D PD) as [I' [PD' [HI' ?]]]; auto; subst.
+      { rewrite EPP_N_spec in HN. apply HN; auto. }
+      rewrite EPP_cons; auto.
+      2:{ admit  (* wfinsn *). }
+      rewrite HI'; simpl.
+      eexists; split; eauto.
+      apply HEPP_N'.
+      rewrite Heq.
+      Actor.simplify.
+      right. split; auto. right. split; auto.
+      rewrite fold_uncons_mapsto_eq; auto.
+      eexists; eauto.
 
 Admitted.
 
