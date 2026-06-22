@@ -243,18 +243,21 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
                  Label.t ->
                  Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
 
-| SendC : forall TA' A e B x C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+| SendC : forall TA TA' A e B x C T cfg e' T' cfg',
+    Expr.step e TA cfg e' TA' cfg' ->
+
+    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+
     step  (Insn.Send A e B x :: C) T cfg
           (Label.Loc A)
           (Insn.Send A e' B x :: C) T' cfg'
 
 | SendB : forall A v B x C refs refs' cfg C',
-    Expr.Val v ->
     C' = Choreography.subst B x v C ->
     ChorEnv.Equal refs refs' ->
-    step  (Insn.Send A v B x :: C) refs cfg
+
+    step  (Insn.Send A (Expr.Bang v) B x :: C) refs cfg
           (Label.Send A v B)
           C' refs' cfg
 
@@ -278,9 +281,10 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.EPR B A) 
           C' T' cfg'
 
-| LetC : forall TA' A x e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+| LetC : forall TA TA' A x e C T cfg e' T' cfg',
+    Expr.step e TA cfg e' TA' cfg' ->
     
+    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
     step  (Insn.Let A x e :: C) T cfg
@@ -295,8 +299,10 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.Loc A)
           C' refs' cfg
 
-| LetBangC : forall TA' A x e C T cfg e' T' cfg',
+| LetBangC : forall TA TA' A x e C T cfg e' T' cfg',
     Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+
+    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
     step  (Insn.LetBang A x e :: C) T cfg
           (Label.Loc A)
@@ -309,8 +315,10 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.Loc A)
           C' refs' cfg
 
-| LetPairC : forall TA' A x1 x2 e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+| LetPairC : forall TA TA' A x1 x2 e C T cfg e' T' cfg',
+    Expr.step e TA cfg e' TA' cfg' ->
+
+    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
     step  (Insn.LetPair A x1 x2 e :: C) T cfg
@@ -638,7 +646,6 @@ Lemma remove_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x,
     Var.Map.Properties.Disjoint
       (ChorEnv.find A (ChorEnv.remove B x CE1))
       (ChorEnv.find A CE2).
-    
 Proof.
 Admitted.
 
@@ -3625,18 +3632,27 @@ Proof.
     specialize (Hscoped A).
 
     rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
-               (empty_is_empty (X:=Expr.typ) A)) in H12.
+               (empty_is_empty (X:=Expr.typ) A)) in H13.
 
     assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
     Var.simplify.
     
-    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H12) as Hdp.
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H13) as Hdp.
     rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
-               (empty_is_empty (X:=Expr.typ) A)) in H10.
-    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H10.
+               (empty_is_empty (X:=Expr.typ) A)) in H11.
+    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H11.
     
-    pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg e' TA' cfg' H 
-                  ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H10 H13) as Hsi.
+    assert (Hfind' : Var.Map.Equal (ChorEnv.find A T) TA).
+    {
+      unfold ChorEnv.find.
+      rewrite Actor.Map.Properties.F.find_mapsto_iff in H0.
+      rewrite H0.
+      reflexivity.
+    }
+    rewrite Hfind' in *.
+
+    pose proof (Expr.step_inversion e TA cfg e' TA' cfg' H 
+                  ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H11 H14) as Hsi.
 
     destruct Hsi as [ThetaA1' Hsi].
     destruct Hsi as [HsiA HsiB].
@@ -3648,22 +3664,22 @@ Proof.
       { eauto. }
       { apply empty_is_empty. }
       { Var.simplify. }
-      { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H13). }
+      { apply (ws_partition TA ThetaA1 ThetaA2 cfg Hscoped H14). }
       { eauto. }
     }
     {
-      rewrite H0.
+      rewrite H1.
       rewrite addadd2.
       eauto.
     }
     { 
       unfold ChorEnv.find.
       Actor.simplify.
-      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H12.
+      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H13.
       auto.
     }
     {
-      rewrite H0.
+      rewrite H1.
       rewrite find_add; auto.
     }
 
