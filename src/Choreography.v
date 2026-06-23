@@ -3690,9 +3690,8 @@ Lemma nilnostep : forall T cfg l C' T' cfg',
     ~ step [] T cfg l C' T' cfg'. 
 Proof.
   intros.
-  unfold not.
-  intros.
-  inversion H.
+  intros Habsurd.
+  inversion Habsurd.
 Qed.
 
 Theorem preservation : forall C1 T1 cfg1 l C2 T2 cfg2,
