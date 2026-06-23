@@ -7,6 +7,8 @@ From Stdlib Require Import Logic.
 From Stdlib Require Import Logic.Decidable.
 From Stdlib Require Import Bool.Bool.
 From Stdlib Require Import Setoid.
+From Stdlib Require Import Morphisms (* for Proper *).
+
 
 
 Module Insn.
@@ -340,6 +342,48 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
     step (I::C) T cfg l (I::C') T' cfg'
 .
 
+(* TODO (JP): Finish this proof *)
+Lemma stepProper' : forall C Θ1 cfg l C' Θ1' cfg',
+  Choreography.step C Θ1 cfg l C' Θ1' cfg' ->
+  forall Θ2 Θ2',
+    ChorEnv.Equal Θ1 Θ2 ->
+    ChorEnv.Equal Θ1' Θ2' ->
+    Choreography.step C Θ2 cfg l C' Θ2' cfg'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros Θ2 Θ2' Heq Heq';
+    try rewrite Heq in *;
+    try rewrite Heq' in *;
+    try (econstructor; eauto; fail).
+  (*
+  (* only EPR cases left *)
+  * subst.
+
+    apply (ChorEnv.chor_epr_eq Θ2) in H1; auto.
+    destruct H as [T0' [Heq'' H]].
+
+    apply (Choreography.EPRB q1 q2 T0'); auto.
+    { rewrite H0. rewrite Heq''. reflexivity. }
+
+  * apply (chor_epr_eq Θ2) in H; auto.
+    destruct H as [T0' [Heq'' H]].
+
+    apply (Choreography.EPRB' q1 q2 T0'); auto.
+    {
+      rewrite H0. rewrite Heq''. reflexivity.
+    }
+Qed.
+**)
+Admitted.
+
+Global Instance stepProper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.step).
+Proof.
+  intros ? C ? Θ1 Θ2 HΘ ? cfg ? ? l ? ? C' ? Θ1' Θ2' HΘ' ? cfg' ?; subst.
+  split; intros Hstep.
+  * eapply stepProper'; eauto.
+  * eapply stepProper'; eauto. symmetry; auto. symmetry; auto.
+Qed.
+
 Inductive WellTyped :
   ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
   
@@ -403,8 +447,6 @@ Inductive WellTyped :
 
     WellTyped G D T ((Insn.LetPair A x1 x2 e)::C)
 .
-
-From Stdlib Require Import Morphisms. (* for Proper *)
 
 Lemma empty_Equal : forall T (M1 M2 : ChorEnv.t T),
   ChorEnv.Equal M1 M2 ->
@@ -708,9 +750,12 @@ Proof.
   Var.simplify.
 Qed.
 
+(* TODO (JP): Change definition of ChorEnv.Equal to make it support this definition *)
 Lemma empty_to_empty : forall  {X : Type} A (M : Var.Map.t X),
     Var.Map.Empty M ->
-    (Actor.Map.add A M (Actor.Map.empty (Var.Map.t X))) = (Actor.Map.empty (Var.Map.t X)).
+    ChorEnv.Equal
+      (Actor.Map.add A M (Actor.Map.empty (Var.Map.t X)))
+      (Actor.Map.empty (Var.Map.t X)).
 Proof.
   intros. 
   pose proof (Var.Map.Proofs.empty_map_equal M H).
@@ -734,12 +779,10 @@ Qed.
 
 Lemma lopsided_partition : forall {X : Type} (M M1 : Var.Map.t X),
     Var.Map.Partition M (Var.Map.empty X) M1 ->
-    M = M1.
+    Var.Map.Equal M M1.
 Proof.
   intros; Var.simplify.
-  unfold Var.Map.M.Equal in H.
-  (* Chris doesn't know how to work with Map Equality (Var.Map.M.Equal)... *)
-Admitted.
+Qed.
 
 Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
     ChorEnv.find A (Actor.Map.add A M CE) = M.
@@ -750,7 +793,7 @@ Proof.
 Qed.
 
 Lemma find_add_env : forall {X : Type} A (CE : ChorEnv.t X),
-    (Actor.Map.add A (ChorEnv.find A CE) CE) = CE.
+    ChorEnv.Equal (Actor.Map.add A (ChorEnv.find A CE) CE) CE.
 Proof.
 Admitted.
 
@@ -1332,7 +1375,19 @@ Lemma map_subset_add : forall A B y tau (CE1 : ChorEnv.t Expr.typ) CE2 CE3,
       (ChorEnv.find A (ChorEnv.add B y tau CE1))
       (ChorEnv.find A (ChorEnv.add B y tau CE2)) (ChorEnv.find A (ChorEnv.remove B y CE3)).
 Proof.
-Admitted.
+  intros.
+  Var.simplify.
+  Actor.Map.Tactics.compare A B; subst; auto.
+  Var.Map.Tactics.reflect_partition.
+  * Var.simplify. 
+    split; [ | intros [? ?]; try contradiction].
+    intros z [Hin1 Hin2].
+    Var.simplify.
+    apply (Hdisj z); auto.
+  * Var.simplify.
+    rewrite Heq.
+    Var.solve.
+Qed.
 
 Lemma add_mapsto : forall x (tau : Expr.typ) m,
     Var.Map.MapsTo x tau m ->
@@ -3679,8 +3734,8 @@ Admitted.
 Lemma bangty_inversion : forall Gamma Delta Theta e tau,
     Expr.WellTyped Gamma Delta Theta (Expr.Bang e) (Expr.BANG tau) ->
     Expr.WellTyped Gamma Delta Theta e tau /\
-      Delta = (Var.Map.empty Expr.typ) /\
-      Theta = (Var.Map.empty nat).
+      Var.Map.Equal Delta (Var.Map.empty Expr.typ) /\
+      Var.Map.Equal Theta (Var.Map.empty nat).
 Proof.
   intros.
   inversion H; subst.
@@ -3797,6 +3852,4 @@ Proof.
 
     
 Admitted.
-
-
 

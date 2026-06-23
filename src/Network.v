@@ -870,59 +870,7 @@ Proof.
   intuition.
 Qed.
 
-Lemma chor_epr_eq : forall T2 T1 T1' A B cfg cfg' q1 q2,
-  ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') ->
-  ChorEnv.Equal T1 T2 ->
-  exists T2', ChorEnv.Equal T2' T1' /\ ChorEnv.epr A B T2 cfg = (q1, q2, T2', cfg').
-Admitted.
 
-(* TODO: move to Choreography.v *)
-Lemma epr_Proper : Proper (eq ==> eq ==> ChorEnv.Equal ==> eq ==> RelationPairs.RelProd (RelationPairs.RelProd eq ChorEnv.Equal) eq) ChorEnv.epr.
-Proof.
-  intros ? A ? ? B ? T1 T2 HT ? cfg ?; subst.
-  unfold ChorEnv.epr.
-  split; split; simpl; unfold RelationPairs.RelCompFun; simpl; auto.
-  * rewrite HT. auto.
-  * rewrite HT. reflexivity.
-Qed.
-
-Lemma chor_step_Proper' : forall C Θ1 cfg l C' Θ1' cfg',
-  Choreography.step C Θ1 cfg l C' Θ1' cfg' ->
-  forall Θ2 Θ2',
-    ChorEnv.Equal Θ1 Θ2 ->
-    ChorEnv.Equal Θ1' Θ2' ->
-    Choreography.step C Θ2 cfg l C' Θ2' cfg'.
-Proof.
-  intros ? ? ? ? ? ? ? Hstep.
-  induction Hstep; intros Θ2 Θ2' Heq Heq';
-    try rewrite Heq in *;
-    try rewrite Heq' in *;
-    try (econstructor; eauto; fail).
-  (* only EPR cases left *)
-  * subst.
-
-    apply (chor_epr_eq Θ2) in H; auto.
-    destruct H as [T0' [Heq'' H]].
-
-    apply (Choreography.EPRB q1 q2 T0'); auto.
-    { rewrite H0. rewrite Heq''. reflexivity. }
-
-  * apply (chor_epr_eq Θ2) in H; auto.
-    destruct H as [T0' [Heq'' H]].
-
-    apply (Choreography.EPRB' q1 q2 T0'); auto.
-    {
-      rewrite H0. rewrite Heq''. reflexivity.
-    }
-Qed.
-
-Global Instance chor_step_Proper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.step).
-Proof.
-  intros ? C ? Θ1 Θ2 HΘ ? cfg ? ? l ? ? C' ? Θ1' Θ2' HΘ' ? cfg' ?; subst.
-  split; intros Hstep.
-  * eapply chor_step_Proper'; eauto.
-  * eapply chor_step_Proper'; eauto. symmetry; auto. symmetry; auto.
-Qed.
 
 Lemma EPP_N_weakening : forall C N N',
   (forall A PA, Actor.Map.MapsTo A PA N' -> Actor.Map.MapsTo A PA N) ->

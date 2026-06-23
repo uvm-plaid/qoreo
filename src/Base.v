@@ -2820,4 +2820,19 @@ Module ChorEnv.
       eapply actor_map_Equal'; eauto; symmetry; auto.
     Qed.
 
+  Lemma chor_epr_eq : forall T2 T1 T1' A B cfg cfg' q1 q2,
+    ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') ->
+    ChorEnv.Equal T1 T2 ->
+    exists T2', ChorEnv.Equal T2' T1' /\ ChorEnv.epr A B T2 cfg = (q1, q2, T2', cfg').
+  Admitted.
+
+  Lemma epr_Proper : Proper (eq ==> eq ==> ChorEnv.Equal ==> eq ==> RelationPairs.RelProd (RelationPairs.RelProd eq ChorEnv.Equal) eq) ChorEnv.epr.
+  Proof.
+    intros ? A ? ? B ? T1 T2 HT ? cfg ?; subst.
+    unfold ChorEnv.epr.
+    split; split; simpl; unfold RelationPairs.RelCompFun; simpl; auto.
+    * rewrite HT. auto.
+    * rewrite HT. reflexivity.
+  Qed.
+
 End ChorEnv.
