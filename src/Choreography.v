@@ -712,7 +712,7 @@ Lemma empty_to_empty : forall  {X : Type} A (M : Var.Map.t X),
     Var.Map.Empty M ->
     (Actor.Map.add A M (Actor.Map.empty (Var.Map.t X))) = (Actor.Map.empty (Var.Map.t X)).
 Proof.
-  intros.
+  intros. 
   pose proof (Var.Map.Proofs.empty_map_equal M H).
 Admitted.
 
@@ -737,6 +737,7 @@ Lemma lopsided_partition : forall {X : Type} (M M1 : Var.Map.t X),
     M = M1.
 Proof.
   intros; Var.simplify.
+  unfold Var.Map.M.Equal in H.
   (* Chris doesn't know how to work with Map Equality (Var.Map.M.Equal)... *)
 Admitted.
 
@@ -747,6 +748,11 @@ Proof.
   unfold ChorEnv.find.
   Actor.simplify.
 Qed.
+
+Lemma find_add_env : forall {X : Type} A (CE : ChorEnv.t X),
+    (Actor.Map.add A (ChorEnv.find A CE) CE) = CE.
+Proof.
+Admitted.
 
 Lemma find_ab_neq1 : forall {X : Type} A B x tau (CE : ChorEnv.t X),
     A <> B ->
@@ -3676,7 +3682,18 @@ Lemma bangty_inversion : forall Gamma Delta Theta e tau,
       Delta = (Var.Map.empty Expr.typ) /\
       Theta = (Var.Map.empty nat).
 Proof.
+  intros.
+  inversion H; subst.
 Admitted.
+
+Lemma nilnostep : forall T cfg l C' T' cfg',
+    ~ step [] T cfg l C' T' cfg'. 
+Proof.
+  intros.
+  unfold not.
+  intros.
+  inversion H.
+Qed.
 
 Theorem preservation : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
@@ -3766,8 +3783,18 @@ Proof.
     pose proof (empty_partition
                   (Var.Map.empty Expr.typ) DeltaA2 (Var.Map.empty Expr.typ)
                   empty_map_empty Hpart) as Hep.
-
+    
     rewrite empty_to_empty in H11; auto.
+    rewrite <- (lopsided_partition (ChorEnv.find A refs) ThetaA2 H13) in H11.
+    rewrite find_add_env in H11; auto.
+
+    eapply wt_subst_bang; eauto.
+
+  (* Case EPRB *)
+  - intros HWT Hscoped.
+    
+    inversion HWT; subst.
+    
 
     
 Admitted.
