@@ -38,10 +38,10 @@ Declare Scope example_scope.
       f a s'.
 
   (** Notation for monadic sequencing (similar to Haskell's do-notation). *)
-  Notation "'do' x '←' m ';;' e" := (bind m (fun x => e))
-      (right associativity, at level 90) : example_scope.
-  Notation "'do' ( x , y ) '←' m ';;' e" := (bind m (fun z => let (x,y) := z in e))
-      (right associativity, at level 90) : example_scope.
+  Notation "x '←' m ';;' e" := (bind m (fun x => e))
+      (right associativity, at level 90, x ident) : example_scope.
+  Notation "( x , y ) '←' m ';;' e" := (bind m (fun z => let (x,y) := z in e))
+      (right associativity, at level 90, x ident, y ident) : example_scope.
 
   Definition empty_state : state :=
   {|
@@ -79,42 +79,42 @@ Declare Scope example_scope.
 
   (** Create an entangled pair (EPR pair) between actors [A] and [B]. *)
   Definition get_entangled_pair (A B : Actor.t) : Qoreo (Var.t * Var.t) :=
-    do xA ← fresh A ;;
-    do xB ← fresh B ;;
-    do _  ← add_insn (Choreography.Insn.EPR A xA B xB) ;;
+    xA ← fresh A ;;
+    xB ← fresh B ;;
+    _  ← add_insn (Choreography.Insn.EPR A xA B xB) ;;
     ret (xA, xB).
 
   (** Create a new qubit initialized to |0⟩ owned by [A]. *)
   Definition new (A : Actor.t) : Qoreo Var.t :=
-    do q ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.Let A q (New (Bit false))) ;;
+    q ← fresh A ;;
+    _ ← add_insn (Choreography.Insn.Let A q (New (Bit false))) ;;
     ret q.
   
   Coercion Var : Var.t >-> Expr.t.
 
   (** Bind the expression [e] to a fresh variable [x] at [A], and return [x]. *)
   Definition local A e : Qoreo Var.t :=
-    do q ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.Let A q e);;
+    q ← fresh A ;;
+    _ ← add_insn (Choreography.Insn.Let A q e);;
     ret q.
 
    (** Bind the expression [e] to the tuple [(x1,x2)] of fresh variables at [A], and return [(x1,x2)]. *)
   Definition localPair A e : Qoreo (Var.t * Var.t) :=
-    do x1 ← fresh A ;;
-    do x2 ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.LetPair A x1 x2 e);;
+    x1 ← fresh A ;;
+    x2 ← fresh A ;;
+    _ ← add_insn (Choreography.Insn.LetPair A x1 x2 e);;
     ret (x1, x2).
 
   (** Measure qubit [q] owned by [A] in the computational basis. *)
   Definition meas (A : Actor.t) (q : Var.t) : Qoreo Var.t :=
-    do x ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.Let A x (Meas (Var q)));;
+    x ← fresh A ;;
+    _ ← add_insn (Choreography.Insn.Let A x (Meas (Var q)));;
     ret q.
 
   (** Send quantum data from actor [A] to actor [B]. *)
   Definition send A (e : Expr.t) B : Qoreo Var.t :=
-    do x ← fresh B;;
-    do _ ← add_insn (Choreography.Insn.Send A e B x);;
+    x ← fresh B;;
+    _ ← add_insn (Choreography.Insn.Send A e B x);;
     ret x.
 
   (** Conditionally apply X gate based on classical bit [e]. *)

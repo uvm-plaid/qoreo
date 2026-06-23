@@ -15,26 +15,26 @@ Open Scope example_scope.
    announces his result to Alice so both parties know which rounds to keep. *)
 Definition b92_round (Alice Bob : Actor.t) : Qoreo Var.t :=
   (* Alice randomly picks her key bit by preparing |+⟩ and measuring. *)
-  do coin_a ← Alice [- Unitary H (New (Bit false)) -] ;;
-  do a      ← Alice [- Meas coin_a -] ;;
+  coin_a ← Alice [- Unitary H (New (Bit false)) -] ;;
+  a      ← Alice [- Meas coin_a -] ;;
 
   (* Alice prepares her transmission qubit: |0⟩ if a=0, |+⟩ if a=1. *)
-  do q      ← Alice [- New (Bit false) -] ;;
-  do q      ← Alice [- If a (Unitary H q) q -] ;;
+  q      ← Alice [- New (Bit false) -] ;;
+  q      ← Alice [- If a (Unitary H q) q -] ;;
 
   (* Alice sends the qubit to Bob over the quantum channel. *)
-  do q_b    ← send Alice q Bob ;;
+  q_b    ← send Alice q Bob ;;
 
   (* Bob randomly picks his measurement basis. *)
-  do coin_b ← Bob [- Unitary H (New (Bit false)) -] ;;
-  do b      ← Bob [- Meas coin_b -] ;;
+  coin_b ← Bob [- Unitary H (New (Bit false)) -] ;;
+  b      ← Bob [- Meas coin_b -] ;;
 
   (* Bob rotates into his chosen basis by applying H when b=1. *)
-  do q_b    ← Bob [- If b (Unitary H q_b) q_b -] ;;
+  q_b    ← Bob [- If b (Unitary H q_b) q_b -] ;;
 
   (* Bob measures in his chosen basis.  A result of 1 means the round is
      conclusive: both Alice and Bob know they share the same key bit. *)
-  do r      ← Bob [- Meas q_b -] ;;
+  r      ← Bob [- Meas q_b -] ;;
 
   (* Bob announces the round result to Alice over the classical channel. *)
   send Bob r Alice.
@@ -44,8 +44,8 @@ Definition b92_round (Alice Bob : Actor.t) : Qoreo Var.t :=
    Bob share the same key bit: Alice's prepared bit equals Bob's inferred bit. *)
 Definition choreo : Choreography.t :=
   mk (
-    do _ ← b92_round "alice" "bob" ;;
-    do _ ← b92_round "alice" "bob" ;;
+    _ ← b92_round "alice" "bob" ;;
+    _ ← b92_round "alice" "bob" ;;
     b92_round "alice" "bob"
   ).
 
