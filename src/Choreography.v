@@ -564,7 +564,7 @@ Qed.
 
 (* A slew of Lemmas for manipulating environment mappings. *)
 
-(* START Jennifer to address with map tactics. *)
+(* START *)
 
 Lemma extension : forall A G x (tau : Expr.typ),
     ChorEnv.MapsTo A x tau G <-> Var.Map.MapsTo x tau (ChorEnv.find A G).
@@ -1343,6 +1343,20 @@ Lemma add_mapsto : forall x (tau : Expr.typ) m,
     Var.Map.Equal (Var.Map.add x tau m) m.
 Proof.
   intros. Var.solve.
+Qed.
+
+Lemma rem_empty : forall {X : Type} A x,
+    ChorEnv.Equal
+      (ChorEnv.remove A x (Actor.Map.empty (Var.Map.t X)))
+      (Actor.Map.empty (Var.Map.t X)).
+Proof.
+  intros.
+  unfold ChorEnv.Equal.
+  intro.
+  unfold ChorEnv.remove.
+  Var.simplify.
+  Actor.simplify.
+  Var.simplify.
 Qed.
 
 (* STOP Easily(?) proven facts *)
@@ -3703,6 +3717,24 @@ Proof.
   eapply Expr.WTQRef; eauto.
 Qed.
 
+Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
+    A <> B -> 
+    ChorEnv.epr A B T1 cfg1 = (q1, q2, T2, cfg2) ->
+    (exists idx1 idx2,
+        Var.Map.Partition (ChorEnv.find A T2) (ChorEnv.find A T1)
+	  (Var.Map.add q1 idx1 (Var.Map.empty _)) /\
+        Var.Map.Partition (ChorEnv.find B T2) (ChorEnv.find B T1)
+	  (Var.Map.add q2 idx2 (Var.Map.empty _))) /\
+      (forall D,
+          D <> A -> D <> B ->
+          Var.Map.Equal (ChorEnv.find D T1) (ChorEnv.find D T2)).
+Proof.
+  intros.
+  unfold ChorEnv.epr in H.
+  destruct (Config.epr_cfg cfg1) eqn:Eqnepr.
+  destruct p eqn:Eqneprsplit.
+Admitted.
+   
 Lemma nilnostep : forall T cfg l C' T' cfg',
     ~ step [] T cfg l C' T' cfg'. 
 Proof.
@@ -3802,8 +3834,32 @@ Proof.
   - intros HWT Hscoped.
     
     inversion HWT; subst.
-    
+    rewrite H0.
+
+    destruct (epr_inversion A B T cfg q1 q2 T0 cfg' H9 H) as [HeprA HeprB].
+    destruct HeprA as [idx1 [idx2]].
+    destruct H1 as [HeprAA HeprAB].
+
+    pose proof (qref_ty
+                  (Var.Map.empty _)
+                  (Var.Map.empty _)
+                  (Var.Map.add q1 idx1 (Var.Map.empty _))
+                  q1 idx1 empty_map_empty
+                  (Var.Map.Proofs.singleton_singleton nat q1 idx1)) as Hq1ty.
+
+    pose proof (qref_ty
+                  (Var.Map.empty _)
+                  (Var.Map.empty _)
+                  (Var.Map.add q2 idx2 (Var.Map.empty _))
+                  q2 idx2 empty_map_empty
+                  (Var.Map.Proofs.singleton_singleton nat q2 idx2)) as Hq2ty.
+
+    rewrite rem_empty in H11.
+    rewrite rem_empty in H11.
+
+Admitted.
+
 
     
-Admitted.
+
 
