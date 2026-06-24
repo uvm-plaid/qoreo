@@ -1646,7 +1646,7 @@ Ltac simplify_val :=
     end
   end.
 
-Lemma preservation : forall Γ Δ Θ e τ,
+Lemma WellTyped_preservation : forall Γ Δ Θ e τ,
   WellTyped Γ Δ Θ e τ ->
 
   forall ρ e' Θ' ρ',
@@ -1861,7 +1861,7 @@ Proof.
       eapply wt_subst_bang; eauto with var_db.
 Qed.
 
-Lemma well_scoped_preservation : forall e Θ ρ e' Θ' ρ',
+Lemma WellScoped_preservation : forall e Θ ρ e' Θ' ρ',
   step e Θ ρ e' Θ' ρ' ->
   Config.WellScoped Θ ρ ->
   Config.WellScoped Θ' ρ'.
@@ -1900,6 +1900,18 @@ Proof.
     Var.reflect_find.
     unfold super.
     destruct g; simpl; auto with wf_db.
+Qed.
+
+Theorem preservation :  forall Θ e τ ρ e' Θ' ρ',
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ e τ ->
+  Config.WellScoped Θ ρ ->
+  step e Θ ρ e' Θ' ρ' ->
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ' e' τ /\ Config.WellScoped Θ' ρ'.
+Proof.
+  intros ? ? ? ? ? ? ? HWT HWS Hstep.
+  split.
+  * eapply WellTyped_preservation; eauto; Var.simplify.
+  * eapply WellScoped_preservation; eauto.
 Qed.
 
 
@@ -2170,10 +2182,8 @@ Proof.
   intros ? ? ? ? ? ? Hstep.
   induction Hstep; intros τ HWT HWS.
   * unfold can_step. eapply progress; eauto; Var.simplify.
-  * assert (HWT2 : WellTyped (Var.Map.empty typ) (Var.Map.empty typ) Θ2 e2 τ).
-    { eapply preservation; eauto; Var.simplify. }
-    assert (HWS2 : Config.WellScoped Θ2 cfg2).
-    { eapply well_scoped_preservation; eauto. }
+  * eapply preservation in H; eauto.
+    destruct H as [HWT' HWS'].
     eapply IHHstep; eauto.
 Qed.
 

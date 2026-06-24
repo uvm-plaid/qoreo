@@ -3750,7 +3750,7 @@ Proof.
     eapply Send.
     { auto. }
     { 
-      eapply Expr.preservation.
+      eapply Expr.WellTyped_preservation.
       { eauto. }
       { apply empty_is_empty. }
       { Var.simplify. }
