@@ -1964,32 +1964,36 @@ Lemma soundness_local : forall PA C refs cfg A C' refs' cfg' N,
 Admitted.
 
 
-
-Lemma find_setminus_iff : forall A X T (N : Actor.Map.t T),
-  Actor.Map.find A (Actor.Map.setminus X N) = if Actor.Map.FSetProofs.in_dec A X then None else Actor.Map.find A N.
-Admitted.
-Hint Rewrite find_setminus_iff : actor_db.
+Hint Rewrite Actor.Map.FSetProofs.find_setminus : actor_db.
 
 Lemma remove_singleton : forall A B,
   Actor.FSet.Equal (Actor.Map.S.remove A (Actor.FSet.singleton B))
     (if Actor.eq_dec A B then Actor.FSet.empty else Actor.FSet.singleton B).
-Admitted.
-Hint Rewrite remove_singleton : actor_db.
-
-Lemma step_send_neq : forall C refs cfg A v B C' refs' cfg',
-  Choreography.step C refs cfg (Choreography.Label.Send A v B) C' refs' cfg' ->
-  A <> B.
 Proof.
-Admitted (* currently we allow self-send? *).
+  intros A B.
+  compare A B.
+  * intros D. split; intros; Actor.simplify.
+    rewrite Actor.Map.FSetProperties.empty_iff in H. contradiction.
+  * intros D. Actor.simplify.
+    split; [intros [? ?] | intros ?]; subst; auto.
+Qed.
+Hint Rewrite remove_singleton : actor_db.
 
 Lemma EPP_cons_in_inversion : forall I C D PD,
   EPP D (I :: C) PD ->
   Actor.FSet.In D (Choreography.Insn.actors I) ->
   exists I' PD', eppI D I = [I'] /\ PD = I' :: PD'.
-Admitted.
+Proof.
+  intros I C D PD HEPP Hin.
+  inversion HEPP; subst; try contradiction;
+  simpl; Actor.simplify; eexists; eexists; eauto. 
+Qed.
 
 Lemma soundness_send : forall C refs cfg A v B C' refs' cfg',
+  (* by induction on step relation *)
   Choreography.step C refs cfg (Choreography.Label.Send A v B) C' refs' cfg' ->
+  A <> B ->
+  WFChoreography C ->
   forall N,
   EPP_N C N ->
   Actor.Map.In A N ->
@@ -1998,8 +2002,7 @@ Lemma soundness_send : forall C refs cfg A v B C' refs' cfg',
     Network.step N refs cfg (Choreography.Label.Send A v B) N' refs' cfg'
     /\ EPP_N C' N'.
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Hstep N HN HA HB.
-  assert (Hneq : A <> B). { admit. }
+  intros ? ? ? ? ? ? ? ? ? Hstep Hneq HWF N HN HA HB.
   dependent induction Hstep.
   * 
     assert (HA' : exists PA, Actor.Map.MapsTo A (Insn.Send (Expr.Bang v) B :: PA) N).
@@ -2042,7 +2045,13 @@ Proof.
       eapply (EPP_N_add _ B).
       { Actor.simplify. }
       {
-        admit.
+        apply EPP_subst_eq.
+        apply EPP_N_cons_inversion in HN.
+        rewrite EPP_N_spec in HN.
+        apply HN.
+        rewrite fold_uncons_mapsto_eq.
+        2:{ simpl. Actor.simplify. }
+        eexists; eauto.
       }
       apply EPP_N_subst_neq.
       { Actor.simplify. }
@@ -2057,8 +2066,12 @@ Proof.
     set (IH := HN).
     apply EPP_N_cons_inversion in IH.    
     eapply IHHstep in IH; eauto.
-    2:{ admit. (* true *) }
-    2:{ admit (* true *). }
+    2:{ inversion HWF; auto. }
+    2:{ 
+        Actor.reflect_find.
+        rewrite find_fold_uncons_neq; auto.
+        rewrite HA; discriminate.
+    }
     destruct IH as [N' [Hstep' HEPP_N']].
     inversion Hstep'; subst; clear Hstep'.
     rename H4 into HA'', H5 into HB'', H9 into Heq.
@@ -2101,7 +2114,7 @@ Proof.
       destruct (EPP_cons_in_inversion I C D PD) as [I' [PD' [HI' ?]]]; auto; subst.
       { rewrite EPP_N_spec in HN. apply HN; auto. }
       rewrite EPP_cons; auto.
-      2:{ admit  (* wfinsn *). }
+      2:{ inversion HWF; subst; auto. }
       rewrite HI'; simpl.
       eexists; split; eauto.
       apply HEPP_N'.
@@ -2111,8 +2124,11 @@ Proof.
       rewrite fold_uncons_mapsto_eq; auto.
       eexists; eauto.
 
-Admitted.
-
+    + Actor.reflect_find.
+      rewrite find_fold_uncons_neq; auto.
+      rewrite HB.
+      discriminate.
+Qed.
 
 
 Lemma soundness_epr : forall C refs cfg A B C' refs' cfg',
@@ -2126,18 +2142,26 @@ Lemma soundness_epr : forall C refs cfg A B C' refs' cfg',
     /\ EPP_N C' N'.
 Admitted.
 
+Inductive WFLabel : Label.t -> Prop :=
+| WFLSend : forall A v B, A <> B -> WFLabel (Label.Send A v B)
+| WFLEPR : forall A B, A <> B -> WFLabel (Label.EPR A B)
+| WFLLoc : forall A, WFLabel (Label.Loc A)
+.
+
 Theorem soundness : forall C C' refs cfg refs' cfg' l,
     Choreography.step C refs cfg l C' refs' cfg' ->
     WFChoreography C ->
+    WFLabel l ->
     forall N,
       (forall D, Actor.FSet.In D (Choreography.Label.actors l) -> Actor.Map.In D N) ->
       EPP_N C N ->
     exists N', Network.step N refs cfg l N' refs' cfg'
               /\ EPP_N C'  N'.
 Proof.
-  intros ? ? ? ? ? ? ? Hstep WF N Hsubset HN.
+  intros ? ? ? ? ? ? ? Hstep WF WFl N Hsubset HN.
   destruct l as [A v B | A B | A].
   * (* Send *)
+    inversion WFl; subst; clear WFl.
     eapply soundness_send; eauto.
     { apply Hsubset. simpl. Actor.simplify. }
     { apply Hsubset. simpl. Actor.simplify. }
