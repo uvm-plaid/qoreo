@@ -3725,9 +3725,9 @@ Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
 	  (Var.Map.add q1 idx1 (Var.Map.empty _)) /\
         Var.Map.Partition (ChorEnv.find B T2) (ChorEnv.find B T1)
 	  (Var.Map.add q2 idx2 (Var.Map.empty _))) /\
-      (forall D,
-          D <> A -> D <> B ->
-          Var.Map.Equal (ChorEnv.find D T1) (ChorEnv.find D T2)).
+      ChorEnv.Equal T1
+        (Actor.Map.add B (ChorEnv.find B T1) (
+             Actor.Map.add A (ChorEnv.find A T1) T2)).
 Proof.
   intros.
   unfold ChorEnv.epr in H.
@@ -3856,9 +3856,53 @@ Proof.
 
     rewrite rem_empty in H11.
     rewrite rem_empty in H11.
+    rewrite HeprB in H11.
+
+    pose proof (wt_subst_lin
+                  C
+                  (Var.Map.add q2 idx2 (Var.Map.empty nat))
+                  (ChorEnv.find B T)
+                  Expr.QUBIT
+                  (Actor.Map.empty (Var.Map.t Expr.typ))
+                  (ChorEnv.add A x Expr.QUBIT (Actor.Map.empty (Var.Map.t Expr.typ)))
+                  (Actor.Map.add A (ChorEnv.find A T) T0)
+                  B y
+                  (Expr.QRef q2)
+                  Hq2ty H11) as HwtCAy.
+
+    rewrite find_ab_neq1 in HwtCAy; auto.
+    rewrite find_ab_neq2 in HwtCAy; auto.
+    
+    specialize (HwtCAy
+                  (@Var.Map.Properties.Partition_sym _
+                     (ChorEnv.find B T0)
+                     (ChorEnv.find B T)
+                     (Var.Map.add q2 idx2 (Var.Map.empty nat))
+                     HeprAB)
+                  H13 H13).
+
+    pose proof (wt_subst_lin
+                  (Choreography.subst B y (Expr.QRef q2) C)
+                  (Var.Map.add q1 idx1 (Var.Map.empty nat))
+                  (ChorEnv.find A T)
+                  Expr.QUBIT
+                  (Actor.Map.empty (Var.Map.t Expr.typ))
+                  (Actor.Map.empty (Var.Map.t Expr.typ))
+                  T0
+                  A x
+                  (Expr.QRef q1)
+                  Hq1ty HwtCAy) as HwtCBx.
+
+    apply (HwtCBx
+             (@Var.Map.Properties.Partition_sym _
+                (ChorEnv.find A T0)
+                (ChorEnv.find A T)
+                (Var.Map.add q1 idx1 (Var.Map.empty nat))
+                HeprAA)
+             H12 H12).
+    
 
 Admitted.
-
 
     
 
