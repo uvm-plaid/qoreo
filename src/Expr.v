@@ -260,7 +260,7 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   (refs0, cfg') = Config.measure b x refs cfg ->
   Var.Map.Equal refs0 refs' ->
 
-  step (Meas (QRef x)) refs cfg (Bit b) refs' cfg'
+  step (Meas (QRef x)) refs cfg (Bang (Bit b)) refs' cfg'
 
 
 (* Unitary *)
@@ -459,7 +459,7 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
 
 | WTMeas : forall Γ Δ Θ e,
   WellTyped Γ Δ Θ e QUBIT ->
-  WellTyped Γ Δ Θ (Meas e) BIT
+  WellTyped Γ Δ Θ (Meas e) (BANG BIT)
 
 | WTQRef : forall Γ Δ Θ q idx,
 
@@ -1774,6 +1774,7 @@ Proof.
         inversion H; subst; clear H
       end.
       Var.simplify.
+      econstructor; eauto with var_db.
       econstructor; eauto with var_db.
 
   * (* New *)
