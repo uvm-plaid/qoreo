@@ -245,10 +245,9 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
                  Label.t ->
                  Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
 
-| SendC : forall TA TA' A e B x C T cfg e' T' cfg',
-    Expr.step e TA cfg e' TA' cfg' ->
+| SendC : forall TA' A e B x C T cfg e' T' cfg',
+    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
 
-    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
     step  (Insn.Send A e B x :: C) T cfg
@@ -283,10 +282,9 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.EPR B A) 
           C' T' cfg'
 
-| LetC : forall TA TA' A x e C T cfg e' T' cfg',
-    Expr.step e TA cfg e' TA' cfg' ->
+| LetC : forall TA' A x e C T cfg e' T' cfg',
+    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
     
-    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
     step  (Insn.Let A x e :: C) T cfg
@@ -301,10 +299,9 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.Loc A)
           C' refs' cfg
 
-| LetBangC : forall TA TA' A x e C T cfg e' T' cfg',
+| LetBangC : forall TA' A x e C T cfg e' T' cfg',
     Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
 
-    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
     step  (Insn.LetBang A x e :: C) T cfg
           (Label.Loc A)
@@ -317,10 +314,9 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
           (Label.Loc A)
           C' refs' cfg
 
-| LetPairC : forall TA TA' A x1 x2 e C T cfg e' T' cfg',
-    Expr.step e TA cfg e' TA' cfg' ->
+| LetPairC : forall TA' A x1 x2 e C T cfg e' T' cfg',
+    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
 
-    Actor.Map.MapsTo A TA T ->
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
     step  (Insn.LetPair A x1 x2 e :: C) T cfg
@@ -342,7 +338,6 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
     step (I::C) T cfg l (I::C') T' cfg'
 .
 
-(* TODO (JP): Finish this proof *)
 Lemma stepProper' : forall C Θ1 cfg l C' Θ1' cfg',
   Choreography.step C Θ1 cfg l C' Θ1' cfg' ->
   forall Θ2 Θ2',
@@ -355,17 +350,17 @@ Proof.
     try rewrite Heq in *;
     try rewrite Heq' in *;
     try (econstructor; eauto; fail).
-  (*
+
   (* only EPR cases left *)
   * subst.
 
-    apply (ChorEnv.chor_epr_eq Θ2) in H1; auto.
+    apply (ChorEnv.chor_epr_eq Θ2) in H; auto.
     destruct H as [T0' [Heq'' H]].
 
     apply (Choreography.EPRB q1 q2 T0'); auto.
     { rewrite H0. rewrite Heq''. reflexivity. }
 
-  * apply (chor_epr_eq Θ2) in H; auto.
+  * apply (ChorEnv.chor_epr_eq Θ2) in H; auto.
     destruct H as [T0' [Heq'' H]].
 
     apply (Choreography.EPRB' q1 q2 T0'); auto.
@@ -373,8 +368,7 @@ Proof.
       rewrite H0. rewrite Heq''. reflexivity.
     }
 Qed.
-**)
-Admitted.
+
 
 Global Instance stepProper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.step).
 Proof.
@@ -388,8 +382,8 @@ Inductive WellTyped :
   ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
   
 | Nil : forall G D T, 
-    Actor.Map.Empty D ->
-    Actor.Map.Empty T ->
+    ChorEnv.Empty D ->
+    ChorEnv.Empty T ->
     WellTyped G D T nil
                                 
 | EPR : forall G D T A x B y C,
@@ -448,29 +442,7 @@ Inductive WellTyped :
     WellTyped G D T ((Insn.LetPair A x1 x2 e)::C)
 .
 
-Lemma empty_Equal : forall T (M1 M2 : ChorEnv.t T),
-  ChorEnv.Equal M1 M2 ->
-  Actor.Map.Empty M1 ->
-  Actor.Map.Empty M2.
-Proof.
-  intros T M1 M2 [Heq Heq'] Hempty.
-  Actor.reflect_find.
-  apply Actor.Map.Properties.F.not_find_in_iff.
-  rewrite <- Heq.
-  Actor.simplify. rewrite Hempty.
-  Actor.solve.
-Qed.
-  
-
-Global Instance empty_Proper' : forall T,
-  Proper (ChorEnv.Equal ==> iff) (@Actor.Map.Empty (Var.Map.t T)).
-Proof.
-  intros T M1 M2 Heq.
-  split; apply empty_Equal; auto.
-  symmetry; auto.
-Qed.
-
-Lemma WellTyped_proper : forall G D T C,
+Lemma WellTypedProper' : forall G D T C,
   WellTyped G D T C ->
   forall G' D' T',
   ChorEnv.Equal G G' ->
@@ -531,7 +503,7 @@ Global Instance WellTypedProper :
   Proper (ChorEnv.Equal ==> ChorEnv.Equal ==> ChorEnv.Equal ==> eq ==> iff) WellTyped.
 Proof.
   intros G1 G2 HG D1 D2 HD T1 T2 HT ? e ?; subst.
-  split; intros; eapply WellTyped_proper; eauto;
+  split; intros; eapply WellTypedProper'; eauto;
     symmetry; auto.
 Qed.
 
@@ -604,13 +576,12 @@ Proof.
 Qed.
 
 Lemma empty_dj : forall {X : Type} (CE1 : ChorEnv.t X) CE2 A,
-    Actor.Map.Empty CE2 ->
+    ChorEnv.Empty CE2 ->
     Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2).
 Proof.
   intros X CE1 CE2 A Hempty.
   intros z [Hin1 Hin2].
-  unfold ChorEnv.find in Hin2.
-  rewrite Actor.Map.Proofs.Empty_find in Hempty.
+  unfold ChorEnv.Empty in Hempty.
   rewrite Hempty in Hin2.
   Var.simplify.
 Qed.
@@ -728,11 +699,15 @@ Proof.
 Qed.
 
 Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
-    ~ Actor.Map.Empty (ChorEnv.add A x tau D).
+    ~ ChorEnv.Empty (ChorEnv.add A x tau D).
 Proof.
   intros. intros Hempty.
   unfold ChorEnv.add in Hempty.
-  Actor.simplify.
+  unfold ChorEnv.Empty in Hempty.
+  specialize (Hempty A).
+  ChorEnv.simplify.
+  specialize (Hempty x).
+  Var.simplify.
 Qed.
 
 Lemma empty_is_empty : forall {X : Type} A,
@@ -750,7 +725,6 @@ Proof.
   Var.simplify.
 Qed.
 
-(* TODO (JP): Change definition of ChorEnv.Equal to make it support this definition *)
 Lemma empty_to_empty : forall  {X : Type} A (M : Var.Map.t X),
     Var.Map.Empty M ->
     ChorEnv.Equal
@@ -758,8 +732,10 @@ Lemma empty_to_empty : forall  {X : Type} A (M : Var.Map.t X),
       (Actor.Map.empty (Var.Map.t X)).
 Proof.
   intros. 
-  pose proof (Var.Map.Proofs.empty_map_equal M H).
-Admitted.
+  pose proof (H0 := Var.Map.Proofs.empty_map_equal M H).
+  rewrite H0.
+  intros D. ChorEnv.simplify.
+Qed.
 
 Lemma find_empty : forall {X : Type} A,
     (ChorEnv.find A (Actor.Map.empty (Var.Map.t X))) =  (Var.Map.empty X).
@@ -795,7 +771,9 @@ Qed.
 Lemma find_add_env : forall {X : Type} A (CE : ChorEnv.t X),
     ChorEnv.Equal (Actor.Map.add A (ChorEnv.find A CE) CE) CE.
 Proof.
-Admitted.
+  intros X A CE B.
+  ChorEnv.simplify.
+Qed.
 
 Lemma find_ab_neq1 : forall {X : Type} A B x tau (CE : ChorEnv.t X),
     A <> B ->
@@ -1032,20 +1010,9 @@ Proof.
   intros.
   unfold ChorEnv.remove.
   repeat (Var.simplify; Actor.simplify).
-  (* should work but strange typing issues here... 
-  rewrite
-    (Actor.Map.Proofs.remove_swap (Expr.typ) x y (ChorEnv.find A CE)).*)
-  split.
-  * intros D. Actor.simplify.
-  * intros D PD PD' HD HD'.
-    Actor.simplify.
-    destruct HD  as [[? ?] | [? HD]];
-    destruct HD' as [[? ?] | [? HD']];
-      subst; try contradiction.
-    + rewrite Var.Map.Proofs.remove_swap. reflexivity.
-    + Search Actor.Map.MapsTo (_ = _).
-      replace PD' with PD; try reflexivity.
-      eapply Actor.Map.Properties.F.MapsTo_fun; eauto.
+  intros D. ChorEnv.simplify.
+  rewrite Var.Map.Proofs.remove_swap.
+  reflexivity.
 Qed.
 
 Lemma rmadd1 : forall (CE : ChorEnv.t Expr.typ) A x tau,
@@ -1288,27 +1255,9 @@ Proof.
   unfold ChorEnv.add, ChorEnv.find in *.
   destruct (Actor.Map.find A CE) as [ctx | ] eqn:Hfind.
   2:{ Var.simplify. }
-
-  split.
-  + intros B.
-    Actor.Map.Tactics.compare A B.
-    {
-      Actor.simplify.
-      Actor.solve.
-    }
-    Actor.simplify.
-  + intros B G G' HG HG'.
-    Actor.simplify.
-    destruct HG as [[? ?] | [? HG]]; subst.
-    { (*A=B*)
-      Actor.reflect_find. inversion Hfind; subst; clear Hfind.
-      intros D.
-      Var.solve.
-    }
-    { (* A <> B *)
-      replace G with G'; try reflexivity.
-      eapply Actor.Map.Properties.F.MapsTo_fun; eauto.
-    }
+  ChorEnv.solve.
+  unfold ChorEnv.find.
+  rewrite Hfind. Var.solve.
 Qed.
 
 Lemma remove_add_partition : forall (CE1 CE2 CE3: ChorEnv.t Expr.typ) A B x tau,
@@ -1696,7 +1645,6 @@ Proof.
           rewrite -> find_ab_neq2 in IHC; auto.
         }
 Qed.
-
 
 Lemma weakening_gen : forall C G D T G0,
     WellTyped G D T C ->
@@ -3739,7 +3687,9 @@ Lemma bangty_inversion : forall Gamma Delta Theta e tau,
 Proof.
   intros.
   inversion H; subst.
-Admitted.
+  Var.simplify.
+  repeat split; auto.
+Qed.
 
 Lemma nilnostep : forall T cfg l C' T' cfg',
     ~ step [] T cfg l C' T' cfg'. 
@@ -3768,27 +3718,19 @@ Proof.
     specialize (Hscoped A).
     
     rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
-               (empty_is_empty (X:=Expr.typ) A)) in H13.
+               (empty_is_empty (X:=Expr.typ) A)) in H12.
     
     assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
     Var.simplify.
     
-    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H13) as Hdp.
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H12) as Hdp.
     rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A (Actor.Map.empty (Var.Map.t Expr.typ)))
-               (empty_is_empty (X:=Expr.typ) A)) in H11.
-    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H11.
+               (empty_is_empty (X:=Expr.typ) A)) in H10.
+    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H10.
     
-    assert (Hfind' : Var.Map.Equal (ChorEnv.find A T) TA).
-    {
-      unfold ChorEnv.find.
-      rewrite Actor.Map.Properties.F.find_mapsto_iff in H0.
-      rewrite H0.
-      reflexivity.
-    }
-    rewrite Hfind' in *.
 
-    pose proof (Expr.step_inversion e TA cfg e' TA' cfg' H 
-                  ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H11 H14) as Hsi.
+    pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg e' TA' cfg' H 
+                  ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H10 H13) as Hsi.
 
     destruct Hsi as [ThetaA1' Hsi].
     destruct Hsi as [HsiA HsiB].
@@ -3800,22 +3742,22 @@ Proof.
       { eauto. }
       { apply empty_is_empty. }
       { Var.simplify. }
-      { apply (ws_partition TA ThetaA1 ThetaA2 cfg Hscoped H14). }
+      { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H13). }
       { eauto. }
     }
     {
-      rewrite H1.
+      rewrite H0.
       rewrite addadd2.
       eauto.
     }
     { 
       unfold ChorEnv.find.
       Actor.simplify.
-      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H13.
+      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H12.
       auto.
     }
     {
-      rewrite H1.
+      rewrite H0.
       rewrite find_add; auto.
     }
 
