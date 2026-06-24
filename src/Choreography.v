@@ -267,7 +267,7 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
     ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
     ChorEnv.Equal T' T0 ->
 
-    C' = Choreography.subst A x (Expr.Var q1) (Choreography.subst B y (Expr.Var q2) C) ->
+    C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
 
     step  (Insn.EPR A x B y :: C) T cfg
           (Label.EPR A B) 
@@ -277,7 +277,7 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
     ChorEnv.epr B A T cfg = (q2, q1, T0, cfg') ->
     ChorEnv.Equal T' T0 ->
 
-    C' = Choreography.subst A x (Expr.Var q1) (Choreography.subst B y (Expr.Var q2) C) ->
+    C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
 
     step  (Insn.EPR A x B y :: C) T cfg
           (Label.EPR B A) 
@@ -3737,9 +3737,23 @@ Lemma bangty_inversion : forall Gamma Delta Theta e tau,
       Var.Map.Equal Delta (Var.Map.empty Expr.typ) /\
       Var.Map.Equal Theta (Var.Map.empty nat).
 Proof.
-  intros.
+  intros. 
   inversion H; subst.
-Admitted.
+
+  split; auto.
+  split.
+  Var.simplify.
+  Var.simplify.
+Qed.
+
+Lemma qref_ty : forall Gamma Delta Theta q idx,
+    Var.Map.Empty Delta ->
+    Var.Map.Singleton q idx Theta ->
+    Expr.WellTyped Gamma Delta Theta (Expr.QRef q) Expr.QUBIT.
+Proof.
+  intros.
+  eapply Expr.WTQRef; eauto.
+Qed.
 
 Lemma nilnostep : forall T cfg l C' T' cfg',
     ~ step [] T cfg l C' T' cfg'. 
