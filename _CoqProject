@@ -6,5 +6,7 @@ src/Choreography.v
 src/Network.v
 src/NetQasm.v
 examples/Notation.v
+examples/HOASNotation.v
+examples/HOASTeleportation.v
 examples/Teleportation.v
 examples/MeasureSend.v

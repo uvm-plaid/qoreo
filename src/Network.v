@@ -94,10 +94,10 @@ Module Network.
                         Label.t ->
                         Network.t -> ChorEnv.t nat -> Config.t -> Prop :=
 
-    | Loc : forall P P' refsA refsA' N' N refs cfg A refs' cfg',
+    | Loc : forall P P' (*refsA*) refsA' N' N refs cfg A refs' cfg',
       Actor.Map.MapsTo A P N ->
-      Actor.Map.MapsTo A refsA refs ->
-      Process.step  P refsA cfg
+      (*Actor.Map.MapsTo A refsA refs ->*)
+      Process.step  P (ChorEnv.find A refs) cfg
                     P' refsA' cfg' ->
       N' = Actor.Map.add A P' N ->
       ChorEnv.Equal refs' (Actor.Map.add A refsA' refs) ->
@@ -105,16 +105,15 @@ Module Network.
             (Label.Loc A)
             N' refs' cfg'
 
-    | Send : forall PA PB y N refs refs' cfg cfg' A v B N',
+    | Send : forall PA PB y N refs refs' cfg cfg' A e B N',
       A <> B ->
-      Actor.Map.MapsTo A (Insn.Send v B :: PA) N ->
+      Actor.Map.MapsTo A (Insn.Send (Expr.Bang e) B :: PA) N ->
       Actor.Map.MapsTo B (Insn.Receive y A :: PB) N ->
-      Expr.Val v ->
-      Actor.Map.Equal N' (Actor.Map.add A PA (Actor.Map.add B (Process.subst y v PB) N)) ->
+      Actor.Map.Equal N' (Actor.Map.add A PA (Actor.Map.add B (Process.subst y e PB) N)) ->
       ChorEnv.Equal refs' refs ->
       cfg' = cfg ->
       
-      step N refs cfg (Label.Send A v B) N' refs' cfg'
+      step N refs cfg (Label.Send A e B) N' refs' cfg'
 
     | EPR : forall x y PA PB qA qB N refs cfg A B N' refs' cfg',
       A <> B ->
@@ -122,8 +121,8 @@ Module Network.
       Actor.Map.MapsTo B (Insn.EPR y A :: PB) N ->
       ChorEnv.epr A B refs cfg = (qA, qB, refs', cfg') ->
       Actor.Map.Equal N' 
-        (Actor.Map.add A (Process.subst x (Expr.Var qA) PA) (
-            Actor.Map.add B (Process.subst y (Expr.Var qB) PB) N)) ->
+        (Actor.Map.add A (Process.subst x (Expr.QRef qA) PA) (
+            Actor.Map.add B (Process.subst y (Expr.QRef qB) PB) N)) ->
 
       step N refs cfg (Label.EPR A B) N' refs' cfg'
     .
@@ -1235,8 +1234,8 @@ Lemma completeness_local : forall PA (refs : Var.Map.t nat) cfg PA' refs' cfg',
   EPP_N C N ->
   WFChoreography C ->
   Actor.Map.MapsTo A PA N ->
-  Actor.Map.MapsTo A refs Θ ->
-  (*Var.Map.Equal refs (ChorEnv.find A Θ) ->*)
+  (*Actor.Map.MapsTo A refs Θ ->*)
+  Var.Map.Equal refs (ChorEnv.find A Θ) ->
   ChorEnv.Equal Θ' (Actor.Map.add A refs' Θ) ->
   
   exists C',
@@ -1260,11 +1259,7 @@ Proof.
     Var.simplify.
     exists (Choreography.Insn.Send A e' B y :: C).
     split.
-    { econstructor; eauto.
-      unfold ChorEnv.find.
-      Actor.reflect_find.
-      auto.
-    }
+    { econstructor; eauto. }
     { 
       eapply (EPP_N_add _ A (Insn.Send e' B :: P)).
       { Actor.simplify. }
@@ -1295,11 +1290,7 @@ Proof.
       Var.simplify.
       exists (Choreography.Insn.Let A x e' :: C).
       split.
-      { econstructor; eauto.
-        unfold ChorEnv.find.
-        Actor.reflect_find.
-        auto.
-      }
+      { econstructor; eauto. }
       {
         EPP_N_cons.
         EPP_N_cons.
@@ -1319,8 +1310,8 @@ Proof.
         assert (Heq' : ChorEnv.Equal Θ' Θ).
         {
           rewrite HΘ'.
-          apply ChorEnv.actor_map_Equal.
-          apply Actor.Map.Proofs.add_mapsto; auto.
+          rewrite Hrefs.
+          apply Choreography.find_add_env.
         }
         rewrite Heq'.
         eapply Choreography.LetB; eauto.
@@ -1346,10 +1337,7 @@ Proof.
       Var.simplify.
       exists (Choreography.Insn.LetBang A x e' :: C).
       split.
-      { econstructor; eauto.
-        unfold ChorEnv.find.
-        Actor.reflect_find; auto.
-      }
+      { econstructor; eauto. }
       {
         EPP_N_cons.
         EPP_N_cons.
@@ -1370,8 +1358,8 @@ Proof.
         assert (Heq' : ChorEnv.Equal Θ' Θ).
         {
           rewrite HΘ'.
-          apply ChorEnv.actor_map_Equal.
-          apply Actor.Map.Proofs.add_mapsto; auto.
+          rewrite Hrefs.
+          apply Choreography.find_add_env.
         }
         rewrite Heq'.
         eapply Choreography.LetBangB; eauto.
@@ -1395,10 +1383,7 @@ Proof.
       Var.simplify.
       exists (Choreography.Insn.LetPair A x1 x2 e' :: C).
       split.
-      { econstructor; eauto.
-        unfold ChorEnv.find.
-        Actor.reflect_find; auto. 
-      }
+      { econstructor; eauto. }
       {
         EPP_N_cons.
         EPP_N_cons.
@@ -1415,8 +1400,8 @@ Proof.
         assert (Heq' : ChorEnv.Equal Θ' Θ).
         {
           rewrite HΘ'.
-          apply ChorEnv.actor_map_Equal.
-          apply Actor.Map.Proofs.add_mapsto; auto.
+          rewrite Hrefs.
+          apply Choreography.find_add_env.
         }
         rewrite Heq'.
         eapply Choreography.LetPairB; eauto.
@@ -1523,9 +1508,8 @@ Proof.
   rename H2 into WFC'.
   rename H5 into HA.
   rename H6 into HB.
-  rename H7 into Hv.
-  rename H11 into HN'.
-  rename H15 into Hrefs.
+  rename H10 into HN'.
+  rename H14 into Hrefs.
 
   (*
   intros N refs cfg A v B N' refs' cfg' C HWF H.
@@ -1545,7 +1529,7 @@ Proof.
   }
     *)
 
-  assert (HI : I = Choreography.Insn.Send A v B y
+  assert (HI : I = Choreography.Insn.Send A (Expr.Bang v) B y
     \/ (~ Actor.FSet.In A (Choreography.Insn.actors I)
      /\ ~ Actor.FSet.In B (Choreography.Insn.actors I))).
   {
@@ -1554,13 +1538,13 @@ Proof.
     destruct (Actor.Map.FSetProofs.in_dec B (Choreography.Insn.actors I)) as [HinB | HinB].
     2:{
       (* contradiction *)
-      set (HinA' := H _ (Insn.Send v B :: PA) HinA HA).
+      set (HinA' := H _ _ HinA HA).
       inversion HinA'; subst; clear HinA'; try contradiction.
       simpl in *. Actor.simplify.
     }
     2:{
       (* contradiction *)
-      set (HinB' := H _ (Insn.Receive y A :: PB) HinB HB).
+      set (HinB' := H _ _ HinB HB).
       inversion HinB'; subst; clear HinB'; try contradiction.
       simpl in *. Actor.simplify.
     }
@@ -1734,7 +1718,7 @@ Proof.
   intros Hstep.
   clear H. revert Hempty.
   induction Hstep; intros Hempty; subst.
-  * apply Hempty in H. subst. inversion H1.
+  * apply Hempty in H. subst. inversion H0.
   * apply Hempty in H0. inversion H0.
   * apply Hempty in H0. inversion H0.
 Qed. 
@@ -1960,6 +1944,7 @@ Proof.
       eapply completeness_local in H1; eauto.
       destruct H1 as [C0 [Hstep HEPP_N]].
       exists C0. split; auto.
+      reflexivity.
 
 Qed.
 
@@ -1973,8 +1958,9 @@ Lemma soundness_local : forall PA C refs cfg A C' refs' cfg' N,
   Choreography.step C refs cfg (Choreography.Label.Loc A) C' refs' cfg' ->
   EPP_N C N ->
   Actor.Map.MapsTo A PA N ->
-  exists PA', Process.step PA (ChorEnv.find A refs) cfg PA' (ChorEnv.find A refs') cfg'
-           /\ EPP_N C' (Actor.Map.add A PA' N).
+  exists PA' refsA', Process.step PA (ChorEnv.find A refs) cfg PA' refsA' cfg'
+           /\ EPP_N C' (Actor.Map.add A PA' N)
+           /\ ChorEnv.Equal refs' (Actor.Map.add A refsA' refs).
 Admitted.
 
 
@@ -2016,7 +2002,7 @@ Proof.
   assert (Hneq : A <> B). { admit. }
   dependent induction Hstep.
   * 
-    assert (HA' : exists PA, Actor.Map.MapsTo A (Insn.Send v B :: PA) N).
+    assert (HA' : exists PA, Actor.Map.MapsTo A (Insn.Send (Expr.Bang v) B :: PA) N).
     {
       destruct HA as [PA HA].
       rewrite EPP_N_spec in HN.
@@ -2046,7 +2032,7 @@ Proof.
       { Actor.simplify. }
       { apply EPP_subst_neq; auto.
         EPP_N_cons.
-        apply H0 in HA.
+        apply H in HA.
         2:{ Actor.simplify. }
         inversion HA; subst; clear HA; auto.
         {
@@ -2075,7 +2061,7 @@ Proof.
     2:{ admit (* true *). }
     destruct IH as [N' [Hstep' HEPP_N']].
     inversion Hstep'; subst; clear Hstep'.
-    rename H4 into HA'', H5 into HB'', H10 into Heq.
+    rename H4 into HA'', H5 into HB'', H9 into Heq.
     rewrite fold_uncons_mapsto_neq in HA''; auto.
     rewrite fold_uncons_mapsto_neq in HB''; auto.
 
@@ -2169,9 +2155,9 @@ Proof.
     }
     destruct HA as [PA HA].
     eapply soundness_local in Hstep; eauto.
-    destruct Hstep as [PA' [Hstep HPA']].
+    destruct Hstep as [PA' [refsA' [Hstep [HPA' Hrefs']]]].
     eexists. split; eauto.
     {
-      econstructor; eauto. admit (*?*). admit (*?*).
+      econstructor; eauto.
     }
-Admitted.
+Qed.
