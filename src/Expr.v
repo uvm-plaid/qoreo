@@ -2147,3 +2147,34 @@ Proof.
 
 Unshelve. exact true.
 Qed.
+
+(** General type safety *)
+
+Inductive multi_step : t -> Var.Map.t nat -> Config.t -> t -> Var.Map.t nat -> Config.t -> Prop :=
+| Step0 : forall e Θ cfg, multi_step e Θ cfg e Θ cfg
+| Step1 : forall e1 e2 e3 Θ1 Θ2 Θ3 cfg1 cfg2 cfg3,
+  step e1 Θ1 cfg1 e2 Θ2 cfg2 ->
+  multi_step e2 Θ2 cfg2 e3 Θ3 cfg3 ->
+  multi_step e1 Θ1 cfg1 e3 Θ3 cfg3.
+
+Definition can_step e Θ cfg :=
+  exists e' Θ' cfg', step e Θ cfg e' Θ' cfg'.
+
+Theorem safety : forall e Θ cfg e' Θ' cfg',
+  multi_step e Θ cfg e' Θ' cfg' ->
+  forall τ,
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ e τ ->
+  Config.WellScoped Θ cfg ->
+  Val e' \/ can_step e' Θ' cfg'.
+Proof.
+  intros ? ? ? ? ? ? Hstep.
+  induction Hstep; intros τ HWT HWS.
+  * unfold can_step. eapply progress; eauto; Var.simplify.
+  * assert (HWT2 : WellTyped (Var.Map.empty typ) (Var.Map.empty typ) Θ2 e2 τ).
+    { eapply preservation; eauto; Var.simplify. }
+    assert (HWS2 : Config.WellScoped Θ2 cfg2).
+    { eapply well_scoped_preservation; eauto. }
+    eapply IHHstep; eauto.
+Qed.
+
+  
