@@ -118,8 +118,8 @@ Module Network.
       Actor.Map.MapsTo A (Insn.EPR x B :: PA) N ->
       Actor.Map.MapsTo B (Insn.EPR y A :: PB) N ->
       ChorEnv.epr A B refs cfg = (qA, qB, refs', cfg') ->
-      N' = Actor.Map.add A (Process.subst x (Expr.Var qA) PA) (
-            Actor.Map.add B (Process.subst y (Expr.Var qB) PB) N) ->
+      N' = Actor.Map.add A (Process.subst x (Expr.QRef qA) PA) (
+            Actor.Map.add B (Process.subst y (Expr.QRef qB) PB) N) ->
 
       step N refs cfg (Label.EPR A B) N' refs' cfg'
     .

@@ -9,6 +9,7 @@ From Stdlib Require Import Bool.Bool.
 From Stdlib Require Import Setoid.
 From Stdlib Require Import Morphisms (* for Proper *).
 
+Require Import Lia.
 
 
 Module Insn.
@@ -3717,6 +3718,79 @@ Proof.
   eapply Expr.WTQRef; eauto.
 Qed.
 
+
+Lemma fresh_empty : forall T,
+  Var.fresh (Var.Map.empty T) = 0.
+Proof.
+  intros. unfold Var.fresh.
+  rewrite Var.Map.Properties.fold_spec_right.
+  simpl.
+  auto.
+Qed.
+
+Lemma fresh_add : forall T (m : Var.Map.t T) x v,
+  ~ Var.Map.In x m ->
+  Var.fresh (Var.Map.add x v m) = max (x+1) (Var.fresh m).
+Proof.
+  intros.
+  unfold Var.fresh.
+  rewrite Var.Map.Properties.fold_add; auto.
+  
+  + fold (Var.fresh m).
+    destruct (PeanoNat.Nat.leb (Var.fresh m) x) eqn:Hleb.
+    - apply PeanoNat.Nat.leb_le in Hleb.
+      rewrite max_l; auto.
+      lia.
+
+    - rewrite PeanoNat.Nat.leb_nle in Hleb.
+      rewrite max_r; auto.
+      lia.
+
+  + clear m x v H.
+    intros ? x ? ? ? ? ? z ?; subst; auto.
+  + clear m x v H.
+    intros z1 z2 v1 v2 w Hneq.
+    repeat match goal with
+    | [ H : context[PeanoNat.Nat.leb ?x ?y] |- _ ] =>
+      let H := fresh "H" in
+      destruct (PeanoNat.Nat.leb x y) eqn:H;
+      try rewrite PeanoNat.Nat.leb_le in *;
+      try rewrite PeanoNat.Nat.leb_nle in *
+    | [ |- context[PeanoNat.Nat.leb ?x ?y] ] =>
+      let H := fresh "H" in
+      destruct (PeanoNat.Nat.leb x y) eqn:H;
+      try rewrite PeanoNat.Nat.leb_le in *;
+      try rewrite PeanoNat.Nat.leb_nle in *
+    end;
+    try lia.
+Qed.
+
+Lemma fresh_upper_bound : forall T (m : Var.Map.t T),
+  forall x, Var.Map.In x m ->
+    Var.fresh m > x.
+Proof.
+  intros T m.
+  induction m using Var.Map.Properties.map_induction;
+    intros y Hin.
+  * Var.simplify.
+  * Var.simplify.
+  rewrite fresh_add; auto.
+  destruct Hin; subst.
+  { try lia. }
+  apply IHm1 in H0. lia. 
+Qed.
+
+Lemma fresh_not_in : forall T (m : Var.Map.t T) x,
+  x = Var.fresh m ->
+  ~ Var.Map.In x m.
+Proof.
+  intros. subst.
+  intros Hin.
+  apply fresh_upper_bound in Hin.
+  lia.
+Qed.
+
+
 Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     A <> B -> 
     ChorEnv.epr A B T1 cfg1 = (q1, q2, T2, cfg2) ->
@@ -3729,11 +3803,32 @@ Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
         (Actor.Map.add B (ChorEnv.find B T1) (
              Actor.Map.add A (ChorEnv.find A T1) T2)).
 Proof.
-  intros.
-  unfold ChorEnv.epr in H.
-  destruct (Config.epr_cfg cfg1) eqn:Eqnepr.
-  destruct p eqn:Eqneprsplit.
-Admitted.
+  intros A B T1 cfg1 q1 q2 T2 cfg2 Heq Hepr.
+  unfold ChorEnv.epr in Hepr.
+  destruct (Config.epr_cfg cfg1) as [[idx1 idx2] cfg'] eqn:Eqnepr.
+  inversion Hepr; subst; clear Hepr.
+
+  remember (Var.fresh (ChorEnv.find A T1)) as q1 eqn:Hq1.
+  remember (Var.fresh (ChorEnv.find B (ChorEnv.add A q1 idx1 T1))) as q2 eqn:Hq2.
+
+  split.
+  2:{
+    intros D.
+    ChorEnv.simplify.
+  }
+  exists idx1, idx2.
+  split.
+  {
+    ChorEnv.simplify.
+    apply Var.Map.Proofs.partition_add_r; auto with var_db.
+    apply fresh_not_in. subst. auto.
+  }
+  {
+    ChorEnv.simplify.
+    apply Var.Map.Proofs.partition_add_r; auto with var_db.
+    rewrite Hq2. apply fresh_not_in; auto.
+  }
+Qed.
    
 Lemma nilnostep : forall T cfg l C' T' cfg',
     ~ step [] T cfg l C' T' cfg'. 
