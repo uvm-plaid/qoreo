@@ -4370,8 +4370,8 @@ Proof.
     rewrite find_empty in Hwtslinx1; auto.
     Var.simplify.
     
-    
-
+  (* Case Delay *)
+  - 
     
 
 Admitted.
