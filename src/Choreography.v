@@ -1004,6 +1004,21 @@ Proof.
   repeat (Var.simplify; Actor.simplify).
 Qed.
 
+Lemma addadd9 : forall (CE : ChorEnv.t Expr.typ) A x taux y tauy,
+    y <> x ->
+    ChorEnv.Equal (ChorEnv.add A x taux (ChorEnv.add A y tauy CE))
+                  (ChorEnv.add A y tauy (ChorEnv.add A x taux CE)).
+Proof.
+  intros.
+  assert (Insn.bind_eqb (A, y) (A, x) = false).
+  destruct (Insn.bind_eqb_false (A, y) (A, x)).
+  assert (~ Insn.bind_eq (A, y) (A, x)).
+  unfold Insn.bind_eq.
+  tauto.
+  tauto.
+  apply addadd5; auto.
+Qed.
+
 Lemma overwrite : forall (CE : ChorEnv.t Expr.typ) A x tau1 tau2,
     ChorEnv.Equal
       (ChorEnv.add A x tau1 (ChorEnv.add A x tau2 CE))
@@ -4305,11 +4320,11 @@ Proof.
 
     pose proof wt_subst_lin as Hwtslinx2.
 
-    specialize (Hwtslinx2 C Θ1 ThetaA2 tau1
+    specialize (Hwtslinx2 C Θ2 ThetaA2 tau2
                   (Actor.Map.empty (Var.Map.t Expr.typ))
-                  (ChorEnv.add A x2 tau2 (Actor.Map.empty (Var.Map.t Expr.typ)))
-                  (Actor.Map.add A (Var.Map.concat ThetaA2 Θ1) refs)
-                  A x1 v1 H11).
+                  (ChorEnv.add A x1 tau1 (Actor.Map.empty (Var.Map.t Expr.typ)))
+                  (Actor.Map.add A (Var.Map.concat ThetaA2 Θ2) refs)
+                  A x2 v2 H12).
 
     rewrite addadd2 in Hwtslinx2; auto.
     rewrite find_add in Hwtslinx2; auto.
@@ -4319,20 +4334,44 @@ Proof.
                 (ChorEnv.find A refs) Θ1 ThetaA2 ThetaA1 Θ2
                 (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A refs)
                    ThetaA1 ThetaA2 H14) H19)
-      as [HPartition [_ [_ _]]].
+      as [HPartitionA [HPartitionB [HPartitionC HPartitionD]]].
     
-    assert (~ Var.Map.In x1 (Var.Map.empty Expr.typ)) as Hninempty.
+    assert (~ Var.Map.In x1 (Var.Map.empty Expr.typ)) as Hninempty1.
     Var.simplify.
- 
+    assert (~ Var.Map.In x2 (Var.Map.empty Expr.typ)) as Hninempty2.
+    Var.simplify.
+
+    rewrite addadd9 in H9; auto.
+       
     specialize (Hwtslinx2 H9
-                  (@Var.Map.Properties.Partition_sym _ (Var.Map.concat ThetaA2 Θ1)
-                     ThetaA2 Θ1 HPartition)
-                  Hninempty).
+                  (@Var.Map.Properties.Partition_sym _ (Var.Map.concat ThetaA2 Θ2)
+                     ThetaA2 Θ2 HPartitionB)
+                  Hninempty2).
 
     rewrite find_add_map in Hwtslinx2; auto.
     rewrite find_empty in Hwtslinx2; auto.
+
+    assert (x2 <> x1) as Hx2nex1; auto.
+    specialize (Hwtslinx2 (nin_mapl (Var.Map.empty Expr.typ) x2 x1 tau1 Hx2nex1 Hninempty2)).
+
+    pose proof wt_subst_lin as Hwtslinx1.
+
+    specialize (Hwtslinx1
+                  (Choreography.subst A x2 v2 C)
+                  Θ1
+                  (Var.Map.concat ThetaA2 Θ2)
+                  tau1
+                  (Actor.Map.empty (Var.Map.t Expr.typ))
+                  (Actor.Map.empty (Var.Map.t Expr.typ))
+                  refs
+                  A x1 v1 H11 Hwtslinx2
+                  HPartitionD).
+
+    rewrite find_empty in Hwtslinx1; auto.
+    Var.simplify.
     
-    specialize (Hwtslinx2 (nin_mapl (Var.Map.empty Expr.typ) x1 x2 tau2 H17 Hninempty)).
+    
+
     
 
 Admitted.
