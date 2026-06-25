@@ -1376,8 +1376,8 @@ Proof.
         assert (Heq' : ChorEnv.Equal Θ' Θ).
         {
           rewrite HΘ'.
-          rewrite Hrefs.
-          apply Choreography.find_add_env.
+          intros D.
+          ChorEnv.simplify.
         }
         rewrite Heq'.
         eapply Choreography.LetB; eauto.
@@ -1424,8 +1424,7 @@ Proof.
         assert (Heq' : ChorEnv.Equal Θ' Θ).
         {
           rewrite HΘ'.
-          rewrite Hrefs.
-          apply Choreography.find_add_env.
+          ChorEnv.solve.
         }
         rewrite Heq'.
         eapply Choreography.LetBangB; eauto.
@@ -1466,8 +1465,7 @@ Proof.
         assert (Heq' : ChorEnv.Equal Θ' Θ).
         {
           rewrite HΘ'.
-          rewrite Hrefs.
-          apply Choreography.find_add_env.
+          ChorEnv.solve.
         }
         rewrite Heq'.
         eapply Choreography.LetPairB; eauto.
@@ -1835,7 +1833,7 @@ Proof.
 
   inversion Hstep; subst; clear Hstep.
   rename H2 into HmapstoA, H3 into HmapstoB.
-  rename H7 into HEPR, H11 into HN'.
+  rename H4 into HEPR, H12 into HN'.
 
   rewrite EPP_N_spec in HEPP_N.
   assert (HEPPA : EPP A (I :: C) (Insn.EPR x B :: PA))
@@ -1855,7 +1853,7 @@ Proof.
 
   + eexists.
     split.
-    { econstructor; eauto. reflexivity. }
+    { econstructor; eauto. }
 
     rewrite HN'; clear N' HN'.
     rewrite EPP_N_spec.
@@ -1890,7 +1888,6 @@ Proof.
     split.
     {
       eapply Choreography.EPRB'; eauto.
-      reflexivity.
     }
 
     rewrite HN'; clear N' HN'.
@@ -2007,14 +2004,13 @@ Proof.
   
     * (* local step *)
       inversion Hstep; subst; clear Hstep.
-      eapply completeness_local in H1; eauto.
-      destruct H1 as [C0 [Hstep HEPP_N]].
+      rename H1 into Hstep, H2 into HN', H6 into Hrefs'.
+      eapply completeness_local in Hstep; eauto; try reflexivity.
+      destruct Hstep as [C0 [Hstep HEPP_N]].
       exists C0. split; auto.
-      reflexivity.
+      rewrite HN'; auto.
 
 Qed.
-
-
 
 
 
@@ -2027,6 +2023,7 @@ Lemma soundness_local : forall PA C refs cfg A C' refs' cfg' N,
   exists PA' refsA', Process.step PA (ChorEnv.find A refs) cfg PA' refsA' cfg'
            /\ EPP_N C' (Actor.Map.add A PA' N)
            /\ ChorEnv.Equal refs' (Actor.Map.add A refsA' refs).
+Proof.
 Admitted.
 
 
@@ -2251,7 +2248,9 @@ Proof.
     
     eexists.
     split.
-    + rewrite H0. econstructor; eauto.
+    + rewrite H0.
+      econstructor; eauto.
+      reflexivity.
       reflexivity.
 
     +
@@ -2333,6 +2332,7 @@ Proof.
     split.
     + rewrite H0. econstructor; eauto.
       reflexivity.
+      reflexivity.
 
     +
       rewrite EPP_N_spec.
@@ -2390,7 +2390,7 @@ Proof.
     }
     destruct IH as [N' [Hstep' HEPP_N']].
     inversion Hstep'; subst; clear Hstep'.
-    rename H3 into HA'', H4 into HB'', H8 into Heq, H12 into HN'.
+    rename H3 into HA'', H4 into HB'', H9 into Heq, H13 into HN'.
     rewrite fold_uncons_mapsto_neq in HA''; auto.
     rewrite fold_uncons_mapsto_neq in HB''; auto.
 
@@ -2444,7 +2444,7 @@ Proof.
       rewrite find_fold_uncons_neq; auto.
       rewrite HB. discriminate.
 
-Qed. 
+Qed.
 
 
 Inductive WFLabel : Label.t -> Prop :=
@@ -2473,6 +2473,7 @@ Proof.
 
   * (* EPR *) 
     eapply soundness_epr; eauto.
+    { inversion WFl; auto. }
     { apply Hsubset. simpl. Actor.simplify. }
     { apply Hsubset. simpl. Actor.simplify. }
 
@@ -2488,5 +2489,6 @@ Proof.
     eexists. split; eauto.
     {
       econstructor; eauto.
+      reflexivity.
     }
 Qed.
