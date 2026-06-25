@@ -4073,36 +4073,46 @@ Proof.
     
     inversion HWT; subst.
 
-    eapply LetIn; eauto.
-
-    rewrite find_empty in H5; auto.
-    pose proof Expr.preservation as Hep.
-
-    specialize (Hep
-                  (Var.Map.empty Expr.typ) DeltaA1 ThetaA1 e tau H5
-                  
-               ).
-
     unfold  WellScoped in Hscoped.
     specialize (Hscoped A).
 
-    rewrite find_empty in H10; auto.
     assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
     Var.simplify.
-    
-    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H10) as Hdp.
 
-    
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H10) as Hdp.
     rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H5.
     
     pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg e' TA' cfg' H 
-                  ThetaA1 ThetaA2 tau Hscoped H5 H11).
-    
+                  ThetaA1 ThetaA2 tau Hscoped H5 H11) as Hsi.
 
-    
-    Hscoped H10 H13) as Hsi.
-    
+    destruct Hsi as [ThetaA1' Hsi].
+    destruct Hsi as [HsiA HsiB].
 
+
+    eapply LetIn; eauto.
+    { 
+      rewrite find_empty in *; auto.
+      eapply Expr.preservation.
+      { rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp); eauto. }
+      { auto. }
+      { auto. }
+      { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H11). }
+      { eauto. }
+    }
+    {
+      instantiate (1 := ThetaA2).
+      rewrite H0.
+      rewrite addadd2.
+      auto.
+    }
+    {
+      rewrite H0.
+      rewrite find_add; auto.
+    }
+
+    (* Case LetB *)
+  -
+    
 Admitted.
 
     
