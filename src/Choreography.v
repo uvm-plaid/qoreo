@@ -4183,7 +4183,34 @@ Proof.
     }
 
   (* Case LetBangB *)
-  - 
+  - intros HWT Hscoped.
+    
+    inversion HWT; subst.
+
+    rewrite find_empty in *; auto.
+    rewrite H0 in *.
+    
+    assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+    Var.simplify.
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H10) as Hdp.
+
+    destruct (bangty_inversion (Var.Map.empty Expr.typ) DeltaA1 ThetaA1 e0 tau H8)
+      as [HbangA [HbangB HbangC]].
+    rewrite HbangB in *.
+    rewrite HbangC in *.
+
+    pose proof (@Var.Map.Properties.Partition_sym _
+                  (Var.Map.empty Expr.typ) (Var.Map.empty Expr.typ) DeltaA2 H10) as Hpart.
+    pose proof (empty_partition
+                  (Var.Map.empty Expr.typ) DeltaA2 (Var.Map.empty Expr.typ)
+                  empty_map_empty Hpart) as Hep.
+    
+    rewrite empty_to_empty in H9; auto.
+    rewrite <- (lopsided_partition (ChorEnv.find A refs) ThetaA2 H11) in H9.
+    rewrite find_add_env in H9; auto.
+
+    eapply wt_subst_bang; eauto.
+    
 
     
 Admitted.
