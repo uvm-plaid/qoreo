@@ -3701,7 +3701,6 @@ Lemma bangty_inversion : forall Gamma Delta Theta e tau,
 Proof.
   intros. 
   inversion H; subst.
-
   split; auto.
   split.
   Var.simplify.
@@ -3716,7 +3715,6 @@ Proof.
   intros.
   eapply Expr.WTQRef; eauto.
 Qed.
-
 
 Lemma fresh_empty : forall T,
   Var.fresh (Var.Map.empty T) = 0.
@@ -4210,9 +4208,51 @@ Proof.
     rewrite find_add_env in H9; auto.
 
     eapply wt_subst_bang; eauto.
-    
 
+  (* Case LetPairC *)
+  - intros HWT Hscoped.
     
+    inversion HWT; subst.
+    
+    unfold  WellScoped in Hscoped.
+    specialize (Hscoped A).
+
+    rewrite find_empty in *; auto.
+    
+    assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+    Var.simplify.
+    
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H11) as Hdp.
+    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in *.    
+
+    pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg e' TA' cfg' H 
+                  ThetaA1 ThetaA2 (Expr.Tensor tau1 tau2) Hscoped H6 H12) as Hsi.
+
+    destruct Hsi as [ThetaA1' Hsi].
+    destruct Hsi as [HsiA HsiB].
+
+    eapply LetPair; auto.
+    {
+      rewrite find_empty; auto.
+      eapply Expr.preservation.
+      { eauto. }
+      { auto. }
+      { auto. }
+      { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H12). }
+      { eauto. }
+    }
+    {
+      rewrite H0.
+      rewrite addadd2.
+      eauto.
+    }
+    { rewrite find_empty; auto. }
+    { 
+      rewrite H0.
+      rewrite find_add; auto.
+    }
+    { auto. }
+    { auto. }
 Admitted.
 
     
