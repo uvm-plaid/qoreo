@@ -4111,8 +4111,34 @@ Proof.
     }
 
     (* Case LetB *)
-  -
+  - intros HWT Hscoped.
     
+    inversion HWT; subst.
+
+    rewrite find_empty in *; auto.
+    rewrite <- H1 in *.
+    
+    assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+    Var.simplify.
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H11) as Hdp.
+
+    eapply wt_subst_lin; eauto.
+    { rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H6; eauto. }
+    {
+      unfold ChorEnv.add.
+      Var.simplify.
+      auto.
+      rewrite rem_empty in H10; auto.
+    }
+    {
+      rewrite find_empty; auto.
+      Var.simplify.
+    }
+    {
+      rewrite find_empty; auto.
+      Var.simplify.
+    }
+      
 Admitted.
 
     
