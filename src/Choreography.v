@@ -438,6 +438,7 @@ Inductive WellTyped :
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
     ~ Var.Map.In x1 DeltaA2 -> 
     ~ Var.Map.In x2 DeltaA2 ->
+    x1 <> x2 ->
 
     WellTyped G D T ((Insn.LetPair A x1 x2 e)::C)
 .
@@ -1607,7 +1608,7 @@ Proof.
                       (ChorEnv.remove A' y (ChorEnv.remove A' z G))
                       (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                       (Actor.Map.add A' ThetaA2 T) 
-                      H8).
+                      H5).
         
         assert (A = A' \/ A <> A') as HCasesAeqA'.
         tauto.
@@ -1834,7 +1835,7 @@ Proof.
         eapply (IHC (ChorEnv.remove A y (ChorEnv.remove A z G))
                       (Actor.Map.add A  (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D) 
                       (Actor.Map.add A ThetaA2 T)
-                      (ChorEnv.remove A y (ChorEnv.remove A z G0)) H8
+                      (ChorEnv.remove A y (ChorEnv.remove A z G0)) H5
                       (ChorEnv.remove A y (ChorEnv.remove A z G'))).
 
         intros A0.
@@ -1859,6 +1860,7 @@ Proof.
                         A0 A y tau1 Hpdjez).
         }
       }
+      { auto. }
       { auto. }
       { auto. }
       { auto. }
@@ -2271,18 +2273,18 @@ Proof.
               destruct Hrbi as [HrbiA | HrbiB].
               {
                 rewrite remrem.
-                rewrite remrem in H8.
+                rewrite remrem in H5.
                 destruct (beq A A x y) as [HbeqL _].
                 destruct (HbeqL HrbiA) as [_ Heqxy].
                 rewrite <- Heqxy in *.
-                rewrite rmadd1 in H8.
+                rewrite rmadd1 in H5.
                 eauto.
               }
               {
                 destruct (beq A A x z) as [HbeqL _].
                 destruct (HbeqL HrbiB) as [_ Heqxz].
                 rewrite <- Heqxz in *.
-                rewrite rmadd1 in H8.
+                rewrite rmadd1 in H5.
                 eauto.
               }                
             }
@@ -2291,13 +2293,13 @@ Proof.
               rewrite orb_false_iff in Hrbi.
               destruct Hrbi as [HrbiA HrbiB].
 
-              rewrite rmadd2 in H8; auto.
-              rewrite rmadd2 in H8; auto.
+              rewrite rmadd2 in H5; auto.
+              rewrite rmadd2 in H5; auto.
                apply (IHC tau
                         (ChorEnv.remove A y (ChorEnv.remove A z G))
                         (Actor.Map.add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                         (Actor.Map.add A ThetaA2 T) 
-                        A x v H8 HWTV).
+                        A x v H5 HWTV).
             }
           }
 
@@ -2341,13 +2343,13 @@ Proof.
                rewrite orb_false_iff in Hrbi.
                destruct Hrbi as [HrbiA HrbiB].
                {
-                 rewrite rmadd2 in H8; auto.
-                 rewrite rmadd2 in H8; auto.
+                 rewrite rmadd2 in H5; auto.
+                 rewrite rmadd2 in H5; auto.
                  apply (IHC tau
                           (ChorEnv.remove A' y (ChorEnv.remove A' z G))
                           (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                           (Actor.Map.add A' ThetaA2 T)
-                          A x v H8 HWTV).
+                          A x v H5 HWTV).
                }
              }
            }
@@ -2652,7 +2654,7 @@ Proof.
                           (ChorEnv.remove A' y (ChorEnv.remove A' z G))
                           (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                           (Actor.Map.add A' ThetaA2 T)                          
-                          H8).
+                          H5).
 
             pose proof (nin_remove_ce (ChorEnv.remove A' z G) A x A' y
                           (nin_remove_ce G A x A' z HninG)) as HninGzy.
@@ -2696,7 +2698,6 @@ Proof.
       setoid_rewrite Hgoale.
       setoid_rewrite HgoalC.
       auto.
-
 Qed.
 
 Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
@@ -3441,8 +3442,8 @@ Proof.
       {
         rewrite <- HCasesAeqA'L in *.
 
-        rewrite -> (addadd1 A D (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) x tau) in H8.
-        rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H8.
+        rewrite -> (addadd1 A D (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) x tau) in H5.
+        rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H5.
         
         assert (Var.Map.In x DeltaA1 \/ ~ Var.Map.In x DeltaA1) as HESL.
         tauto.
@@ -3479,7 +3480,7 @@ Proof.
                         (ChorEnv.remove A y (ChorEnv.remove A z G))
                         (Actor.Map.add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                         (Actor.Map.add A ThetaA3 T)
-                        H8) as HCSL.
+                        H5) as HCSL.
           rewrite -> (find_add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D) in HCSL.
           destruct Hnin as [HninA HninB].
 
@@ -3512,6 +3513,8 @@ Proof.
               
             + auto.
               
+            + auto.
+
             + auto.
 
             + auto.
@@ -3579,10 +3582,10 @@ Proof.
                 pose proof (nbeqeq A x z HeqB).
                 
                 (* prepare C typing. *)
-                rewrite -> HDA2A in H8.                
-                rewrite -> (addadd6 x tau z tau2 DeltaA2' H0) in H8.
-                rewrite -> (addadd6 x tau y tau1 (Var.Map.add z tau2 DeltaA2') H) in H8.
-                rewrite -> (addadd8 D A x tau (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2'))) in H8.
+                rewrite -> HDA2A in H5.                
+                rewrite -> (addadd6 x tau z tau2 DeltaA2' H0) in H5.
+                rewrite -> (addadd6 x tau y tau1 (Var.Map.add z tau2 DeltaA2') H) in H5.
+                rewrite -> (addadd8 D A x tau (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2'))) in H5.
 
                 specialize (IHC ThetaA1 ThetaA3 tau
                               (ChorEnv.remove A y (ChorEnv.remove A z G))
@@ -3598,7 +3601,7 @@ Proof.
                 pose proof (nin_mapl DeltaA2' x z tau2 H0 HDA2B) as Hninz.
                 pose proof (nin_mapl (Var.Map.add z tau2 DeltaA2') x y tau1 H Hninz) as Hniny.
                 
-                specialize (IHC H8 HPartitionB HninGzy Hniny).
+                specialize (IHC H5 HPartitionB HninGzy Hniny).
                 eauto.
               }
 
@@ -3616,6 +3619,8 @@ Proof.
             + rewrite -> HDA2A in H12.
               pose proof (nin_mapr DeltaA2' z x tau (nin_nxeq DeltaA2' z x tau H12) H12).
               auto.
+
+            + auto.
         }
       }
       (* Case A <> A' *)
@@ -3650,14 +3655,14 @@ Proof.
             { 
               (* prepare C typing *)
               rewrite -> (addadd3 D A x tau A'
-                            (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) HCasesAeqA'R) in H8.
-              rewrite -> (addadd4 T A ThetaA2 A' ThetaA3 HCasesAeqA'R) in H8.
+                            (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) HCasesAeqA'R) in H5.
+              rewrite -> (addadd4 T A ThetaA2 A' ThetaA3 HCasesAeqA'R) in H5.
               
               (* specialize and apply IH *)
               specialize (IHC ThetaA1 ThetaA2 tau (ChorEnv.remove A' y (ChorEnv.remove A' z G))
                             (Actor.Map.add A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) D)
                             (Actor.Map.add A' ThetaA3 T)
-                            A x v Hv H8).
+                            A x v Hv H5).
  
               rewrite -> (find_ab_neq2 A A' ThetaA3 T HCasesAeqA'R) in IHC.
               rewrite -> (find_ab_neq2 A A' (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2))
@@ -3677,6 +3682,8 @@ Proof.
             rewrite -> (find_ab_neq2 A' A ThetaA2 T H) in H10.
             auto.
             
+          + auto.
+
           + auto.
 
           + auto.
@@ -4253,8 +4260,50 @@ Proof.
     }
     { auto. }
     { auto. }
+
+  (* Case LetPairB *)
+  - intros HWT Hscoped.
+    
+    inversion HWT; subst.
+
+    rewrite find_empty in *; auto.
+    rewrite H2 in *.
+    
+    assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+    Var.simplify.
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H13) as Hdp1.
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA2 DeltaA1 Hee
+                  (@Var.Map.Properties.Partition_sym _ (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 H13)) as Hdp2.
+
+    rewrite (Var.Map.Proofs.empty_map_equal DeltaA2 Hdp2) in H9.  
+
+
+    inversion H8; subst.
+    pose proof (empty_partition DeltaA1 Δ1 Δ2 Hdp1 H18) as Hdpd1.
+    pose proof (empty_partition DeltaA1 Δ2 Δ1 Hdp1
+                  (@Var.Map.Properties.Partition_sym _ DeltaA1 Δ1 Δ2 H18)) as Hdpd2.
+    
+    rewrite (Var.Map.Proofs.empty_map_equal Δ1 Hdpd1) in H11.    
+    rewrite (Var.Map.Proofs.empty_map_equal Δ2 Hdpd2) in H12.
+
+    rewrite rem_empty in H9; auto.
+    rewrite rem_empty in H9; auto.
+    rewrite addadd8 in H9.
+    rewrite addadd8 in H9.
+    rewrite empty_to_empty in H9.
+
+    pose proof wt_subst_lin as Hwtslinx2.
+
+    specialize (Hwtslinx2 C Θ1 ThetaA2 tau1
+                  (Actor.Map.empty (Var.Map.t Expr.typ))
+                  (ChorEnv.add A x2 tau2 (Actor.Map.empty (Var.Map.t Expr.typ)))
+                  refs A x1 v1 H11 H9).
+
+    
+    
 Admitted.
 
     
 
 
+Lemma tensor_inversion : 
