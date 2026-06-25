@@ -4138,7 +4138,54 @@ Proof.
       rewrite find_empty; auto.
       Var.simplify.
     }
-      
+
+    (* Case LetBangC *)
+  - intros HWT Hscoped.
+    
+    inversion HWT; subst.
+    
+    unfold  WellScoped in Hscoped.
+    specialize (Hscoped A).
+
+    rewrite find_empty in *; auto.
+    
+    assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+    Var.simplify.
+    
+    pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H10) as Hdp.
+    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in *.    
+
+    pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg e' TA' cfg' H 
+                  ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H8 H11) as Hsi.
+
+    destruct Hsi as [ThetaA1' Hsi].
+    destruct Hsi as [HsiA HsiB].
+
+    eapply LetBang; auto.
+    {
+      rewrite find_empty; auto.
+      eapply Expr.preservation.
+      { eauto. }
+      { auto. }
+      { auto. }
+      { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H11). }
+      { eauto. }
+    }
+    {
+      rewrite H0.
+      rewrite addadd2.
+      eauto.
+    }
+    { rewrite find_empty; auto. }
+    { 
+      rewrite H0.
+      rewrite find_add; auto.
+    }
+
+  (* Case LetBangB *)
+  - 
+
+    
 Admitted.
 
     
