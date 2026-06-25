@@ -769,6 +769,17 @@ Proof.
   Actor.simplify.
 Qed.
 
+Lemma find_add_map : forall A x tau (CE : ChorEnv.t Expr.typ),
+    Var.Map.Equal
+      (ChorEnv.find A (ChorEnv.add A x tau CE))
+      (Var.Map.add x tau (ChorEnv.find A CE)).
+Proof.
+  intros.
+  unfold ChorEnv.find.
+  unfold ChorEnv.add.
+  Actor.simplify.
+Qed.      
+
 Lemma find_add_env : forall {X : Type} A (CE : ChorEnv.t X),
     ChorEnv.Equal (Actor.Map.add A (ChorEnv.find A CE) CE) CE.
 Proof.
@@ -4297,13 +4308,32 @@ Proof.
     specialize (Hwtslinx2 C Θ1 ThetaA2 tau1
                   (Actor.Map.empty (Var.Map.t Expr.typ))
                   (ChorEnv.add A x2 tau2 (Actor.Map.empty (Var.Map.t Expr.typ)))
-                  refs A x1 v1 H11 H9).
+                  (Actor.Map.add A (Var.Map.concat ThetaA2 Θ1) refs)
+                  A x1 v1 H11).
 
+    rewrite addadd2 in Hwtslinx2; auto.
+    rewrite find_add in Hwtslinx2; auto.
+    rewrite find_empty in Hwtslinx2; auto.
+
+    destruct (partitioning
+                (ChorEnv.find A refs) Θ1 ThetaA2 ThetaA1 Θ2
+                (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A refs)
+                   ThetaA1 ThetaA2 H14) H19)
+      as [HPartition [_ [_ _]]].
     
+    assert (~ Var.Map.In x1 (Var.Map.empty Expr.typ)) as Hninempty.
+    Var.simplify.
+ 
+    specialize (Hwtslinx2 H9
+                  (@Var.Map.Properties.Partition_sym _ (Var.Map.concat ThetaA2 Θ1)
+                     ThetaA2 Θ1 HPartition)
+                  Hninempty).
+
+    rewrite find_add_map in Hwtslinx2; auto.
+    rewrite find_empty in Hwtslinx2; auto.
     
+    specialize (Hwtslinx2 (nin_mapl (Var.Map.empty Expr.typ) x1 x2 tau2 H17 Hninempty)).
+    
+
 Admitted.
 
-    
-
-
-Lemma tensor_inversion : 
