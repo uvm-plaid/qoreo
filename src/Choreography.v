@@ -4787,18 +4787,21 @@ Proof.
                                        (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D))) as Hih.
       {
         intros A0 HA0inl.
-        assert (Actor.FSet.In A (Insn.actors (Insn.Let A x e))) as HAinI.
+        assert (Actor.FSet.In A (Insn.actors (Insn.LetPair A x1 x2 e ))) as HAinI.
         unfold Insn.actors.
         Actor.simplify.
         
         pose proof (members_dj A0 A
                       (Label.actors l)
-                      (Insn.actors (Insn.Let A x e))
-                      H12 HA0inl HAinI).
+                      (Insn.actors (Insn.LetPair A x1 x2 e))
+                      H14 HA0inl HAinI).
         
         destruct (Hemptiness A0 HA0inl) as [HempA0G HempA0D].
         split.
-        { rewrite find_ab_neq3; auto. }
+        {
+          rewrite find_ab_neq3; auto.
+          rewrite find_ab_neq3; auto.
+        }
         { rewrite find_ab_neq2; auto. }
       }
 
