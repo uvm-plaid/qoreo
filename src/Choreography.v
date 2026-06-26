@@ -4212,7 +4212,38 @@ Proof.
         rewrite H15.
         rewrite find_add; auto.
       }
+   
+    (* Case SendB *)
+    + rewrite <- H15 in *.
+
+      assert (Actor.FSet.In A (Label.actors (Label.Send A v B))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      assert (Actor.FSet.In B (Label.actors (Label.Send A v B))) as HBinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      destruct (Hemptiness B HBinl) as [HBGempty HBDempty].
       
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H0.
+      destruct (bangty_inversion (Var.Map.empty Expr.typ) DeltaA1 ThetaA1 v tau H0)
+        as [HbangA [HbangB HbangC]].
+      rewrite HbangB in *.
+      rewrite HbangC in *.
+
+      
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in H1.
+      pose proof (@Var.Map.Properties.Partition_sym _
+                    (Var.Map.empty Expr.typ) (Var.Map.empty Expr.typ) DeltaA2 H1) as Hpart.
+      pose proof (empty_partition
+                    (Var.Map.empty Expr.typ) DeltaA2 (Var.Map.empty Expr.typ)
+                    empty_map_empty Hpart) as Hep.
+      eapply wt_subst_bang; eauto.
+      
+      rewrite <- (lopsided_partition (ChorEnv.find A T) ThetaA2 H2) in HWT.
+      rewrite find_add_env in HWT; auto.
+      rewrite empty_to_empty in HWT; auto.
+    
   - admit.
 
   (* Case LetIn *)
