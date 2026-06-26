@@ -4807,22 +4807,22 @@ Proof.
 
       specialize (IHHWT Hih).
       
-      eapply LetIn.
+      eapply LetPair.
       { eauto. }
       {
         assert (WellTyped
-                  (ChorEnv.remove A x G)
-                  (Actor.Map.add A (Var.Map.add x tau DeltaA2) D)
+                  (ChorEnv.remove A x1 (ChorEnv.remove A x2 G))
+                  (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D)
                   (Actor.Map.add A (ChorEnv.find A T0) T2) C').
         rewrite HsiT0C.
         auto.
         eauto.
       }
       { eauto. }
-      { eapply (@Var.Map.Properties.Partition_sym _ (
-                    ChorEnv.find A T2) (ChorEnv.find A T0) ThetaA1 HsiT0B). }
+      { eapply (@Var.Map.Properties.Partition_sym _
+                  (ChorEnv.find A T2) (ChorEnv.find A T0) ThetaA1 HsiT0B). }
       { auto. }
+      { auto. }
+      { auto. }
+Qed.
 
-
-    
-Admitted.
