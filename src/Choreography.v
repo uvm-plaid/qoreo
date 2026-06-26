@@ -3770,12 +3770,6 @@ Proof.
   Var.simplify.
 Qed.
 
-Lemma bangty_inversion2 : forall Gamma Delta Theta e tau,
-    Expr.WellTyped Gamma Delta Theta e (Expr.BANG tau) ->
-    (exists e0, e = (Expr.Bang e0)).
-Proof.
-Admitted.
-
 Lemma qref_ty : forall Gamma Delta Theta q idx,
     Var.Map.Empty Delta ->
     Var.Map.Singleton q idx Theta ->
@@ -4245,29 +4239,37 @@ Proof.
       rewrite empty_to_empty in HWT; auto.
    
     (* Case Delay/Send *)
-    + destruct (bangty_inversion2 (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H0) as [e0 Hbang2].
-      rewrite Hbang2 in H0.
-      
-      destruct (bangty_inversion (ChorEnv.find A G) DeltaA1 ThetaA1 e0 tau H0)
-        as [HbangA [HbangB HbangC]].
-      
-      rewrite HbangC in H2. 
-      pose proof (lopsided_partition (ChorEnv.find A T) ThetaA2 H2) as Hlp.      
-      rewrite <- Hlp in HWT.
-      rewrite find_add_env in HWT. 
-      
-      specialize (IHHWT cfg1 l C' T2 cfg2).
-
-      assert (step C (Actor.Map.add A ThetaA2 T) cfg1 l C' T2 cfg2) as HstA2.
+    + assert (Var.Map.Partition (ChorEnv.find A T)
+                (ChorEnv.find A (Actor.Map.add A ThetaA2 T)) ThetaA1) as Hsipart.
       {
-        rewrite <- Hlp.
+        rewrite find_add; auto.
+        apply @Var.Map.Properties.Partition_sym; auto.
+      }
+                        
+      assert (ChorEnv.Equal
+                (Actor.Map.add A (ChorEnv.find A T) (Actor.Map.add A ThetaA2 T)) T) as Hsieq.
+      {
+        rewrite addadd2; auto.
         rewrite find_add_env; auto.
+        ChorEnv.simplify.
       }
       
+      pose proof (step_inversion
+                    C T cfg1 l C' T2 cfg2 H5 Hscoped
+                    (ChorEnv.add B y tau G)
+                    (Actor.Map.add A DeltaA2 D)
+                    (Actor.Map.add A ThetaA2 T)
+                    A ThetaA1 HWT Hsipart Hsieq) as Hsi.
+      
+      destruct Hsi as [Theta0 Hsi].
+      destruct Hsi as [HsiA [HsiB HsiC]].
+      
+      specialize (IHHWT cfg1 l C' Theta0 cfg2 HsiA).
+      
       pose proof (ws_partition_env
-                    A T ThetaA2 (Var.Map.empty nat) cfg1 Hscoped
+                    A T ThetaA2 ThetaA1 cfg1 Hscoped
                     (@Var.Map.Properties.Partition_sym _
-                       (ChorEnv.find A T) (Var.Map.empty nat) ThetaA2 H2)) as Hwspe.
+                       (ChorEnv.find A T) ThetaA1 ThetaA2 H2)) as Hwspe.
       
       assert (forall A0 : Actor.FSet.elt,
                  Actor.FSet.In A0 (Label.actors l) ->
@@ -4299,25 +4301,23 @@ Proof.
         { rewrite find_ab_neq2; auto. }
       }
 
-      specialize (IHHWT HstA2 Hwspe Hih).
+      specialize (IHHWT Hwspe Hih).
 
       eapply Send.
       { auto. }
-      { rewrite <- Hbang2 in H0; eauto. }
+      { eauto. }
       {
         assert
           (WellTyped
              (ChorEnv.add B y tau G)
              (Actor.Map.add A DeltaA2 D)
-             (Actor.Map.add A (ChorEnv.find A T2) T2) C') as HwtC.
-        { rewrite find_add_env; auto. }
+             (Actor.Map.add A (ChorEnv.find A Theta0) T2) C') as HwtC.
+        { rewrite HsiC; auto. }
         eauto.
       }
       { auto. }
-      {
-        rewrite HbangC.
-        apply Var.Map.Proofs.partition_empty_l; auto.
-      }
+      { apply (@Var.Map.Properties.Partition_sym _
+                 (ChorEnv.find A T2) (ChorEnv.find A Theta0) ThetaA1 HsiB). }
 
   (* Case LetBang *)
   - intros cfg1 l C2 T2 cfg2 HStep Hscoped Hemptiness.
@@ -4396,7 +4396,7 @@ Proof.
       eapply wt_subst_bang; eauto.
       
     (* Case Delay/LetBang *)
-    + destruct (bangty_inversion2 (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H) as [e0 Hbang2].
+    + (* destruct (bangty_inversion2 (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H) as [e0 Hbang2].
       rewrite Hbang2 in H.
       
       destruct (bangty_inversion (ChorEnv.find A G) DeltaA1 ThetaA1 e0 tau H)
@@ -4405,20 +4405,39 @@ Proof.
       rewrite HbangC in H1.
       pose proof (lopsided_partition (ChorEnv.find A T) ThetaA2 H1) as Hlp.
       rewrite <- Hlp in HWT.
-      rewrite find_add_env in HWT.
+      rewrite find_add_env in HWT.*)
 
-      specialize (IHHWT cfg1 l C' T2 cfg2).
-      
-      assert (step C (Actor.Map.add A ThetaA2 T) cfg1 l C' T2 cfg2) as HstA2.
+      assert (Var.Map.Partition (ChorEnv.find A T)
+                (ChorEnv.find A (Actor.Map.add A ThetaA2 T)) ThetaA1) as Hsipart.
       {
-        rewrite <- Hlp.
-        rewrite find_add_env; auto.
+        rewrite find_add; auto.
+        apply @Var.Map.Properties.Partition_sym; auto.
       }
+                        
+      assert (ChorEnv.Equal
+                (Actor.Map.add A (ChorEnv.find A T) (Actor.Map.add A ThetaA2 T)) T) as Hsieq.
+      {
+        rewrite addadd2; auto.
+        rewrite find_add_env; auto.
+        ChorEnv.simplify.
+      }
+            
+      pose proof (step_inversion
+                    C T cfg1 l C' T2 cfg2 H4 Hscoped
+                    (ChorEnv.add A x tau G)
+                    (Actor.Map.add A DeltaA2 D)
+                    (Actor.Map.add A ThetaA2 T)
+                    A ThetaA1 HWT Hsipart Hsieq) as Hsi.
       
+      destruct Hsi as [Theta0 Hsi].
+      destruct Hsi as [HsiA [HsiB HsiC]].
+
+      specialize (IHHWT cfg1 l C' Theta0 cfg2 HsiA).
+
       pose proof (ws_partition_env
-                    A T ThetaA2 (Var.Map.empty nat) cfg1 Hscoped
+                    A T ThetaA2 ThetaA1 cfg1 Hscoped
                     (@Var.Map.Properties.Partition_sym _
-                       (ChorEnv.find A T) (Var.Map.empty nat) ThetaA2 H1)) as Hwspe.
+                       (ChorEnv.find A T) ThetaA1 ThetaA2 H1)) as Hwspe.
       
       assert (forall A0 : Actor.FSet.elt,
                  Actor.FSet.In A0 (Label.actors l) ->
@@ -4442,23 +4461,23 @@ Proof.
         { rewrite find_ab_neq2; auto. }
       }
 
-      specialize (IHHWT HstA2 Hwspe Hih).
+      specialize (IHHWT Hwspe Hih).
 
       eapply LetBang.
-      { rewrite <- Hbang2 in H; eauto. }
+      { eauto. }
       {
         assert
           (WellTyped
              (ChorEnv.add A x tau G)
              (Actor.Map.add A DeltaA2 D)
-             (Actor.Map.add A (ChorEnv.find A T2) T2) C') as HwtC.
-        { rewrite find_add_env; auto. }
+             (Actor.Map.add A (ChorEnv.find A Theta0) T2) C') as HwtC.
+        { rewrite HsiC; auto. }
         eauto.
       }
       { auto. }
       {
-        rewrite HbangC.
-        apply Var.Map.Proofs.partition_empty_l; auto.
+        apply (@Var.Map.Properties.Partition_sym _
+                 (ChorEnv.find A T2) (ChorEnv.find A Theta0) ThetaA1 HsiB).
       }
       
   (* Case LetIn *)
@@ -4826,3 +4845,30 @@ Proof.
       { auto. }
 Qed.
 
+Theorem progress : forall G D T1 C1,
+    WellTyped G D T1 C1 ->
+    forall cfg1,
+      WellScoped T1 cfg1 ->
+      Actor.Map.Empty G ->
+      Actor.Map.Empty D ->
+      C1 = [] \/ exists l C2 T2 cfg2, step C1 T1 cfg1 l C2 T2 cfg2.
+Proof.
+  intros G D T1 C1 HWT.
+  induction HWT; intros cfg1 Hscoped HGempty HDempty.
+
+  (* Case Nil *)
+  - auto.
+
+  (* Case EPR *)
+  - right.
+    eexists. eexists. eexists. eexists.
+
+    eapply EPRB.
+    admit.
+    admit.
+    admit.
+
+  - right.
+    eexists. eexists. eexists. eexists.
+
+    eapply SendC.
