@@ -3935,11 +3935,95 @@ Proof.
     apply nilnostep in HStep.
     contradiction.
 
+  (* Case EPR *)
   - intros cfg1 l C2 T2 cfg2 HStep Hscoped Hemptiness.
 
-    (* inversion HStep; subst. *)
+    inversion HStep; subst.
 
-    admit.
+    (* Case EPRB *) 
+    + assert (Actor.FSet.In A (Label.actors (Label.EPR A B))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      assert (Actor.FSet.In B (Label.actors (Label.EPR A B))) as HBinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      destruct (Hemptiness B HBinl) as [HBGempty HBDempty].
+      
+      destruct (epr_inversion A B T cfg1 q1 q2 T0 cfg2 H H13) as [HeprA HeprB].
+      destruct HeprA as [idx1 [idx2]].
+      destruct H2 as [HeprAA HeprAB].
+      
+      pose proof (qref_ty
+                    (Var.Map.empty _)
+                    (Var.Map.empty _)
+                    (Var.Map.add q1 idx1 (Var.Map.empty _))
+                    q1 idx1 empty_map_empty
+                    (Var.Map.Proofs.singleton_singleton nat q1 idx1)) as Hq1ty.
+      
+    pose proof (qref_ty
+                  (Var.Map.empty _)
+                  (Var.Map.empty _)
+                  (Var.Map.add q2 idx2 (Var.Map.empty _))
+                  q2 idx2 empty_map_empty
+                  (Var.Map.Proofs.singleton_singleton nat q2 idx2)) as Hq2ty.
+
+    rewrite rem_empty2 in HWT; auto.
+    rewrite rem_empty2 in HWT; auto.
+    rewrite HeprB in HWT.
+
+    pose proof (wt_subst_lin
+                  C
+                  (Var.Map.add q2 idx2 (Var.Map.empty nat))
+                  (ChorEnv.find B T)
+                  Expr.QUBIT
+                  G
+                  (ChorEnv.add A x Expr.QUBIT D)
+                  (Actor.Map.add A (ChorEnv.find A T) T0)
+                  B y
+                  (Expr.QRef q2)
+                  Hq2ty HWT) as HwtCAx.
+
+    rewrite find_ab_neq1 in HwtCAx; auto.
+    rewrite find_ab_neq2 in HwtCAx; auto.
+
+    assert (~ Var.Map.In x (ChorEnv.find A G)) as HxninG.
+    rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
+    Var.simplify.
+    assert (~ Var.Map.In y (ChorEnv.find B G)) as HyninG.
+    rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find B G) HBGempty).
+    Var.simplify.
+                
+    specialize (HwtCAx
+                  (@Var.Map.Properties.Partition_sym _
+                     (ChorEnv.find B T0)
+                     (ChorEnv.find B T)
+                     (Var.Map.add q2 idx2 (Var.Map.empty nat))
+                     HeprAB)
+                  HyninG H1).
+
+    pose proof (wt_subst_lin
+                  (Choreography.subst B y (Expr.QRef q2) C)
+                  (Var.Map.add q1 idx1 (Var.Map.empty nat))
+                  (ChorEnv.find A T)
+                  Expr.QUBIT
+                  G
+                  D
+                  T0
+                  A x
+                  (Expr.QRef q1)
+                  Hq1ty HwtCAx) as HwtCBy.
+
+    rewrite H14.
+    apply (HwtCBy
+             (@Var.Map.Properties.Partition_sym _
+                (ChorEnv.find A T0)
+                (ChorEnv.find A T)
+                (Var.Map.add q1 idx1 (Var.Map.empty nat))
+                HeprAA)
+             HxninG H0).
+
+    rewrite find_ab_neq3; auto.
 
   - admit.
 
