@@ -4750,8 +4750,8 @@ Proof.
       { auto. }
       { rewrite rem_empty2; auto. }
 
-  (* Case Delay/LetPair *)
-  -
+    (* Case Delay/LetPair *)
+    + 
 
     
 Admitted.
