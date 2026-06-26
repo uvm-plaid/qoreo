@@ -4243,6 +4243,81 @@ Proof.
       rewrite <- (lopsided_partition (ChorEnv.find A T) ThetaA2 H2) in HWT.
       rewrite find_add_env in HWT; auto.
       rewrite empty_to_empty in HWT; auto.
+   
+    (* Case Delay/Send *)
+    + destruct (bangty_inversion2 (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H0) as [e0 Hbang2].
+      rewrite Hbang2 in H0.
+      
+      destruct (bangty_inversion (ChorEnv.find A G) DeltaA1 ThetaA1 e0 tau H0)
+        as [HbangA [HbangB HbangC]].
+      
+      rewrite HbangC in H2. 
+      pose proof (lopsided_partition (ChorEnv.find A T) ThetaA2 H2) as Hlp.      
+      rewrite <- Hlp in HWT.
+      rewrite find_add_env in HWT. 
+      
+      specialize (IHHWT cfg1 l C' T2 cfg2).
+
+      assert (step C (Actor.Map.add A ThetaA2 T) cfg1 l C' T2 cfg2) as HstA2.
+      {
+        rewrite <- Hlp.
+        rewrite find_add_env; auto.
+      }
+      
+      pose proof (ws_partition_env
+                    A T ThetaA2 (Var.Map.empty nat) cfg1 Hscoped
+                    (@Var.Map.Properties.Partition_sym _
+                       (ChorEnv.find A T) (Var.Map.empty nat) ThetaA2 H2)) as Hwspe.
+      
+      assert (forall A0 : Actor.FSet.elt,
+                 Actor.FSet.In A0 (Label.actors l) ->
+                 Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (ChorEnv.add B y tau G)) /\
+                   Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (Actor.Map.add A DeltaA2 D))) as Hih.
+      {
+        intros A0 HA0inl.
+
+        assert (Actor.FSet.In A (Insn.actors (Insn.Send A e B y))) as HAinI.
+        unfold Insn.actors.
+        Actor.simplify.
+        assert (Actor.FSet.In B (Insn.actors (Insn.Send A e B y))) as HBinI.
+        unfold Insn.actors.
+        Actor.simplify.
+        
+        pose proof (members_dj A0 A
+                      (Label.actors l)
+                      (Insn.actors (Insn.Send A e B y))
+                      H12 HA0inl HAinI).
+        
+        pose proof (members_dj A0 B
+                      (Label.actors l)
+                      (Insn.actors (Insn.Send A e B y))
+                      H12 HA0inl HBinI).
+        
+        destruct (Hemptiness A0 HA0inl) as [HempA0G HempA0D].
+        split.
+        { rewrite find_ab_neq1; auto. }
+        { rewrite find_ab_neq2; auto. }
+      }
+
+      specialize (IHHWT HstA2 Hwspe Hih).
+
+      eapply Send.
+      { auto. }
+      { rewrite <- Hbang2 in H0; eauto. }
+      {
+        assert
+          (WellTyped
+             (ChorEnv.add B y tau G)
+             (Actor.Map.add A DeltaA2 D)
+             (Actor.Map.add A (ChorEnv.find A T2) T2) C') as HwtC.
+        { rewrite find_add_env; auto. }
+        eauto.
+      }
+      { auto. }
+      {
+        rewrite HbangC.
+        apply Var.Map.Proofs.partition_empty_l; auto.
+      }
     
   - admit.
 
