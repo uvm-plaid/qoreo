@@ -4401,20 +4401,21 @@ Admitted.
     (forall A, Actor.FSet.In A (Label.actors l) ->
        Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->        
  *)
-Theorem preservation : forall C1 T1 cfg1 l C2 T2 cfg2 G D,
+Theorem preservation : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
-    WellTyped G D T1 C1 ->
-    WellScoped T1 cfg1 ->
-    (forall A, Actor.FSet.In A (Label.actors l) ->
-               Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
-    WellTyped G D T2 C2.
+    (forall G D,
+        WellTyped G D T1 C1 ->
+        WellScoped T1 cfg1 ->
+        (forall A, Actor.FSet.In A (Label.actors l) ->
+                   Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
+        WellTyped G D T2 C2).
 Proof.
-  intros C1 T1 cfg1 l C2 T2 cfg2 G D Hstep.
+  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
 
   induction Hstep.
 
   (* Case SendC *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
 
     inversion HWT; subst.
     
@@ -4468,7 +4469,7 @@ Proof.
     }
 
   (* Case SendB *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
     rewrite <- H0 in *.
@@ -4504,7 +4505,7 @@ Proof.
     rewrite empty_to_empty in H11; auto.
 
   (* Case EPRB *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
     rewrite H0.
@@ -4593,7 +4594,7 @@ Proof.
     rewrite find_ab_neq3; auto.
 
   (* Case EPRB' *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
     rewrite H0.
@@ -4685,7 +4686,7 @@ Proof.
     rewrite find_ab_neq3; auto.
 
   (* Case LetC *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
 
@@ -4732,7 +4733,7 @@ Proof.
     }
 
   (* Case LetB *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
 
@@ -4769,7 +4770,7 @@ Proof.
     }
 
   (* Case LetBangC *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
     
@@ -4815,7 +4816,7 @@ Proof.
     }
 
   (* Case LetBangB *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
 
@@ -4848,7 +4849,7 @@ Proof.
     eapply wt_subst_bang; eauto.
 
   (* Case LetPairC *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
     
@@ -4894,7 +4895,7 @@ Proof.
     { auto. }
 
   (* Case LetPairB *)
-  - intros HWT Hscoped Hemptiness.
+  - intros G D HWT Hscoped Hemptiness.
     
     inversion HWT; subst.
 
@@ -4938,7 +4939,6 @@ Proof.
 
     rewrite addadd2 in Hwtslinx2; auto.
     rewrite find_add in Hwtslinx2; auto.
-    (* rewrite find_empty in Hwtslinx2; auto. *)
 
     destruct (partitioning
                 (ChorEnv.find A refs) Θ1 ThetaA2 ThetaA1 Θ2
@@ -4991,8 +4991,11 @@ Proof.
     { rewrite rem_empty2; auto. }
     
   (* Case Delay *)
-  - 
+  - intros G D HWT Hscoped Hemptiness.
+    
+    inversion HWT; subst.
 
+    + 
 
     
 
