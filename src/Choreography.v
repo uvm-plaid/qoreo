@@ -4497,9 +4497,6 @@ Proof.
                   empty_map_empty Hpart) as Hep.
     eapply wt_subst_bang; eauto.
 
-    
-    
-    (* rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find B G) HBGempty) in H11. *)
     rewrite <- (lopsided_partition (ChorEnv.find A refs) ThetaA2 H13) in H11.
     rewrite find_add_env in H11; auto.
     rewrite empty_to_empty in H11; auto.
@@ -4995,8 +4992,22 @@ Proof.
     
     inversion HWT; subst.
 
-    + 
+    + specialize (IHHstep
+                    (ChorEnv.remove B y (ChorEnv.remove A x G))
+                    (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D))
+                    H3 Hscoped).
 
+      assert (forall A0 : Actor.FSet.elt,
+                 Actor.FSet.In A0 (Label.actors l) ->
+                 Var.Map.Empty (ChorEnv.find A0 (ChorEnv.remove B y (ChorEnv.remove A x G))) /\
+                   Var.Map.Empty (ChorEnv.find A0
+                                    (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)))) as Hih.
+      {
+        intros A0 HA0inl.
+        destruct (Hemptiness A0 HA0inl) as [HempA0G HempA0D].
+        split.
+        {
+          
     
 
     
