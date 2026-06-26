@@ -4825,7 +4825,6 @@ Proof.
     destruct (Hemptiness A HAinl) as [HAGempty HADempty].
     
     pose proof (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H10) as Hdp.
-    (* rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H8. *)
     rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H8.
 
     rewrite H0 in *.
@@ -4847,6 +4846,53 @@ Proof.
     rewrite find_add_env in H9; auto.
 
     eapply wt_subst_bang; eauto.
+
+  (* Case LetPairC *)
+  - intros HWT Hscoped Hemptiness.
+    
+    inversion HWT; subst.
+    
+    unfold  WellScoped in Hscoped.
+    specialize (Hscoped A).
+    assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+    unfold Label.actors.
+    Actor.simplify.
+    destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+    
+    pose proof (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H11) as Hdp.
+    rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H6.
+
+    rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in *.    
+
+    pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg e' TA' cfg' H 
+                  ThetaA1 ThetaA2 (Expr.Tensor tau1 tau2) Hscoped H6 H12) as Hsi.
+
+    destruct Hsi as [ThetaA1' Hsi].
+    destruct Hsi as [HsiA HsiB].
+
+    eapply LetPair; auto.
+    {
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); auto.
+      eapply Expr.preservation.
+      { eauto. }
+      { Var.simplify. }
+      { Var.simplify. }
+      { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg Hscoped H12). }
+      { eauto. }
+    }
+    {
+      rewrite H0.
+      rewrite addadd2.
+      eauto.
+    }
+    { auto. }
+    { 
+      rewrite H0.
+      rewrite find_add; auto.
+    }
+    { auto. }
+    { auto. }
+
 
     
 
