@@ -4751,7 +4751,75 @@ Proof.
       { rewrite rem_empty2; auto. }
 
     (* Case Delay/LetPair *)
-    + 
+    + pose proof (step_inversion
+                    C T cfg1 l C' T2 cfg2 H7 Hscoped
+                    (ChorEnv.remove A x1 (ChorEnv.remove A x2 G))
+                    (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D)
+                    (Actor.Map.add A ThetaA2 T) A ThetaA1
+                    HWT) as Hsi.
+
+      rewrite find_add in Hsi; auto.
+      rewrite addadd2 in Hsi; auto.
+      rewrite find_add_env in Hsi; auto.
+
+      assert (Var.Map.Partition (ChorEnv.find A T) ThetaA2 ThetaA1).
+      { apply (@Var.Map.Properties.Partition_sym _
+                 (ChorEnv.find A T) ThetaA1 ThetaA2 H1). }
+      assert (ChorEnv.Equal T T).
+      { ChorEnv.simplify. }
+
+      destruct (Hsi H5 H6) as [T0 HsiT0].
+      destruct HsiT0 as [HsiT0A [HsiT0B HsiT0C]].
+
+      pose proof (ws_partition_env
+                    A T ThetaA2 ThetaA1 cfg1 Hscoped
+                    (@Var.Map.Properties.Partition_sym _
+                       (ChorEnv.find A T) ThetaA1 ThetaA2 H1)) as Hwspe.
+                    
+      specialize (IHHWT cfg1 l C' T0 cfg2 HsiT0A Hwspe).
+
+      assert (forall A0 : Actor.FSet.elt,
+                 Actor.FSet.In A0 (Label.actors l) ->
+                 Var.Map.Empty (ChorEnv.find A0
+                                  (ChorEnv.remove A x1 (ChorEnv.remove A x2 G))) /\
+                   Var.Map.Empty (ChorEnv.find A0
+                                    (Actor.Map.add A
+                                       (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D))) as Hih.
+      {
+        intros A0 HA0inl.
+        assert (Actor.FSet.In A (Insn.actors (Insn.Let A x e))) as HAinI.
+        unfold Insn.actors.
+        Actor.simplify.
+        
+        pose proof (members_dj A0 A
+                      (Label.actors l)
+                      (Insn.actors (Insn.Let A x e))
+                      H12 HA0inl HAinI).
+        
+        destruct (Hemptiness A0 HA0inl) as [HempA0G HempA0D].
+        split.
+        { rewrite find_ab_neq3; auto. }
+        { rewrite find_ab_neq2; auto. }
+      }
+
+      specialize (IHHWT Hih).
+      
+      eapply LetIn.
+      { eauto. }
+      {
+        assert (WellTyped
+                  (ChorEnv.remove A x G)
+                  (Actor.Map.add A (Var.Map.add x tau DeltaA2) D)
+                  (Actor.Map.add A (ChorEnv.find A T0) T2) C').
+        rewrite HsiT0C.
+        auto.
+        eauto.
+      }
+      { eauto. }
+      { eapply (@Var.Map.Properties.Partition_sym _ (
+                    ChorEnv.find A T2) (ChorEnv.find A T0) ThetaA1 HsiT0B). }
+      { auto. }
+
 
     
 Admitted.
