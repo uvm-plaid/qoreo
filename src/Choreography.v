@@ -4396,18 +4396,7 @@ Proof.
       eapply wt_subst_bang; eauto.
       
     (* Case Delay/LetBang *)
-    + (* destruct (bangty_inversion2 (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H) as [e0 Hbang2].
-      rewrite Hbang2 in H.
-      
-      destruct (bangty_inversion (ChorEnv.find A G) DeltaA1 ThetaA1 e0 tau H)
-        as [HbangA [HbangB HbangC]].
-      
-      rewrite HbangC in H1.
-      pose proof (lopsided_partition (ChorEnv.find A T) ThetaA2 H1) as Hlp.
-      rewrite <- Hlp in HWT.
-      rewrite find_add_env in HWT.*)
-
-      assert (Var.Map.Partition (ChorEnv.find A T)
+    + assert (Var.Map.Partition (ChorEnv.find A T)
                 (ChorEnv.find A (Actor.Map.add A ThetaA2 T)) ThetaA1) as Hsipart.
       {
         rewrite find_add; auto.
