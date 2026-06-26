@@ -4318,9 +4318,87 @@ Proof.
         rewrite HbangC.
         apply Var.Map.Proofs.partition_empty_l; auto.
       }
-    
-  - admit.
 
+  (* Case LetBang *)
+  - intros cfg1 l C2 T2 cfg2 HStep Hscoped Hemptiness.
+
+    inversion HStep; subst.
+
+    (* Case LetBangC *)
+    + unfold  WellScoped in Hscoped.
+      specialize (Hscoped A).
+      
+      assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      
+      pose proof (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H0) as Hdp.
+      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H.
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H.
+      
+      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in *.    
+      
+      pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg1 e' TA' cfg2 H12 
+                    ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H H1) as Hsi.
+      
+      destruct Hsi as [ThetaA1' Hsi].
+      destruct Hsi as [HsiA HsiB].
+      
+      eapply LetBang; auto.
+      {
+        rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
+        eapply Expr.preservation.
+        { eauto. }
+        { Var.simplify. }
+        { Var.simplify. }
+        { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
+        { eauto. }
+      }
+      {
+        rewrite H13.
+        rewrite addadd2.
+        eauto.
+      }
+      { auto. }
+      { 
+        rewrite H13.
+        rewrite find_add; auto.
+      }
+      
+    (* Case LetBangB *)
+    + assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      
+      pose proof (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H0) as Hdp.
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H.
+      
+      rewrite H13 in *.
+      
+      destruct (bangty_inversion (Var.Map.empty Expr.typ) DeltaA1 ThetaA1 e0 tau H)
+        as [HbangA [HbangB HbangC]].
+      rewrite HbangB in *.
+      rewrite HbangC in *.
+      
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in H0.
+      pose proof (@Var.Map.Properties.Partition_sym _
+                    (Var.Map.empty Expr.typ) (Var.Map.empty Expr.typ) DeltaA2 H0) as Hpart.
+      pose proof (empty_partition
+                    (Var.Map.empty Expr.typ) DeltaA2 (Var.Map.empty Expr.typ)
+                    empty_map_empty Hpart) as Hep.
+      
+      rewrite empty_to_empty in HWT; auto.
+      rewrite <- (lopsided_partition (ChorEnv.find A T) ThetaA2 H1) in HWT.
+      rewrite find_add_env in HWT; auto.
+      
+      eapply wt_subst_bang; eauto.
+
+      
+    (* Case Delay/LetBang *)
+    + admit.
+      
   (* Case LetIn *)
   - intros cfg1 l C2 T2 cfg2 HStep Hscoped Hemptiness.
 
