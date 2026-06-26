@@ -4986,9 +4986,9 @@ Proof.
                   HPartitionD Hx1ninG).
 
     rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in Hwtslinx1; auto.
-    Var.simplify.
-    auto.
-    rewrite rem_empty2; auto.
+    { Var.simplify. }
+    { auto. }
+    { rewrite rem_empty2; auto. }
     
   (* Case Delay *)
   - 
