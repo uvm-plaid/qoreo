@@ -2316,9 +2316,9 @@ Module Config.
   Definition epr refs (cfg : t) : Var.t * Var.t * Var.Map.t nat * t :=
     match epr_cfg cfg with
     | (idx1, idx2, cfg') =>
-      let x1 := Var.fresh refs in
+      let x1 := (*Var.fresh refs*) idx1 in (* don't want x1 to depend on refs *)
       let refs' := Var.Map.add x1 idx1 refs in
-      let x2 := Var.fresh refs' in
+      let x2 := (*Var.fresh refs'*) idx2 in (* don't want x2 to depend on refs*)
       let refs'' := Var.Map.add x2 idx2 refs' in
       (x1, x2, refs'', cfg')
     end.
@@ -2491,8 +2491,7 @@ Module Config.
     intros refs1 refs2 Hrefs ? cfg ?; subst;
     repeat split; unfold RelationPairs.RelCompFun;
       simpl; auto.
-    * rewrite Hrefs; auto.
-    * rewrite Hrefs. reflexivity.
+    * rewrite Hrefs; auto. reflexivity.
   Qed. 
 
   Global Instance apply_gate_Proper :
@@ -2654,9 +2653,9 @@ Module ChorEnv.
                   : Var.t * Var.t * t nat * Config.t :=
       match Config.epr_cfg cfg with
       | (idx1, idx2, cfg') =>
-        let x1 := Var.fresh (find A refs) in
+        let x1 := (* Var.fresh (find A refs) in*) idx1 in
         let refs' := add A x1 idx1 refs in
-        let x2 := Var.fresh (find B refs') in
+        let x2 := (*Var.fresh (find B refs') in*) idx2 in
         let refs'' := add B x2 idx2 refs' in
 
         (x1, x2, refs'', cfg')
@@ -2972,7 +2971,6 @@ Module ChorEnv.
     intros ? A ? ? B ? T1 T2 HT ? cfg ?; subst.
     unfold ChorEnv.epr.
     split; split; simpl; unfold RelationPairs.RelCompFun; simpl; auto.
-    * rewrite HT. auto.
     * rewrite HT. reflexivity.
   Qed.
 
