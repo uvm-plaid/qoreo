@@ -4947,14 +4947,13 @@ Proof.
         auto.
         Var.simplify.
 
-        pose proof Expr.step_weakening_1 as Hsw.
-
         pose proof (concat_partition ThetaA1' ThetaA2
                       (step_scope (ChorEnv.find A T)
                          ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
                          Hscoped H2 HeprogR)) as Hstepscope.
 
-        specialize (Hsw ThetaA1 ThetaA1' ThetaA2 e
+        pose proof (Expr.step_weakening_1
+                      ThetaA1 ThetaA1' ThetaA2 e
                       (ChorEnv.find A T) cfg1 e'
                       (Var.Map.concat ThetaA1' ThetaA2)
                       cfg2
