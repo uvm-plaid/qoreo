@@ -3945,32 +3945,21 @@ Lemma epr_partition : forall T1 Theta2 A B T cfg q1 q2 T' cfg' D,
   exists T1', ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') /\
               Var.Map.Partition (ChorEnv.find D T') (ChorEnv.find D T1') Theta2 /\
               (forall D0, D0 <> D -> Var.Map.Equal (ChorEnv.find D0 T1') (ChorEnv.find D0 T')).
-Admitted.
-
-Definition Partition_on A (T T1 T2 : ChorEnv.t nat) :=
-  Var.Map.Partition (ChorEnv.find A T) (ChorEnv.find A T1) (ChorEnv.find A T2)
-  /\
-  (forall D, D <> A -> Var.Map.Equal (ChorEnv.find D T) (ChorEnv.find D T1)).
-
-Lemma step_inversion_delay : forall C T cfg l C' T' cfg',
-  step C T cfg l C' T' cfg' ->
-  forall G D T1 I,
-  WellTyped G D T1 (I :: C) ->
-  Actor.FSet.Empty (Actor.FSet.inter (Label.actors l) (Insn.actors I)) ->
-  
-  forall T2 A,
-  ~ Actor.FSet.In A (Label.actors l) ->
-  Partition_on A T T1 T2 ->
-  exists T1',
-    step (I :: C) T1 cfg l (I :: C') T1' cfg'
-    /\
-    Partition_on A T' T1' T2.
 Proof.
-  intros C T cfg l C' T' cfg' Hstep G D T1 I HWT Hdisjoint T2 A Hin Hpart.
-  inversion HWT; subst.
-Admitted.
-
-
+  intros T1 Theta2 A B T cfg q1 q2 T' cfg' D Hepr HA HB Hpart Heq.
+  unfold ChorEnv.epr in Hepr.
+  destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hcfg0.
+  unfold ChorEnv.epr. rewrite Hcfg0.
+  inversion Hepr; subst; clear Hepr.
+  eexists. split; [reflexivity | ].
+  split.
+  + ChorEnv.simplify.
+  + intros D0 ?.
+    ChorEnv.simplify.
+    { rewrite Heq; auto; try reflexivity. }
+    { rewrite Heq; auto; try reflexivity. }
+    { rewrite Heq; auto; try reflexivity. }
+Qed.
 
 Lemma step_inversion' : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
@@ -4084,22 +4073,6 @@ Proof.
     split; intros; rewrite H2; auto.
 
   * (* Delay *)
-    edestruct step_inversion_delay
-      with (T2 := Actor.Map.add D Theta (Actor.Map.empty _))
-      as [T2' [Hstep' Hpart']];
-      eauto.
-    {
-      split.
-      ChorEnv.simplify.
-      intros. rewrite HT1; auto.
-      reflexivity.
-    }
-    exists T2'. split; auto.
-    destruct Hpart'.
-    ChorEnv.simplify.
-    split; auto.
-    intros; symmetry; auto.
-Qed.
 
     (* Cases on the typing judgment of I::C*)
     inversion HWT; subst; clear HWT.
@@ -4133,40 +4106,14 @@ Qed.
         }
 
         eexists. split.
-        { apply Delay. }
+        { apply Delay. admit. admit. }
         split; eauto.
-    }
-    assert (HWT' : exists Gamma' Delta' T1', WellTyped Gamma' Delta' T1' C).
-    admit.
+      admit. admit.
 
     + (* I = Let *) admit.
     + (* I = LetPair *) admit.
     
-
-
-Lemma foo :
-  WellTyped Gamma Delta Theta (I :: C) ->
-  Disjoint (Label.actors l) (Insn.actors I) ->
-  exists Gamma' Delta' Theta',
-    WellTyped Gamma' Delta' Theta' C /\
-    
-
-  
-    (*edestruct (IHHstep HWS _ _ _ _ Theta) as [T2' [IHste [IHpart IHeq]]]. eauto.*)
-    edestruct (IHHstep HWS) as [T2' [IHste [IHpart IHeq]]]. eauto.
-    4:{
-      eexists. split.
-      { apply Delay; eauto. }
-      split; eauto.
-    }
-    assert (HWT' : exists Gamma' Delta' T1', WellTyped Gamma' Delta' T1' C).
-    admit.
-
-    destruct HWT' as [Gamma' [Delta' [T1' HWT']]].
-    
-
-Qed.
-
+Admitted.
 
 Lemma step_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
