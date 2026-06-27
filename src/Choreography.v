@@ -718,8 +718,21 @@ Proof.
   unfold ChorEnv.find.
   Actor.simplify.
   Var.simplify.
-Qed. 
+Qed.
 
+Lemma empty_eq_env  : forall  {X : Type} (CE : ChorEnv.t X),
+    Actor.Map.Empty CE ->
+    ChorEnv.Equal CE (Actor.Map.empty (Var.Map.t X)).
+Proof.
+  intros.
+  unfold ChorEnv.Equal.
+  intros.
+  unfold ChorEnv.find.
+  Actor.simplify.
+  rewrite H.
+  Actor.simplify.
+Qed.
+  
 Lemma empty_map_empty : forall {X : Type}, Var.Map.Empty (Var.Map.empty X).
 Proof.
   intros.
@@ -1420,6 +1433,14 @@ Proof.
   intros A B AS1 AS2 Hinter HA HB Heq; subst.
   apply (Hinter B).
   Actor.simplify.
+Qed.
+
+Lemma concat_partition : forall {X : Type} (M1 M2 : Var.Map.t X),
+    Var.Map.Properties.Disjoint M1 M2 ->
+    Var.Map.Partition (Var.Map.concat M1 M2) M1 M2.
+Proof.
+  intros.
+  Var.simplify.
 Qed.
 
 (* STOP Easily(?) proven facts *)
@@ -5085,6 +5106,25 @@ Proof.
       { auto. }
 Qed.
 
+Lemma bangval_inversion : forall Gamma Delta Theta e tau,
+    Expr.WellTyped Gamma Delta Theta e (Expr.BANG tau) ->
+    Expr.Val e ->
+    exists e0, e = Expr.Bang e0.
+Proof.
+  intros.
+  Expr.simplify_val.
+  exists e0.
+  auto.
+Qed.
+
+Lemma step_scope : forall Theta Theta2 e Theta1 cfg1 e' Theta1' cfg2,
+    Config.WellScoped Theta cfg1 ->
+    Var.Map.Partition Theta Theta1 Theta2 ->
+    Expr.step e Theta1 cfg1 e' Theta1' cfg2 ->
+    Var.Map.Properties.Disjoint Theta1' Theta2.
+Proof.
+Admitted.  
+
 Theorem progress : forall G D T1 C1,
     WellTyped G D T1 C1 ->
     forall cfg1,
@@ -5101,14 +5141,80 @@ Proof.
 
   (* Case EPR *)
   - right.
-    eexists. eexists. eexists. eexists.
-
-    eapply EPRB.
-    admit.
-    admit.
     admit.
 
+  (* Case Send *)
   - right.
-    eexists. eexists. eexists. eexists.
 
-    eapply SendC.
+    (* This disjunction allows destruction into context and beta subcases *)
+    assert (Expr.Val e \/ ~ Expr.Val e) as Hvale.
+    tauto.
+    destruct Hvale as [HvaleL | HvaleR].
+    {
+      pose proof (bangval_inversion (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H0 HvaleL) as Hbang.
+      destruct Hbang as [e0 Hbang].
+      rewrite Hbang in H0.
+      rewrite Hbang.
+
+      exists (Label.Send A e0 B).
+      exists (Choreography.subst B y e0 C).
+      exists T.
+      exists cfg1.
+
+      apply SendB.
+      auto.
+      Var.simplify.
+    }
+    { 
+      unfold WellScoped in Hscoped.
+      specialize (Hscoped A).
+      pose proof (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H2) as Hpart.
+      
+      pose proof
+        (Expr.progress e (Expr.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H0 cfg1 Hpart) as Heprog.
+
+      rewrite (empty_eq_env G HGempty) in Heprog.
+
+      assert (Var.Map.Empty (ChorEnv.find A D)) as HADempty.
+      {
+        rewrite (empty_eq_env D HDempty).
+        apply (empty_is_empty A).
+      }
+     
+      specialize (Heprog (empty_is_empty A)
+                    (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H1)).
+
+      destruct Heprog as [Habsurd | HeprogR].
+      { contradiction. }
+      {
+        destruct HeprogR as [e' [ThetaA1' [cfg2 HeprogR]]].
+
+        exists (Label.Loc A).
+        exists (Insn.Send A e' B y :: C).
+        exists (Actor.Map.add A (Var.Map.concat ThetaA1' ThetaA2) T).
+        exists cfg2.
+
+        eapply SendC.
+        auto.
+        Var.simplify.
+
+        pose proof (concat_partition ThetaA1' ThetaA2
+                      (step_scope (ChorEnv.find A T)
+                         ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
+                         Hscoped H2 HeprogR)) as Hstepscope.
+
+        pose proof (Expr.step_weakening_1
+                      ThetaA1 ThetaA1' ThetaA2 e
+                      (ChorEnv.find A T) cfg1 e'
+                      (Var.Map.concat ThetaA1' ThetaA2)
+                      cfg2
+                      HeprogR H2 Hstepscope).
+        eauto.
+        Var.simplify.
+      }
+    }
+    
+Admitted.
+
+
+
