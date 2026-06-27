@@ -4778,34 +4778,20 @@ Proof.
       
       pose proof (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H0) as Hdp.
       
-      eapply wt_subst_lin.
+      eapply wt_subst_lin with (ThetaA2 := ThetaA2).
       {
         rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H.
         rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H.
         eauto.
       }
       {
+        rewrite <- H15.
         rewrite rem_empty2 in HWT; auto.
         unfold ChorEnv.add.
         Var.simplify.
-
-        rewrite HADempty.
-        rewrite HADempty in HWT.
-
-        assert (HT2 : ChorEnv.Equal (Actor.Map.add A ThetaA2 T) T2).
-        {
-          rewrite <- H15.
-          rewrite Actor.Map.Proofs.add_mapsto; [reflexivity | ].
-          admit.
-        }
-        rewrite <- HT2.
-        (*rewrite <- H15.*)
-
-        auto.
       }
       {
         rewrite <- H15; auto.
-        admit.
       }
       { 
         rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
@@ -5123,7 +5109,21 @@ Lemma step_scope : forall Theta Theta2 e Theta1 cfg1 e' Theta1' cfg2,
     Expr.step e Theta1 cfg1 e' Theta1' cfg2 ->
     Var.Map.Properties.Disjoint Theta1' Theta2.
 Proof.
-Admitted.  
+  intros ? ? ? ? ? ? ? ? HWS Hpart Hstep.
+  dependent induction Hstep;
+    Var.Map.Tactics.reflect_partition; auto;
+    try (apply IHHstep; auto;
+      Var.Map.Tactics.reflect_partition; auto;
+      try reflexivity).
+
+  * inversion H; subst; clear H.
+    Var.simplify.
+    split; auto.
+    intros Hin; eapply Config.wf_qrefs in Hin; eauto.
+    lia.
+  * inversion H0; subst; clear H0.
+    apply Var.Map.Proofs.disjoint_remove_1; auto.
+Qed.
 
 Theorem progress : forall G D T1 C1,
     WellTyped G D T1 C1 ->
