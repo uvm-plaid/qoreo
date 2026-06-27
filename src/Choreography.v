@@ -1422,6 +1422,14 @@ Lemma members_dj : forall A B AS1 AS2,
 Proof.
 Admitted.
 
+Lemma concat_partition : forall {X : Type} (M1 M2 : Var.Map.t X),
+    Var.Map.Properties.Disjoint M1 M2 ->
+    Var.Map.Partition (Var.Map.concat M1 M2) M1 M2.
+Proof.
+  intros.
+  Var.simplify.
+Qed.
+
 (* STOP Easily(?) proven facts *)
 
 Lemma wt_disjoint : forall C A G D T,
@@ -4857,7 +4865,15 @@ Proof.
   exists e0.
   auto.
 Qed.
-  
+
+Lemma step_scope : forall Theta Theta2 e Theta1 cfg1 e' Theta1' cfg2,
+    Config.WellScoped Theta cfg1 ->
+    Var.Map.Partition Theta Theta1 Theta2 ->
+    Expr.step e Theta1 cfg1 e' Theta1' cfg2 ->
+    Var.Map.Properties.Disjoint Theta1' Theta2.
+Proof.
+Admitted.  
+
 Theorem progress : forall G D T1 C1,
     WellTyped G D T1 C1 ->
     forall cfg1,
@@ -4923,7 +4939,7 @@ Proof.
 
         exists (Label.Loc A).
         exists (Insn.Send A e' B y :: C).
-        exists (Actor.Map.add A ThetaA1 T).
+        exists (Actor.Map.add A (Var.Map.concat ThetaA1' ThetaA2) T).
         exists cfg2.
 
         eapply SendC.
@@ -4932,11 +4948,22 @@ Proof.
 
         pose proof Expr.step_weakening_1 as Hsw.
 
+        pose proof (concat_partition ThetaA1' ThetaA2
+                      (step_scope (ChorEnv.find A T)
+                         ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
+                         Hscoped H2 HeprogR)) as Hstepscope.
+
         specialize (Hsw ThetaA1 ThetaA1' ThetaA2 e
                       (ChorEnv.find A T) cfg1 e'
                       (Var.Map.concat ThetaA1' ThetaA2)
                       cfg2
-                      HeprogR H2).
-
+                      HeprogR H2 Hstepscope).
+        eauto.
+        Var.simplify.
+      }
+    }
+    
 Admitted.
+
+
 
