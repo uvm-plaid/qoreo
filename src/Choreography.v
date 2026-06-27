@@ -4894,7 +4894,8 @@ Proof.
 
   (* Case Send *)
   - right.
-    
+
+    (* This disjunction allows destruction into context and beta subcases *)
     assert (Expr.Val e \/ ~ Expr.Val e) as Hvale.
     tauto.
     destruct Hvale as [HvaleL | HvaleR].
