@@ -5103,6 +5103,18 @@ Proof.
   auto.
 Qed.
 
+Lemma tensorval_inversion : forall Gamma Delta Theta e tau1 tau2,
+    Expr.WellTyped Gamma Delta Theta e (Expr.Tensor tau1 tau2) ->
+    Expr.Val e ->
+    exists v1 v2, e = Expr.Pair v1 v2 /\ Expr.Val v1 /\ Expr.Val v2 .
+Proof.
+  intros.
+  Expr.simplify_val.
+  exists e1.
+  exists e2.
+  auto.
+Qed.
+
 Lemma step_scope : forall Theta Theta2 e Theta1 cfg1 e' Theta1' cfg2,
     Config.WellScoped Theta cfg1 ->
     Var.Map.Partition Theta Theta1 Theta2 ->
@@ -5348,6 +5360,76 @@ Proof.
       }
     }
 
+  (* Case LetPair *)
+  - right.
+
+    (* This disjunction allows destruction into context and beta subcases *)
+    assert (Expr.Val e \/ ~ Expr.Val e) as Hvale.
+    tauto.
+    destruct Hvale as [HvaleL | HvaleR].
+    {
+      pose proof (tensorval_inversion
+                    (ChorEnv.find A G) DeltaA1 ThetaA1 e tau1 tau2 H HvaleL) as Htensor.
+      destruct Htensor as [v1 [v2 [HtensorA [HtensorB HtensorC]]]].
+      rewrite HtensorA in H.
+      rewrite HtensorA.
+      
+      exists (Label.Loc A).
+      exists (Choreography.subst A x1 v1 (Choreography.subst A x2 v2 C)).
+      exists T.
+      exists cfg1.
+
+      apply LetPairB; auto.
+      Var.simplify.
+    }
+    { 
+      unfold WellScoped in Hscoped.
+      specialize (Hscoped A).
+      pose proof (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
+      
+      pose proof
+        (Expr.progress
+           e (Expr.Tensor tau1 tau2) (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
+
+      rewrite (empty_eq_env G HGempty) in Heprog.
+
+      assert (Var.Map.Empty (ChorEnv.find A D)) as HADempty.
+      {
+        rewrite (empty_eq_env D HDempty).
+        apply (empty_is_empty A).
+      }
+     
+      specialize (Heprog (empty_is_empty A)
+                    (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H0)).
+
+      destruct Heprog as [Habsurd | HeprogR].
+      { contradiction. }
+      {
+        destruct HeprogR as [e' [ThetaA1' [cfg2 HeprogR]]].
+
+        exists (Label.Loc A).
+        exists (Insn.LetPair A x1 x2 e' :: C).
+        exists (Actor.Map.add A (Var.Map.concat ThetaA1' ThetaA2) T).
+        exists cfg2.
+
+        eapply LetPairC.
+ 
+        pose proof (concat_partition ThetaA1' ThetaA2
+                      (step_scope (ChorEnv.find A T)
+                         ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
+                         Hscoped H1 HeprogR)) as Hstepscope.
+
+        pose proof (Expr.step_weakening_1
+                      ThetaA1 ThetaA1' ThetaA2 e
+                      (ChorEnv.find A T) cfg1 e'
+                      (Var.Map.concat ThetaA1' ThetaA2)
+                      cfg2
+                      HeprogR H1 Hstepscope).
+        eauto.
+        Var.simplify.
+      }
+    }
+    
 Admitted.
 
 
