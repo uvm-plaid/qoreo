@@ -5213,7 +5213,74 @@ Proof.
         Var.simplify.
       }
     }
-    
+
+  - right.
+
+    (* This disjunction allows destruction into context and beta subcases *)
+    assert (Expr.Val e \/ ~ Expr.Val e) as Hvale.
+    tauto.
+    destruct Hvale as [HvaleL | HvaleR].
+    {
+      pose proof (bangval_inversion (ChorEnv.find A G) DeltaA1 ThetaA1 e tau H HvaleL) as Hbang.
+      destruct Hbang as [e0 Hbang].
+      rewrite Hbang in H.
+      rewrite Hbang.
+
+      exists (Label.Loc A).
+      exists (Choreography.subst A x e0 C).
+      exists T.
+      exists cfg1.
+
+      apply LetBangB.
+      auto.
+      Var.simplify.
+    }
+    { 
+      unfold WellScoped in Hscoped.
+      specialize (Hscoped A).
+      pose proof (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
+      
+      pose proof
+        (Expr.progress e (Expr.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
+
+      rewrite (empty_eq_env G HGempty) in Heprog.
+
+      assert (Var.Map.Empty (ChorEnv.find A D)) as HADempty.
+      {
+        rewrite (empty_eq_env D HDempty).
+        apply (empty_is_empty A).
+      }
+     
+      specialize (Heprog (empty_is_empty A)
+                    (empty_partition (ChorEnv.find A D) DeltaA1 DeltaA2 HADempty H0)).
+
+      destruct Heprog as [Habsurd | HeprogR].
+      { contradiction. }
+      {
+        destruct HeprogR as [e' [ThetaA1' [cfg2 HeprogR]]].
+
+        exists (Label.Loc A).
+        exists (Insn.LetBang A x e' :: C).
+        exists (Actor.Map.add A (Var.Map.concat ThetaA1' ThetaA2) T).
+        exists cfg2.
+
+        eapply LetBangC.
+ 
+        pose proof (concat_partition ThetaA1' ThetaA2
+                      (step_scope (ChorEnv.find A T)
+                         ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
+                         Hscoped H1 HeprogR)) as Hstepscope.
+
+        pose proof (Expr.step_weakening_1
+                      ThetaA1 ThetaA1' ThetaA2 e
+                      (ChorEnv.find A T) cfg1 e'
+                      (Var.Map.concat ThetaA1' ThetaA2)
+                      cfg2
+                      HeprogR H1 Hstepscope).
+        eauto.
+        Var.simplify.
+      }
+    }
 Admitted.
 
 
