@@ -3972,7 +3972,8 @@ Proof.
   destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hcfg0.
   unfold ChorEnv.epr. rewrite Hcfg0.
   inversion Hepr; subst; clear Hepr.
-  eexists. split; [reflexivity | ].
+  eexists.
+  split; [reflexivity | ].
   split.
   + ChorEnv.simplify.
   + intros D0 ?.
@@ -3982,22 +3983,36 @@ Proof.
     { rewrite Heq; auto; try reflexivity. }
 Qed.
 
+(* Defined this helper function Partition_on to mean that find A T == find A T1 ++ ThetaA2 
+  and for all other B <> A, find B T = find B T1
+*)
+Definition Partition_on {X} A (T T1 : ChorEnv.t X) ThetaA2 :=
+  Var.Map.Partition (ChorEnv.find A T) (ChorEnv.find A T1) ThetaA2 
+  /\
+  forall B, A <> B -> Var.Map.Equal (ChorEnv.find B T1) (ChorEnv.find B T).
+
+
+Lemma step_weakening : forall T1 T1' ThetaA2 T T' A C cfg l C' cfg',
+  step C T1 cfg l C' T1' cfg' ->
+  Partition_on A T T1 ThetaA2 ->
+  Partition_on A T' T1' ThetaA2 ->
+  step C T cfg l C' T' cfg'.
+Admitted.
+
 Lemma step_inversion' : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
     WellScoped T1 cfg1 ->
-    forall G D T1' A Theta,
-      ~ Actor.FSet.In A (Label.actors l) ->
+    forall G D T1' A0 Theta,
+      ~ Actor.FSet.In A0 (Label.actors l) ->
       WellTyped G D T1' C1 ->
-      Var.Map.Partition (ChorEnv.find A T1) (ChorEnv.find A T1') Theta ->
-      (forall B, A <> B -> Var.Map.Equal (ChorEnv.find B T1') (ChorEnv.find B T1)) ->
+      Partition_on A0 T1 T1' Theta ->
       exists T2',
         step C1 T1' cfg1 l C2 T2' cfg2 /\
-          Var.Map.Partition (ChorEnv.find A T2) (ChorEnv.find A T2') Theta /\
-          (forall B, A <> B -> Var.Map.Equal (ChorEnv.find B T2') (ChorEnv.find B T2)).
+          Partition_on A0 T2 T2' Theta.
 
 Proof.
   intros C T cfg l C' T' cfg' Hstep.
-  induction Hstep; intros HWS Gamma Delta T1 D Theta Hnin HWT Hpart HT1;
+  induction Hstep; intros HWS Gamma Delta T1 A0 Theta Hnin HWT [Hpart HT1];
     simpl in Hnin; Actor.simplify. 
   * (* SendC *)
     setoid_replace (ChorEnv.find A T) with (ChorEnv.find A T1) in H.
@@ -4023,7 +4038,7 @@ Proof.
     { econstructor; eauto. reflexivity. }
     split.
     { rewrite <- H0. auto. }
-    intros A0 HA0.
+    intros B0 HB0.
     rewrite <- H0.
     apply HT1; auto.
 
@@ -4037,7 +4052,10 @@ Proof.
     }
     split; auto.
     { rewrite H0; auto. }
-    { intros. rewrite H0; auto. }
+    {
+      intros.
+      rewrite H0; auto.
+    }
 
   * (* epr' *) 
     eapply epr_partition in H; eauto.
@@ -4088,7 +4106,6 @@ Proof.
     split; intros; rewrite H0; ChorEnv.simplify.
 
   * (*LetPairB*)
-    
     eexists. split.
     { econstructor; eauto. reflexivity. }
     split; intros; rewrite H2; auto.
@@ -4104,32 +4121,8 @@ Proof.
       assert (~ Actor.FSet.In A (Label.actors l)).
       { intros Hin. apply (H A). simpl. Actor.simplify. }
 
-      (* G,A.x; Delta,A|->DeltaA2;T1,A|->ThetaA2 |- C *)
-      (* We know that T[A] == ThetaA2 ++ ?? *)
-      (* ThetaA == ThetaA1 ++ ThetaA2 *)
-
-      Actor.Map.Tactics.compare A D.
-      (* if A = D then *)
-      - (* A = D *)
-        admit.
-      - (* A <> D *)
-        edestruct (IHHstep HWS) with (Theta := ThetaA1)
-          as [T2' [IHste [IHpart IHeq]]]; eauto.
-        {
-          autorewrite with var_db.
-          Actor.simplify.
-          apply Var.Map.Properties.Partition_sym; auto.
-          rewrite <- HT1; auto.
-        }
-        { intros.
-          ChorEnv.simplify.
-          admit.
-        }
-
-        eexists. split.
-        { apply Delay. admit. admit. }
-        split; eauto.
-      admit. admit.
+      (* Step weakening lemma here... *)
+      admit.
 
     + (* I = Let *) admit.
     + (* I = LetPair *) admit.
@@ -4151,14 +4144,14 @@ Lemma step_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
 Proof.
   intros ? ? ? ? ? ? ? Hstep HWS G D T1' A Theta Hnin HWT Hpart Heq.
   eapply step_inversion' in Hstep; eauto.
-  2:{ intros. rewrite <- Heq. ChorEnv.simplify. }
+  2:{ split; eauto. intros. rewrite <- Heq. ChorEnv.simplify. }
   destruct Hstep as [T2' [Hstep [Hpart' Heq']]].
   exists T2'. split; auto.
   split; auto.
   { intros B. ChorEnv.simplify.
     symmetry. apply Heq'; auto.
   }
-Qed. 
+Qed.
 
 Theorem preservation : forall G D T1 C1,
     WellTyped G D T1 C1 ->
@@ -4433,7 +4426,7 @@ Proof.
       eapply Send.
       { auto. }
       { 
-        eapply Expr.preservation.
+        eapply Expr.WellTyped_preservation.
         { rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); eauto. }
         { rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); Var.simplify. }
         { Var.simplify. }
@@ -4600,8 +4593,6 @@ Proof.
         rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
         eapply Expr.preservation.
         { eauto. }
-        { Var.simplify. }
-        { Var.simplify. }
         { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
         { eauto. }
       }
@@ -4748,7 +4739,7 @@ Proof.
 
       eapply LetIn; eauto.
       { 
-        eapply Expr.preservation.
+        eapply Expr.WellTyped_preservation.
         {
           rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp).
           rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
@@ -4903,8 +4894,6 @@ Proof.
         rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); auto.
         eapply Expr.preservation.
         { eauto. }
-        { Var.simplify. }
-        { Var.simplify. }
         { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
         { eauto. }
       }
