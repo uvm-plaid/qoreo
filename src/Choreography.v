@@ -5137,6 +5137,14 @@ Proof.
     apply Var.Map.Proofs.disjoint_remove_1; auto.
 Qed.
 
+Lemma epr_exists : forall A B T cfg,
+  exists q1 q2 T0 cfg',  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg').
+Proof.
+  intros.
+  eexists. eexists. eexists. eexists.
+  Var.simplify.
+Qed.
+       
 Theorem progress : forall G D T1 C1,
     WellTyped G D T1 C1 ->
     forall cfg1,
@@ -5153,6 +5161,18 @@ Proof.
 
   (* Case EPR *)
   - right.
+
+    destruct (epr_exists A B T cfg1) as [q1 [q2 [T0 [cfg2 Hepr]]]].
+
+    exists (Label.EPR A B).
+    exists (Choreography.subst A x (Expr.QRef q2)
+              (Choreography.subst B y (Expr.QRef q2) C)).
+    exists T0. 
+    exists cfg2.
+
+    apply EPRB.
+
+    
     admit.
 
   (* Case Send *)
