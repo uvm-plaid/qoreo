@@ -5165,15 +5165,15 @@ Proof.
     destruct (epr_exists A B T cfg1) as [q1 [q2 [T0 [cfg2 Hepr]]]].
 
     exists (Label.EPR A B).
-    exists (Choreography.subst A x (Expr.QRef q2)
+    exists (Choreography.subst A x (Expr.QRef q1)
               (Choreography.subst B y (Expr.QRef q2) C)).
-    exists T0. 
+    eexists T0. 
     exists cfg2.
 
-    apply EPRB.
-
-    
-    admit.
+    eapply EPRB.
+    eauto.
+    Var.simplify.
+    eauto.
 
   (* Case Send *)
   - right.
@@ -5449,8 +5449,7 @@ Proof.
         Var.simplify.
       }
     }
-    
-Admitted.
 
+Qed.
 
 
