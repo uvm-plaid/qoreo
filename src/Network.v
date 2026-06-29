@@ -372,19 +372,6 @@ Proof.
 Qed.
 
 
-Inductive WFInsn : Choreography.Insn.t -> Prop :=
-| WFSend : forall A v B x,
-  A <> B -> WFInsn (Choreography.Insn.Send A v B x)
-| WFEPR : forall A x B y,
-  A <> B -> WFInsn (Choreography.Insn.EPR A x B y)
-| WFLet : forall A x e, WFInsn (Choreography.Insn.Let A x e)
-| WFLetBang : forall A x e, WFInsn (Choreography.Insn.LetBang A x e)
-| WFLetPair : forall A x1 x2 e, WFInsn (Choreography.Insn.LetPair A x1 x2 e)
-.
-Inductive WFChoreography : Choreography.t -> Prop :=
-| WFNil : WFChoreography []
-| WFCons : forall I C,
-  WFInsn I -> WFChoreography C -> WFChoreography (I :: C).
 
 (*
 Lemma add_ok_inversion : forall A ls,
@@ -406,9 +393,8 @@ Qed.
 *)
 
 
-
 Lemma EPP_cons : forall A I C PA,
-  WFInsn I ->
+  Choreography.WFInsn I ->
   EPP A (I :: C) PA <->
   exists PA', PA = eppI A I ++ PA' /\ EPP A C PA'.
 Proof.
@@ -1285,7 +1271,7 @@ Lemma completeness_local : forall PA (refs : Var.Map.t nat) cfg PA' refs' cfg',
   Process.step PA refs cfg PA' refs' cfg' -> 
   forall A N C (Θ : ChorEnv.t nat) Θ',
   EPP_N C N ->
-  WFChoreography C ->
+  Choreography.WFChoreography C ->
   Actor.Map.MapsTo A PA N ->
   (*Actor.Map.MapsTo A refs Θ ->*)
   Var.Map.Equal refs (ChorEnv.find A Θ) ->
@@ -1536,7 +1522,7 @@ Qed.
 
 
 Lemma completeness_send : forall C N refs cfg A v B N' refs' cfg',
-  WFChoreography C ->
+  Choreography.WFChoreography C ->
   Network.step N refs cfg (Label.Send A v B) N' refs' cfg' ->
   EPP_N C N ->
   exists C',
@@ -1805,7 +1791,7 @@ Qed.
 Lemma completeness_epr : forall C N refs cfg A B N' refs' cfg',
   Network.step N refs cfg (Label.EPR A B) N' refs' cfg' ->
   EPP_N C N ->
-  WFChoreography C ->
+  Choreography.WFChoreography C ->
   exists C',
     Choreography.step C refs cfg (Label.EPR A B) C' refs' cfg'  /\
     EPP_N C' N'.
@@ -1971,7 +1957,7 @@ Theorem completeness : forall N refs cfg l N' refs' cfg',
 
     Network.step N refs cfg l N' refs' cfg' ->
 
-    forall C, WFChoreography C ->
+    forall C, Choreography.WFChoreography C ->
     EPP_N C N ->
     exists C', EPP_N C' N' /\
                 Choreography.step C refs cfg l C' refs' cfg'.
@@ -2283,7 +2269,7 @@ Ltac reflect_EPP_N_goal :=
 Lemma soundness_local : forall PA C refs cfg A C' refs' cfg' N,
   Choreography.step C refs cfg (Choreography.Label.Loc A) C' refs' cfg' ->
   EPP_N C N ->
-  WFChoreography C ->
+  Choreography.WFChoreography C ->
   Actor.Map.MapsTo A PA N ->
   exists PA' refsA', Process.step PA (ChorEnv.find A refs) cfg PA' refsA' cfg'
            /\ EPP_N C' (Actor.Map.add A PA' N)
@@ -2488,7 +2474,7 @@ Lemma soundness_send : forall C refs cfg A v B C' refs' cfg',
   (* by induction on step relation *)
   Choreography.step C refs cfg (Choreography.Label.Send A v B) C' refs' cfg' ->
   A <> B ->
-  WFChoreography C ->
+  Choreography.WFChoreography C ->
   forall N,
   EPP_N C N ->
   Actor.Map.In A N ->
@@ -2594,7 +2580,7 @@ Qed.
 Lemma soundness_epr : forall C refs cfg A B C' refs' cfg',
   Choreography.step C refs cfg (Choreography.Label.EPR A B) C' refs' cfg' ->
   A <> B ->
-  WFChoreography C ->
+  Choreography.WFChoreography C ->
   forall N,
   EPP_N C N ->
   Actor.Map.In A N ->
@@ -2757,7 +2743,7 @@ Inductive WFLabel : Label.t -> Prop :=
 
 Theorem soundness : forall C C' refs cfg refs' cfg' l,
     Choreography.step C refs cfg l C' refs' cfg' ->
-    WFChoreography C ->
+    Choreography.WFChoreography C ->
     WFLabel l ->
     forall N,
       (forall D, Actor.FSet.In D (Choreography.Label.actors l) -> Actor.Map.In D N) ->

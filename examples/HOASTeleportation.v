@@ -247,6 +247,7 @@ Proof.
     ChorEnv.simplify. repeat solve_wt; auto with var_db; lia.
   }
   auto.
+  auto.
 Qed.
 
 Definition choreo : Choreography.t :=

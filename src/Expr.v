@@ -1884,7 +1884,7 @@ Proof.
     split; simpl in *.
     + unfold super. auto with wf_db.
     + intros z Hin. Var.simplify.
-  * (* apply_gate *) 
+  * (* apply_gate *)
     subst.
     unfold Config.apply_gate.
     destruct HWS.
