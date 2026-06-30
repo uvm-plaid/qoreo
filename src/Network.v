@@ -1001,6 +1001,7 @@ Require Import Setoid.
 Definition uncons A (N : Network.t) :=
   match Actor.Map.find A N with
   | Some (_ :: P) => Actor.Map.add A P N
+  | Some [] => N
   | _ => Actor.Map.remove A N
   end.
 
@@ -1138,7 +1139,7 @@ Qed.
 Lemma fold_uncons_mapsto_eq : forall N A PA X,
   Actor.FSet.In A X ->
   Actor.Map.MapsTo A PA (Actor.FSet.fold uncons X N) <->
-  exists I, Actor.Map.MapsTo A (I :: PA) N.
+  (PA = [] /\ Actor.Map.MapsTo A [] N) \/ exists I, Actor.Map.MapsTo A (I :: PA) N.
 Proof.
   intros N A PA X Hin.
   rewrite Actor.FSet.fold_1.
@@ -1206,40 +1207,107 @@ Proof.
     unfold uncons.
     destruct (Actor.Map.find A N) as [[ | IA PA'] | ] eqn:Hfind.
     + Actor.simplify.
-      transitivity False. { intuition. }
-      split; intros H; destruct H.
-      Actor.solve.
-      unfold Process.t in Hfind.
-      rewrite Hfind in *.
-      discriminate.
+      split; intros H; auto.
+      {
+        left.
+        Actor.reflect_find.
+        inversion Hfind; auto.
+        subst; split; auto.
+        Actor.reflect_find. unfold Process.t in *; auto.
+      }
+      {
+        Actor.reflect_find.
+        destruct H as [ [? H] | [I0 H]]; subst; auto.
+        Actor.reflect_find.
+        unfold Process.t in Hfind.
+        rewrite Hfind in H.
+        discriminate.
+      }
+
 
     + Actor.simplify.
       transitivity (PA = PA'). { intuition. }
       split.
-      - intros; subst.
+      - intros; subst. right.
         exists IA. Actor.solve.
-      - intros [I Hmapsto].
-        Actor.reflect_find.
-        unfold Process.t in Hfind.
-        rewrite Hfind in Hmapsto.
-        inversion Hmapsto; subst; auto.
+      - intros [[? H] | [I Hmapsto]]; subst.
+        {
+          Actor.reflect_find. unfold Process.t in *.
+          rewrite Hfind in H. discriminate.
+        }
+        {
+          Actor.reflect_find.
+          unfold Process.t in Hfind.
+          rewrite Hfind in Hmapsto.
+          inversion Hmapsto; subst; auto.
+        }
 
     + rewrite <- Actor.Map.Properties.F.not_find_in_iff in Hfind.
       split; intros Hmapsto.
       - exfalso. Actor.solve.
-      - destruct Hmapsto. exfalso. Actor.reflect_find.
-        unfold Process.t in Hfind.
-        rewrite Hfind in *. discriminate.
+      - exfalso. apply Hfind.
+        destruct Hmapsto as [[? Hmapsto] | [I0 Hmapsto]];
+          eexists; eauto.
   }
   {
     (* A <> B, so A ∈ ls *)
     rewrite (IHls (Actor.FSet.remove B X)); auto.
     3:{ Actor.simplify. }
     2:{ symmetry; auto. }
-    split; intros [I H]; exists I;
-      rewrite uncons_neq in *; auto.
+    split.
+    + intros [[? H] | [I H]]; subst;
+        rewrite uncons_neq in *; auto.
+      right. eexists; eauto.
+    + intros [[? H] | [I H]]; subst;
+        rewrite uncons_neq in *; auto.
+      right. eexists; eauto.
+      rewrite uncons_neq; eauto.
   }
 Qed.
+
+
+Lemma fold_uncons_find_iff : forall X A N,
+  Actor.Map.find A (Actor.FSet.fold uncons X N)
+  =
+  if Actor.Map.FSetProofs.in_dec A X
+  then match Actor.Map.find A N with
+       | Some (_ :: PA) => Some PA
+       | Some [] => Some []
+       | None => None
+       end
+  else Actor.Map.find A N.
+Proof.
+  intros.
+  
+  destruct (Actor.Map.FSetProofs.in_dec A X) as [HA | HA].
+  2:{ rewrite find_fold_uncons_neq; auto.  }
+  (* from here on, assume A in X *)
+
+  destruct (Actor.Map.find A (Actor.FSet.fold uncons X N)) as [PA | ] eqn:HPA.
+  + rewrite <- Actor.Map.Properties.F.find_mapsto_iff in HPA.
+    rewrite fold_uncons_mapsto_eq in HPA; auto.
+    destruct HPA as [[ ? HPA] | [I HPA]]; subst; Actor.reflect_find; unfold Process.t in *;
+      rewrite HPA; auto.
+  + destruct (Actor.Map.find A N) as [[ | ? PA'] | ] eqn:HPA'; auto.
+    {
+      exfalso.
+      rewrite <- Actor.Map.Properties.F.find_mapsto_iff in HPA'.
+      rewrite <- Actor.Map.Properties.F.not_find_in_iff in HPA.
+      assert (Actor.Map.MapsTo A [] (Actor.FSet.fold uncons X N)).
+      { rewrite fold_uncons_mapsto_eq; auto. }
+      apply HPA. eexists; eauto.
+    }
+    {
+      exfalso.
+      rewrite <- Actor.Map.Properties.F.find_mapsto_iff in HPA'.
+      rewrite <- Actor.Map.Properties.F.not_find_in_iff in HPA.
+      assert (Actor.Map.MapsTo A PA' (Actor.FSet.fold uncons X N)).
+      { rewrite fold_uncons_mapsto_eq; auto. right. eexists; eauto. }
+      apply HPA. eexists; eauto.
+    }  
+Qed.
+#[global] Hint Rewrite fold_uncons_find_iff : actor_db.
+  
 
 Lemma EPP_N_cons_inversion : forall I C N,
   EPP_N (I :: C) N ->
@@ -1248,9 +1316,15 @@ Proof.
   intros I C N HN.
   rewrite EPP_N_spec in *.
   intros D PD HD.
+  Actor.simplify.
   destruct (Actor.Map.FSetProofs.in_dec D (Choreography.Insn.actors I)) as [Hin | Hin].
   * rewrite fold_uncons_mapsto_eq in HD; auto.
-    destruct HD as [I0 HD].
+    destruct HD as [[? HD] | [I0 HD]]; subst.
+    {
+      exfalso. apply HN in HD.
+      inversion HD; subst; clear HD.
+      contradiction.
+    }
     apply HN in HD.
     inversion HD; subst; clear HD; auto.
     contradiction.
@@ -1502,6 +1576,7 @@ Proof.
         apply HEPP_N_uncons.
         Actor.simplify. right. split; auto.
         rewrite fold_uncons_mapsto_eq; auto.
+        right.
         destruct I; simpl in *; Actor.simplify; simpl in *; eexists; eauto.
         all: (destruct HinD; subst; contradiction).
       }
@@ -1518,22 +1593,18 @@ Lemma fold_uncons_in_iff : forall A X N,
   <->
   Actor.Map.In A N.
 Proof.
-    (*
-        assert (HD' : exists PD, Actor.Map.MapsTo D PD (Actor.FSet.fold uncons (Choreography.Insn.actors I) N)).
-      { destruct HD; eexists; eauto. }
-      destruct HD' as [PD HD'].
-      
-      destruct (Actor.Map.FSetProofs.in_dec D (Choreography.Insn.actors I)) as [Hin | Hin].
-      {
-        rewrite fold_uncons_mapsto_eq in HD'; auto.
-        destruct HD'; eexists; eauto.
-      }
-      {
-        rewrite fold_uncons_mapsto_neq in HD'; auto.
-        eexists; eauto.
-      }
-*)
-Admitted.
+  intros A X N.
+  split; intros Hin.
+  * Actor.reflect_find.
+    destruct (Actor.Map.FSetProofs.in_dec A X) as [HinX | HinX].
+    + destruct (Actor.Map.find A N); discriminate.
+    + rewrite Hin. discriminate.
+
+  * Actor.reflect_find. 
+    destruct (Actor.Map.FSetProofs.in_dec A X) as [HinX | HinX].
+    + destruct v; discriminate.
+    + discriminate. 
+Qed.
 Hint Rewrite fold_uncons_in_iff : actor_db.
 
 
@@ -1643,16 +1714,21 @@ Proof.
     Actor.simplify.
     destruct HD as [[? ?] | [? [[? ?] | [? HD]]]]; subst.
     { apply EPP_subst_neq; auto. apply HEPP_N.
-      simpl.
-      rewrite fold_uncons_mapsto_eq; auto.
+      Actor.reflect_find. simpl. unfold Process.t in *.
+      match goal with
+      | [ |- context[Actor.Map.FSetProofs.in_dec ?A ?X]] =>
+        let HA := fresh "H" in
+        destruct (Actor.Map.FSetProofs.in_dec A X) as [HA | HA]
+      end.
       2:{ Actor.simplify. }
-      eexists; eauto. 
+      rewrite HA; auto.
     }
     {
       apply EPP_subst_eq; auto.
       apply HEPP_N. simpl.
       rewrite fold_uncons_mapsto_eq; auto.
       2:{ Actor.simplify. }
+      right.
       eexists; eauto. 
     }
     {
@@ -1752,7 +1828,7 @@ Proof.
       destruct HI as [I' HI].
       rewrite HI in HD. simpl in HD.
       rewrite fold_uncons_mapsto_eq; auto.
-      exists I'; auto.
+      right. exists I'; auto.
 Qed.
 
 
@@ -2036,6 +2112,7 @@ Proof.
       right. split; auto.
       right. split; auto.
       apply fold_uncons_mapsto_eq; auto.
+      right.
       destruct I; simpl in *; Actor.simplify; eexists; subst; try contradiction; eauto.
       destruct Hin; subst; try contradiction.
       destruct Hin; subst; try contradiction.
@@ -2048,17 +2125,24 @@ Qed.
 
 Lemma step_domain_label_subset : forall C Θ ρ l C' Θ' ρ',
   Choreography.step C Θ ρ l C' Θ' ρ' ->
-  forall A,
-  Actor.FSet.In A (Choreography.Label.actors l) ->
-  Actor.FSet.In A (Choreography.actors C).
-Admitted.
+  forall D,
+  Actor.FSet.In D (Choreography.Label.actors l) ->
+  Actor.FSet.In D (Choreography.actors C).
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros D HD; simpl in *; Actor.simplify.
+Qed.
 
 Lemma step_domain_subset : forall C Θ ρ l C' Θ' ρ',
   Choreography.step C Θ ρ l C' Θ' ρ' ->
-  forall A,
-  Actor.FSet.In A (Choreography.actors C') ->
-  Actor.FSet.In A (Choreography.actors C).
-Admitted.
+  forall D,
+  Actor.FSet.In D (Choreography.actors C') ->
+  Actor.FSet.In D (Choreography.actors C).
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros D HD; simpl in *; subst; Actor.simplify.
+  * destruct HD; auto.
+Qed.
 
 Theorem completeness : forall N refs cfg l N' refs' cfg',
 
@@ -2263,7 +2347,7 @@ Proof.
   rewrite EPP_N_spec in HN.
   apply HN.
   rewrite fold_uncons_mapsto_eq; auto.
-  eexists; eauto.
+  right. eexists; eauto.
 Qed.
 
 Lemma EPP_mapsto_uncons_nin : forall I C N D PD,
@@ -2580,7 +2664,7 @@ Proof.
       Actor.simplify.
       right; split; auto.
       rewrite fold_uncons_mapsto_eq; auto.
-      eexists; eauto.
+      right. eexists; eauto.
     }
 Qed.
 
@@ -2684,7 +2768,7 @@ Proof.
       Actor.simplify.
       right. split; auto. right. split; auto.
       rewrite fold_uncons_mapsto_eq; auto.
-      eexists; eauto.
+      right. eexists; eauto.
 
     + Actor.reflect_find.
       discriminate.
@@ -2838,7 +2922,7 @@ Proof.
       Actor.simplify.
       right. split; auto. right. split; auto.
       rewrite fold_uncons_mapsto_eq; auto.
-      eexists; eauto.
+      right. eexists; eauto.
 
     + Actor.reflect_find.
       discriminate.
@@ -2941,13 +3025,6 @@ Inductive multi_step : Network.t -> ChorEnv.t nat -> Config.t -> Network.t -> Ch
   multi_step N2 Θ2 ρ2 N3 Θ3 ρ3 ->
   multi_step N1 Θ1 ρ1 N3 Θ3 ρ3
 .
-Definition Normal (N : Network.t) :=
-  forall D PD, Actor.Map.MapsTo D PD N -> PD = [].
-Definition Stuck N Θ ρ :=
-  ~ Normal N /\ forall N' Θ' ρ' l, ~ Network.step N Θ ρ l N' Θ' ρ'.
-Definition GoesWrong N Θ ρ :=
-  exists N' Θ' ρ',
-    multi_step N Θ ρ N' Θ' ρ' /\ Stuck N' Θ' ρ'.
 
 (** EPP+type safety *)
 Theorem safety : forall N Θ ρ N' Θ' ρ',
