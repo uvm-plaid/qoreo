@@ -3956,6 +3956,15 @@ Lemma step_monotone : forall C T cfg l C' T' cfg',
 Proof.
 Admitted.
 
+Lemma step_fresh_deterministic : forall C T1 cfg l C' T1' cfg' T2 T2',
+    WellScoped T1 cfg ->
+    WellScoped T1' cfg ->
+    step C T1 cfg l C' T1' cfg' ->
+    step C T2 cfg l C' T2' cfg' ->
+    
+Proof.
+Admitted.
+
 Lemma ws_fresh : forall Theta1 Theta2 cfg,
     Config.WellScoped Theta1 cfg ->
     ~ Config.WellScoped Theta2 cfg ->
@@ -4339,8 +4348,26 @@ Proof.
         }
         {
           (*  we have Step_partition_pairs T (Actor.Map.add A ThetaA2 T1') T' T2 *)
-          
-          
+          unfold Step_partition_pairs.
+          intros A0 ThetaEx0 Hspps.
+          assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
+          tauto.
+          {
+            rewrite <- HAeqA0 in *.
+            rewrite find_add; auto.
+
+            unfold Partition_except in HPex.
+            destruct HPex as [HPexA HPexB].
+            
+            destruct (H0 A
+                        (inter_nin A (Label.actors l)
+                           (Insn.actors (Insn.LetBang A x e)) H HAinI)) as [ThetaEx1 Hspproot].
+            
+            rewrite find_add in Hspproot.
+
+            pose proof (step_monotone
+                        C T cfg l C' T' cfg' Hstep HWS A) as [ThetaEx4 [HmonorootA HmonorootB]].
+
 Admitted.
 
 
