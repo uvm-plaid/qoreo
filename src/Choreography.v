@@ -3999,6 +3999,76 @@ Lemma step_weakening : forall T1 T1' ThetaA2 T T' A C cfg l C' cfg',
   step C T cfg l C' T' cfg'.
 Admitted.
 
+Definition Step_partition_pairs (T1 T1' T2 T2' : ChorEnv.t nat) :=
+  forall A Theta,
+    Var.Map.Partition (ChorEnv.find A T1) (ChorEnv.find A T1') Theta ->
+    Var.Map.Partition (ChorEnv.find A T2) (ChorEnv.find A T2') Theta.
+
+Lemma spps_on : forall A Theta1 Theta2 (T1 T2 T3 : ChorEnv.t nat),
+    Step_partition_pairs T1 (Actor.Map.add A Theta2 T1) T2 T3 ->
+    Var.Map.Partition (ChorEnv.find A T1) Theta1 Theta2 ->
+    ChorEnv.Equal T3 (Actor.Map.add A (ChorEnv.find A T3) T2) /\
+      Var.Map.Partition (ChorEnv.find A T2) Theta1 (ChorEnv.find A T3).
+Proof.
+  intros.  
+  unfold Step_partition_pairs in H.
+  split.
+  {
+    unfold ChorEnv.Equal.
+    intro.
+    assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
+    tauto.
+    {
+      rewrite <- HAeqA0 in *.
+      rewrite find_add.
+      Var.simplify.
+    }
+    {
+      specialize (H A0 (Var.Map.empty _)).
+      rewrite find_ab_neq2 in H; auto.
+      rewrite find_ab_neq2; auto.
+      assert (Var.Map.Partition (ChorEnv.find A0 T1) (ChorEnv.find A0 T1) (Var.Map.empty nat)).
+      apply Var.Map.Proofs.partition_empty_r.
+      specialize (H H1).
+      apply Var.Map.Proofs.partition_empty2_eq in H.
+      rewrite H.
+      Var.simplify.
+    }
+  }
+  {
+    specialize (H A Theta1).
+    rewrite find_add in H.
+    specialize (H (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A T1) Theta1 Theta2 H0)).
+    pose proof (@Var.Map.Properties.Partition_sym _
+                  (ChorEnv.find A T2) (ChorEnv.find A T3) Theta1 H).
+    auto.
+  }
+Qed.
+
+Lemma step_inversion_v2 : forall C1 T1 cfg1 l C2 T2 cfg2,
+    step C1 T1 cfg1 l C2 T2 cfg2 ->
+    WellScoped T1 cfg1 ->    
+    forall G D T1',
+    WellTyped G D T1' C1 ->
+    exists T2',
+      step C1 T1' cfg1 l C2 T2' cfg2 /\
+        Step_partition_pairs T1 T1' T2 T2'.
+Proof.
+Admitted.
+
+Lemma step_inversion_v3 : forall C1 T1 cfg1 l C2 T2 cfg2,
+    step C1 T1 cfg1 l C2 T2 cfg2 ->
+    WellScoped T1 cfg1 ->    
+    forall G D T1',
+    (forall A, exists Theta,
+        Var.Map.Partition (ChorEnv.find A T1) (ChorEnv.find A T1') Theta) ->
+    WellTyped G D T1' C1 ->
+    exists T2',
+      step C1 T1' cfg1 l C2 T2' cfg2 /\
+        Step_partition_pairs T1 T1' T2 T2'.
+Proof.
+Admitted.
+
 Lemma step_inversion' : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
     WellScoped T1 cfg1 ->
@@ -4122,6 +4192,56 @@ Proof.
       { intros Hin. apply (H A). simpl. Actor.simplify. }
 
       (* Step weakening lemma here... *)
+
+      specialize (IHHstep HWS
+                    (ChorEnv.add A x tau Gamma)
+                    (Actor.Map.add A DeltaA2 Delta)
+                    (Actor.Map.add A ThetaA2 T1)
+                    A
+                    (ChorEnv.find A (Actor.Map.add A0
+                                       (Var.Map.concat Theta ThetaA1)
+                                       (Actor.Map.add A ThetaA1 T)))
+                    H0 H3).
+
+      assert (Partition_on A T (Actor.Map.add A ThetaA2 T1)
+                (ChorEnv.find A (Actor.Map.add A0
+                                   (Var.Map.concat Theta ThetaA1)
+                                   (Actor.Map.add A ThetaA1 T)))) as Hpo.
+      {
+        unfold Partition_on.
+        split.
+        {
+          assert (A0 <> A \/ A0 = A) as [AneqA0 | AeqA0].
+          tauto.
+          {
+            rewrite find_add; auto.
+            rewrite find_ab_neq2; auto.
+            specialize (HT1 A AneqA0).
+            rewrite <- HT1.
+            rewrite find_add; auto.
+            apply @Var.Map.Properties.Partition_sym; auto.  
+          }
+          {
+            rewrite AeqA0 in *.
+            rewrite find_add; auto.
+            rewrite find_add; auto.
+            destruct (partitioning
+                          (ChorEnv.find A T) ThetaA1 Theta (ChorEnv.find A T1) ThetaA2
+                          (@Var.Map.Properties.Partition_sym _
+                             (ChorEnv.find A T) (ChorEnv.find A T1) Theta Hpart) H8) as [_ [_ [Hpart2 _]]].
+            apply (@Var.Map.Properties.Partition_sym _
+                     (ChorEnv.find A T) (Var.Map.concat Theta ThetaA1) ThetaA2 Hpart2).
+          }
+        }
+        {
+          intros.
+          rewrite find_ab_neq2; auto.
+          specialize (HT1 B).
+          admit.
+        }
+      }
+      
+      
       admit.
 
     + (* I = Let *) admit.
@@ -4497,6 +4617,7 @@ Proof.
       
       assert (Hnin : ~ Actor.FSet.In A (Label.actors l)).
       { simpl in H12. specialize (H12 A). Actor.simplify. }
+
       pose proof (step_inversion
                     C T cfg1 l C' T2 cfg2 H5 Hscoped
                     (ChorEnv.add B y tau G)
@@ -4662,10 +4783,10 @@ Proof.
                     (Actor.Map.add A ThetaA2 T)
                     A ThetaA1 Hnin HWT Hsipart Hsieq) as Hsi.
       
-      destruct Hsi as [Theta0 Hsi].
+      destruct Hsi as [T0 Hsi].
       destruct Hsi as [HsiA [HsiB HsiC]].
 
-      specialize (IHHWT cfg1 l C' Theta0 cfg2 HsiA).
+      specialize (IHHWT cfg1 l C' T0 cfg2 HsiA).
 
       pose proof (ws_partition_env
                     A T ThetaA2 ThetaA1 cfg1 Hscoped
@@ -4703,14 +4824,14 @@ Proof.
           (WellTyped
              (ChorEnv.add A x tau G)
              (Actor.Map.add A DeltaA2 D)
-             (Actor.Map.add A (ChorEnv.find A Theta0) T2) C') as HwtC.
+             (Actor.Map.add A (ChorEnv.find A T0) T2) C') as HwtC.
         { rewrite HsiC; auto. }
         eauto.
       }
       { auto. }
       {
         apply (@Var.Map.Properties.Partition_sym _
-                 (ChorEnv.find A T2) (ChorEnv.find A Theta0) ThetaA1 HsiB).
+                 (ChorEnv.find A T2) (ChorEnv.find A T0) ThetaA1 HsiB).
       }
       
   (* Case LetIn *)
@@ -5441,4 +5562,397 @@ Proof.
 
 Qed.
 
+Theorem preservation_v2 : forall G D T1 C1,
+    WellTyped G D T1 C1 ->
+    forall cfg1 l C2 T2 cfg2, 
+      step C1 T1 cfg1 l C2 T2 cfg2 ->
+      WellScoped T1 cfg1 ->
+        (forall A, Actor.FSet.In A (Label.actors l) ->
+                   Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
+        WellTyped G D T2 C2.
+Proof.
+  intros G D T1 C1 HWT.
+  induction HWT.
 
+  (* Case Nil *)
+  - intros cfg1 l C2 T2 cfg2 HStep Hscoped Hemptiness.
+    apply nilnostep in HStep.
+    contradiction.
+
+  (* Case EPR *)
+  - intros cfg1 l C2 T2 cfg2 HStep Hscoped Hemptiness.
+
+    inversion HStep; subst.
+
+    (* Case EPRB *) 
+    + assert (Actor.FSet.In A (Label.actors (Label.EPR A B))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      assert (Actor.FSet.In B (Label.actors (Label.EPR A B))) as HBinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      destruct (Hemptiness B HBinl) as [HBGempty HBDempty].
+      
+      destruct (epr_inversion A B T cfg1 q1 q2 T0 cfg2 H H13 Hscoped) as [HeprA HeprB].
+      destruct HeprA as [idx1 [idx2]].
+      destruct H2 as [HeprAA HeprAB].
+      
+      pose proof (qref_ty
+                    (Var.Map.empty _)
+                    (Var.Map.empty _)
+                    (Var.Map.add q1 idx1 (Var.Map.empty _))
+                    q1 idx1 empty_map_empty
+                    (Var.Map.Proofs.singleton_singleton nat q1 idx1)) as Hq1ty.
+      
+      pose proof (qref_ty
+                    (Var.Map.empty _)
+                    (Var.Map.empty _)
+                    (Var.Map.add q2 idx2 (Var.Map.empty _))
+                    q2 idx2 empty_map_empty
+                    (Var.Map.Proofs.singleton_singleton nat q2 idx2)) as Hq2ty.
+      
+      rewrite rem_empty2 in HWT; auto.
+      rewrite rem_empty2 in HWT; auto.
+      rewrite HeprB in HWT.
+      
+      pose proof (wt_subst_lin
+                    C
+                    (Var.Map.add q2 idx2 (Var.Map.empty nat))
+                    (ChorEnv.find B T)
+                    Expr.QUBIT
+                    G
+                    (ChorEnv.add A x Expr.QUBIT D)
+                    (Actor.Map.add A (ChorEnv.find A T) T0)
+                    B y
+                    (Expr.QRef q2)
+                    Hq2ty HWT) as HwtCAx.
+      
+      rewrite find_ab_neq1 in HwtCAx; auto.
+      rewrite find_ab_neq2 in HwtCAx; auto.
+      
+      assert (~ Var.Map.In x (ChorEnv.find A G)) as HxninG.
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
+      Var.simplify.
+      assert (~ Var.Map.In y (ChorEnv.find B G)) as HyninG.
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find B G) HBGempty).
+      Var.simplify.
+      
+      specialize (HwtCAx
+                    (@Var.Map.Properties.Partition_sym _
+                       (ChorEnv.find B T0)
+                       (ChorEnv.find B T)
+                       (Var.Map.add q2 idx2 (Var.Map.empty nat))
+                       HeprAB)
+                    HyninG H1).
+      
+      pose proof (wt_subst_lin
+                    (Choreography.subst B y (Expr.QRef q2) C)
+                    (Var.Map.add q1 idx1 (Var.Map.empty nat))
+                    (ChorEnv.find A T)
+                    Expr.QUBIT
+                    G
+                    D
+                    T0
+                    A x
+                    (Expr.QRef q1)
+                    Hq1ty HwtCAx) as HwtCBy.
+      
+      rewrite H14.
+      apply (HwtCBy
+               (@Var.Map.Properties.Partition_sym _
+                  (ChorEnv.find A T0)
+                  (ChorEnv.find A T)
+                  (Var.Map.add q1 idx1 (Var.Map.empty nat))
+                  HeprAA)
+               HxninG H0).
+      
+      rewrite find_ab_neq3; auto.
+
+    (* Case EPRB' *) 
+    + assert (Actor.FSet.In A (Label.actors (Label.EPR B A))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      assert (Actor.FSet.In B (Label.actors (Label.EPR B A))) as HBinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      destruct (Hemptiness B HBinl) as [HBGempty HBDempty].
+
+      assert (B <> A) as HBneA; auto.
+      destruct (epr_inversion B A T cfg1 q2 q1 T0 cfg2 HBneA H13 Hscoped) as [HeprA HeprB].
+      destruct HeprA as [idx1 [idx2]].
+      destruct H2 as [HeprAA HeprAB].
+      
+      pose proof (qref_ty
+                    (Var.Map.empty _)
+                    (Var.Map.empty _)
+                    (Var.Map.add q1 idx2 (Var.Map.empty _))
+                    q1 idx2 empty_map_empty
+                    (Var.Map.Proofs.singleton_singleton nat q1 idx2)) as Hq1ty.
+      
+      pose proof (qref_ty
+                    (Var.Map.empty _)
+                    (Var.Map.empty _)
+                    (Var.Map.add q2 idx1 (Var.Map.empty _))
+                    q2 idx1 empty_map_empty
+                    (Var.Map.Proofs.singleton_singleton nat q2 idx1)) as Hq2ty.
+      
+      rewrite rem_empty2 in HWT; auto.
+      rewrite rem_empty2 in HWT; auto.
+      rewrite HeprB in HWT.
+      rewrite addadd4 in HWT; auto.
+      
+      pose proof (wt_subst_lin
+                    C
+                    (Var.Map.add q2 idx1 (Var.Map.empty nat))
+                    (ChorEnv.find B T)
+                    Expr.QUBIT
+                    G
+                    (ChorEnv.add A x Expr.QUBIT D)
+                    (Actor.Map.add A (ChorEnv.find A T) T0)
+                    B y
+                    (Expr.QRef q2)
+                    Hq2ty HWT) as HwtCBy.
+      
+      rewrite find_ab_neq1 in HwtCBy; auto.
+      rewrite find_ab_neq2 in HwtCBy; auto.
+      
+      assert (~ Var.Map.In x (ChorEnv.find A G)) as HxninG.
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
+      Var.simplify.
+      assert (~ Var.Map.In y (ChorEnv.find B G)) as HyninG.
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find B G) HBGempty).
+      Var.simplify.
+      
+      specialize (HwtCBy
+                    (@Var.Map.Properties.Partition_sym _
+                       (ChorEnv.find B T0)
+                       (ChorEnv.find B T)
+                       (Var.Map.add q2 idx1 (Var.Map.empty nat))
+                       HeprAA)
+                    HyninG H1).
+      
+      pose proof (wt_subst_lin
+                    (Choreography.subst B y (Expr.QRef q2) C)
+                    (Var.Map.add q1 idx2 (Var.Map.empty nat))
+                    (ChorEnv.find A T)
+                    Expr.QUBIT
+                    G
+                    D
+                    T0
+                    A x
+                    (Expr.QRef q1)
+                    Hq1ty HwtCBy) as HwtCAx.
+      
+      rewrite H14.
+      apply (HwtCAx
+               (@Var.Map.Properties.Partition_sym _
+                  (ChorEnv.find A T0)
+                  (ChorEnv.find A T)
+                  (Var.Map.add q1 idx2 (Var.Map.empty nat))
+                  HeprAB)
+               HxninG H0).
+      
+      rewrite find_ab_neq3; auto.
+
+    (* Case Delay/EPR *) 
+    + assert (forall A0 : Actor.FSet.elt,
+                 Actor.FSet.In A0 (Label.actors l) ->
+                 Var.Map.Empty (ChorEnv.find A0 (ChorEnv.remove B y (ChorEnv.remove A x G))) /\
+                   Var.Map.Empty (ChorEnv.find A0
+                                    (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)))) as Hih.
+      {
+        intros A0 HA0inl.
+        
+        assert (Actor.FSet.In A (Insn.actors (Insn.EPR A x B y))) as HAinI.
+        unfold Insn.actors.
+        Actor.simplify.
+        assert (Actor.FSet.In B (Insn.actors (Insn.EPR A x B y))) as HBinI.
+        unfold Insn.actors.
+        Actor.simplify.
+        
+        pose proof (members_dj A0 A
+                      (Label.actors l)
+                      (Insn.actors (Insn.EPR A x B y))
+                      H11 HA0inl HAinI).
+        
+        pose proof (members_dj A0 B
+                      (Label.actors l)
+                      (Insn.actors (Insn.EPR A x B y))
+                      H11 HA0inl HBinI).
+        
+        destruct (Hemptiness A0 HA0inl) as [HempA0G HempA0D].
+        split.
+        {
+          rewrite find_ab_neq3; auto.
+          rewrite find_ab_neq3; auto.
+        }
+        {
+          rewrite find_ab_neq1; auto.
+          rewrite find_ab_neq1; auto.                    
+        }
+      }
+
+      specialize (IHHWT cfg1 l C' T2 cfg2 H4 Hscoped Hih).
+
+      apply EPR.
+      { auto. }
+      { auto. }
+      { auto. }
+      { auto. }
+
+  (* Case Send *)
+  - intros cfg1 l C2 T2 cfg2 HStep Hscoped Hemptiness.
+
+    inversion HStep; subst.
+   
+    (* Case SendC *)
+    + unfold  WellScoped in Hscoped.
+      specialize (Hscoped A).
+      
+      assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in H1.
+      
+      assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+      Var.simplify.
+      
+      pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H1) as Hdp.
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H0.
+      rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H0.
+      
+
+      pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg1 e' TA' cfg2 H14
+                    ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H0 H2) as Hsi.
+      
+      destruct Hsi as [ThetaA1' Hsi].
+      destruct Hsi as [HsiA HsiB].
+      
+      eapply Send.
+      { auto. }
+      { 
+        eapply Expr.WellTyped_preservation.
+        { rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); eauto. }
+        { rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); Var.simplify. }
+        { Var.simplify. }
+        { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H2). }
+        { eauto. }
+      }
+      {
+        rewrite H15.
+        rewrite addadd2.
+        eauto.
+      }
+      {
+        rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty).
+        rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H1.
+        auto.
+      }
+      {
+        rewrite H15.
+        rewrite find_add; auto.
+      }
+   
+    (* Case SendB *)
+    + rewrite <- H15 in *.
+
+      assert (Actor.FSet.In A (Label.actors (Label.Send A v B))) as HAinl.
+      unfold Label.actors.
+      Actor.simplify.
+      assert (Actor.FSet.In B (Label.actors (Label.Send A v B))) as HBinl.
+      unfold Label.actors.
+      Actor.simplify.
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      destruct (Hemptiness B HBinl) as [HBGempty HBDempty].
+      
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H0.
+      destruct (bangty_inversion (Var.Map.empty Expr.typ) DeltaA1 ThetaA1 v tau H0)
+        as [HbangA [HbangB HbangC]].
+      rewrite HbangB in *.
+      rewrite HbangC in *.
+
+      
+      rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in H1.
+      pose proof (@Var.Map.Properties.Partition_sym _
+                    (Var.Map.empty Expr.typ) (Var.Map.empty Expr.typ) DeltaA2 H1) as Hpart.
+      pose proof (empty_partition
+                    (Var.Map.empty Expr.typ) DeltaA2 (Var.Map.empty Expr.typ)
+                    empty_map_empty Hpart) as Hep.
+      eapply wt_subst_bang; eauto.
+      
+      rewrite <- (lopsided_partition (ChorEnv.find A T) ThetaA2 H2) in HWT.
+      rewrite find_add_env in HWT; auto.
+      rewrite empty_to_empty in HWT; auto.
+   
+    (* Case Delay/Send *)
+    + pose proof (step_inversion_v2
+                    C T cfg1 l C' T2 cfg2 H5 Hscoped
+                    (ChorEnv.add B y tau G)
+                    (Actor.Map.add A DeltaA2 D)
+                    (Actor.Map.add A ThetaA2 T)
+                    HWT) as Hsi.
+
+      destruct Hsi as [T2' [HsiA HsiB]].
+      
+      specialize (IHHWT cfg1 l C' T2' cfg2 HsiA).
+      
+      pose proof (ws_partition_env
+                    A T ThetaA2 ThetaA1 cfg1 Hscoped
+                    (@Var.Map.Properties.Partition_sym _
+                       (ChorEnv.find A T) ThetaA1 ThetaA2 H2)) as Hwspe.
+      
+      assert (forall A0 : Actor.FSet.elt,
+                 Actor.FSet.In A0 (Label.actors l) ->
+                 Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (ChorEnv.add B y tau G)) /\
+                   Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (Actor.Map.add A DeltaA2 D))) as Hih.
+      {
+        intros A0 HA0inl.
+
+        assert (Actor.FSet.In A (Insn.actors (Insn.Send A e B y))) as HAinI.
+        unfold Insn.actors.
+        Actor.simplify.
+        assert (Actor.FSet.In B (Insn.actors (Insn.Send A e B y))) as HBinI.
+        unfold Insn.actors.
+        Actor.simplify.
+        
+        pose proof (members_dj A0 A
+                      (Label.actors l)
+                      (Insn.actors (Insn.Send A e B y))
+                      H12 HA0inl HAinI).
+        
+        pose proof (members_dj A0 B
+                      (Label.actors l)
+                      (Insn.actors (Insn.Send A e B y))
+                      H12 HA0inl HBinI).
+        
+        destruct (Hemptiness A0 HA0inl) as [HempA0G HempA0D].
+        split.
+        { rewrite find_ab_neq1; auto. }
+        { rewrite find_ab_neq2; auto. }
+      }
+
+      specialize (IHHWT Hwspe Hih).
+      destruct (spps_on A ThetaA1 ThetaA2 T T2 T2' HsiB H2) as [HsppsonA HsppsonB].
+
+      eapply Send.
+      { auto. }
+      { eauto. }
+      {
+        assert (WellTyped
+                  (ChorEnv.add B y tau G)
+                  (Actor.Map.add A DeltaA2 D)
+                  (Actor.Map.add A (ChorEnv.find A T2') T2) C').
+        {
+          rewrite HsppsonA in IHHWT; auto.
+        }
+        eauto.
+      }
+      { auto. }
+      { auto. }
+
+Admitted.
+ 
