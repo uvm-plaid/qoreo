@@ -794,6 +794,14 @@ Proof.
   intros; Var.simplify.
 Qed.
 
+Lemma partition_lopsided : forall {X : Type} (M1 M2: Var.Map.t X),
+    Var.Map.Partition M1 M1 M2 ->
+    Var.Map.Empty M2.
+Proof.
+  intros.
+  pose proof (Var.Map.Proofs.partition_empty_r _ M1).  
+Admitted.
+
 Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
     ChorEnv.find A (Actor.Map.add A M CE) = M.
 Proof.
@@ -1442,6 +1450,7 @@ Proof.
   intros.
   Var.simplify.
 Qed.
+
 
 (* STOP Easily(?) proven facts *)
 
@@ -4087,14 +4096,40 @@ Proof.
     {
       eapply SendC.
       {
+        destruct (Hpart A) as [Theta HpartTheta].
+        destruct (partitioning
+                    (ChorEnv.find A T) ThetaA1 Theta (ChorEnv.find A T1') ThetaA2
+                    (@Var.Map.Properties.Partition_sym _
+                       (ChorEnv.find A T) (ChorEnv.find A T1') Theta HpartTheta) H13)              
+          as [HpartA [HpartB [HpartC HpartD]]].
+
+        (* would like to use Expr.step_inversion, but it requires empty Gamma and Delta. *)     
         admit.
       }
       {
-        admit.
+        assert (ChorEnv.Equal (Actor.Map.add A TA' T1') (Actor.Map.add A TA' T1')).
+        Var.simplify.
+        eauto.
       }
     }
     {
-      admit.
+      unfold Step_partition_pairs.
+      intros.
+      rewrite H0.
+      
+      assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
+      tauto.
+      {
+        rewrite <- HAeqA0 in *.
+        rewrite find_add.
+        rewrite find_add.
+        specialize (Hpart A).
+        admit.
+      }
+      {
+        rewrite find_ab_neq2; auto.
+        rewrite find_ab_neq2; auto.
+      }
     }
 
   - intros HWS G D T1' Hpart HWT.
@@ -4115,6 +4150,99 @@ Proof.
       auto.
     }      
 Admitted.
+
+
+Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
+  (forall A,
+    ~ Actor.FSet.In A (Label.actors l) ->
+    exists Theta,
+      Var.Map.Partition (ChorEnv.find A T1) (ChorEnv.find A T2) Theta) /\
+    (forall A,
+      Actor.FSet.In A (Label.actors l) ->
+      Var.Map.Equal (ChorEnv.find A T1) (ChorEnv.find A T2)).
+
+Lemma step_inversion_v4 : forall C1 T1 cfg1 l C2 T2 cfg2,
+    step C1 T1 cfg1 l C2 T2 cfg2 ->
+    WellScoped T1 cfg1 ->    
+    forall G D T1',
+      Partition_except l T1 T1' ->
+      WellTyped G D T1' C1 ->
+      exists T2',
+        step C1 T1' cfg1 l C2 T2' cfg2 /\
+          Step_partition_pairs T1 T1' T2 T2'.
+Proof.
+  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
+  induction Hstep.
+  
+  - intros HWS G D T1' HPex HWT.
+
+    inversion HWT; subst.
+
+    unfold Partition_except in HPex.
+    destruct HPex as [HPexA HPexB].
+    
+    exists (Actor.Map.add A TA' T1').
+    split.
+    {
+      eapply SendC.
+      {
+        assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+        { unfold Label.actors; Actor.simplify. }          
+        specialize (HPexB A HAinl).
+        rewrite <- HPexB.
+        eauto.
+      }
+      {
+        assert (ChorEnv.Equal (Actor.Map.add A TA' T1') (Actor.Map.add A TA' T1')).
+        Var.simplify.
+        eauto.
+      }
+    }
+    {
+      unfold Step_partition_pairs.
+      intros.
+      rewrite H0.
+      
+      assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
+      tauto.
+      {
+        assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+        { unfold Label.actors; Actor.simplify. }          
+        specialize (HPexB A HAinl).   
+        rewrite <- HAeqA0 in *.
+        rewrite HPexB in H1.
+        pose proof (partition_lopsided  (ChorEnv.find A T1') Theta H1) as Hpl. 
+        rewrite find_add.
+        rewrite find_add.
+        pose proof (Var.Map.Proofs.empty_map_equal Theta Hpl) as Heme.
+        rewrite Heme.
+        apply Var.Map.Proofs.partition_empty_r; auto.
+      }
+      {
+        rewrite find_ab_neq2; auto.
+        rewrite find_ab_neq2; auto.
+      }
+    }
+
+  - intros HWS G D T1' Hpart HWT.
+
+    inversion HWT; subst.
+
+    exists T1'.
+    split.
+    {
+      apply SendB.
+      { Var.simplify. }
+      { Var.simplify. }
+    }
+    {
+      unfold Step_partition_pairs.
+      intros.
+      rewrite H0 in H.
+      auto.
+    }      
+Admitted.
+
 
 Lemma step_inversion' : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
