@@ -4054,6 +4054,14 @@ Lemma step_inversion_v2 : forall C1 T1 cfg1 l C2 T2 cfg2,
       step C1 T1' cfg1 l C2 T2' cfg2 /\
         Step_partition_pairs T1 T1' T2 T2'.
 Proof.
+  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
+  induction Hstep.
+  
+  - intros HWS G D T1' HWT.
+
+    inversion HWT; subst.
+    
+    
 Admitted.
 
 Lemma step_inversion_v3 : forall C1 T1 cfg1 l C2 T2 cfg2,
@@ -4067,6 +4075,45 @@ Lemma step_inversion_v3 : forall C1 T1 cfg1 l C2 T2 cfg2,
       step C1 T1' cfg1 l C2 T2' cfg2 /\
         Step_partition_pairs T1 T1' T2 T2'.
 Proof.
+  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
+  induction Hstep.
+  
+  - intros HWS G D T1' Hpart HWT.
+
+    inversion HWT; subst.
+
+    exists (Actor.Map.add A TA' T1').
+    split.
+    {
+      eapply SendC.
+      {
+        admit.
+      }
+      {
+        admit.
+      }
+    }
+    {
+      admit.
+    }
+
+  - intros HWS G D T1' Hpart HWT.
+
+    inversion HWT; subst.
+
+    exists T1'.
+    split.
+    {
+      apply SendB.
+      { Var.simplify. }
+      { Var.simplify. }
+    }
+    {
+      unfold Step_partition_pairs.
+      intros.
+      rewrite H0 in H.
+      auto.
+    }      
 Admitted.
 
 Lemma step_inversion' : forall C1 T1 cfg1 l C2 T2 cfg2,
@@ -5889,13 +5936,34 @@ Proof.
       rewrite empty_to_empty in HWT; auto.
    
     (* Case Delay/Send *)
-    + pose proof (step_inversion_v2
+    + assert (forall A0 : Actor.t,
+               exists Theta : Var.Map.M.t nat,
+                 Var.Map.Partition (ChorEnv.find A0 T)
+                   (ChorEnv.find A0 (Actor.Map.add A ThetaA2 T)) Theta) as Hpart.
+      {
+        intro.
+        assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
+        tauto.
+        {
+          rewrite <- HAeqA0 in *.
+          exists ThetaA1.
+          rewrite find_add.
+          pose proof (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A T) ThetaA1 ThetaA2 H2); auto.
+        }
+        {
+          exists (Var.Map.empty _).
+          rewrite find_ab_neq2; auto.
+          apply Var.Map.Proofs.partition_empty_r.
+        }
+      }
+
+      pose proof (step_inversion_v3
                     C T cfg1 l C' T2 cfg2 H5 Hscoped
                     (ChorEnv.add B y tau G)
                     (Actor.Map.add A DeltaA2 D)
                     (Actor.Map.add A ThetaA2 T)
-                    HWT) as Hsi.
-
+                    Hpart HWT) as Hsi.
+      
       destruct Hsi as [T2' [HsiA HsiB]].
       
       specialize (IHHWT cfg1 l C' T2' cfg2 HsiA).
