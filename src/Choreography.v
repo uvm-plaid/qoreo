@@ -4272,20 +4272,14 @@ Proof.
         destruct IHHstep as [T2 [IHHstepA IHHstepB]].
 
         unfold Step_partition_pairs in IHHstepB.
-
         unfold Partition_except in HPex'.
-
         destruct HPex'.
 
-        pose proof (inter_nin A (Label.actors l)
-                      (Insn.actors (Insn.LetBang A x e)) H HAinI).
-
-        destruct (H0 A H4) as [Theta Hpart].
+        destruct (H0 A (inter_nin A (Label.actors l)
+                          (Insn.actors (Insn.LetBang A x e)) H HAinI)) as [Theta Hpart].
 
         rewrite find_add in Hpart.
-
         specialize (IHHstepB A Theta).
-
         
         rewrite find_add in IHHstepB.
         specialize (IHHstepB Hpart).
@@ -4323,8 +4317,30 @@ Proof.
         destruct (Var.Map.Proofs.partition_concat (ChorEnv.find A T1') ThetaA1 ThetaA2) as [Hpc2 _].
         destruct (Hpc2 H8) as [Hpc2A Hpc2B]; clear Hpc2.
 
-        pose proof (dj_concat_dj ThetaEx2 ThetaA1 ThetaA2 Hwsf Hpc1A Hpc2A).
-        
+        pose proof (dj_concat_dj ThetaEx2 ThetaA2 ThetaA1 Hpc1A Hwsf
+                      (Var.Map.Proofs.disjoint_sym ThetaA1 ThetaA2 Hpc2A)) as Hdjcdj.
+
+        assert (Var.Map.Partition
+                  (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) ThetaA1 (ChorEnv.find A T2)) as Hvmp.
+        {
+          rewrite <- Hpc1B in Hdjcdj.
+          apply (concat_partition ThetaA1 (ChorEnv.find A T2) 
+                   (Var.Map.Proofs.disjoint_sym (ChorEnv.find A T2) ThetaA1 Hdjcdj)).
+        }
+
+        specialize (Hsw Hvmp).
+
+        exists (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2).
+        split.
+        {
+          apply Delay.
+          { auto. }
+          { auto. }
+        }
+        {
+          (*  we have Step_partition_pairs T (Actor.Map.add A ThetaA2 T1') T' T2 *)
+          
+          
 Admitted.
 
 
