@@ -48,6 +48,16 @@ Module Insn.
         LetPair B y1 y2 e'
     end.
 
+
+    Lemma actors_subst : forall I B x v,
+      Actor.FSet.Equal
+        (actors (subst B x v I))
+        (actors I).
+    Proof.
+      destruct I; intros; Actor.simplify.
+    Qed.
+    #[global] Hint Rewrite actors_subst : actor_db.
+
     Definition bindt : Type := Actor.t * Var.t.
     
     Definition bind_eq  (Ax : bindt) (By: bindt) : Prop := (fst Ax) = (fst By) /\ (snd Ax) = (snd By).
@@ -211,8 +221,11 @@ End Insn.
 Module Choreography.
     Definition t := list Insn.t.
 
-    Definition actors (C : t) : Actor.FSet.t :=
-        List.fold_left (fun X I => Actor.FSet.union X (Insn.actors I)) C Actor.FSet.empty.
+    Fixpoint actors (C : t) : Actor.FSet.t :=
+      match C with
+      | [] => Actor.FSet.empty
+      | I0 :: C' => Actor.FSet.union (Insn.actors I0) (actors C')
+      end.
 
     Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
       match C with
@@ -220,6 +233,17 @@ Module Choreography.
       | (Ins :: C') => (Insn.subst A x v Ins)::(if (Insn.rebound_in A x Ins)
                                                 then C' else (subst A x v C')) 
       end.
+
+    Lemma actors_subst : forall C A x v,
+      Actor.FSet.Equal
+        (actors (subst A x v C))
+        (actors C).
+    Proof.
+      induction C as [ | I C]; intros A x v; simpl; Actor.simplify.
+      destruct (Insn.rebound_in A x I); try reflexivity.
+      rewrite IHC; reflexivity.
+    Qed.
+    #[global] Hint Rewrite actors_subst : actor_db.
 End Choreography.
 
 Module Label.
