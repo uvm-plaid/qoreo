@@ -1475,7 +1475,7 @@ Lemma concat_partition_eq : forall {X : Type} (M M1 M2 : Var.Map.t X),
 Proof.
   intros.
   pose proof (Var.Map.Proofs.partition_concat M M1 M2).
-  destruct H0.
+  destruct H0. 
   destruct (H0 H).
   rewrite <- H3.
   Var.simplify.
@@ -3931,6 +3931,28 @@ Proof.
   lia.
 Qed.
 
+Lemma step_weakening : forall C T1 cfg l C' T1' cfg' T2 T2' Theta A,
+    step C T1 cfg l C' T1' cfg' ->
+    Var.Map.Partition (ChorEnv.find A T2) Theta (ChorEnv.find A T1) ->
+    Var.Map.Partition (ChorEnv.find A T2') Theta (ChorEnv.find A T1') ->
+    step C T2 cfg l C' T2' cfg'.
+Admitted.
+
+Lemma step_monotone : forall C T cfg l C' T' cfg',
+    step C T cfg l C' T' cfg' ->
+    WellScoped T cfg ->
+    forall A, exists Theta,
+      Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T) Theta /\
+        ~ Config.WellScoped Theta cfg.
+Proof.
+Admitted.
+
+Lemma ws_fresh : forall Theta1 Theta2 cfg,
+    Config.WellScoped Theta1 cfg ->
+    ~ Config.WellScoped Theta2 cfg ->
+    Var.Map.Properties.Disjoint Theta1 Theta2.
+Proof.
+Admitted.
 
 Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     A <> B ->
@@ -4075,19 +4097,6 @@ Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
     (forall A,
       Actor.FSet.In A (Label.actors l) ->
       Var.Map.Equal (ChorEnv.find A T1) (ChorEnv.find A T2)).
-
-
-Lemma step_weakening : forall C T1 cfg l C' T1' cfg' A Theta,
-  step C T1 cfg l C' T1' cfg' ->
-  step C (Actor.Map.add A (Var.Map.concat (ChorEnv.find A T1) Theta) T1) cfg l
-    C' (Actor.Map.add A (Var.Map.concat (ChorEnv.find A T1') Theta) T1') cfg'.
-Admitted.
-
-Lemma step_monotone : forall C T cfg l C' T' cfg',
-    step C T cfg l C' T' cfg' ->
-    forall A, exists Theta, Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T) Theta.
-Proof.
-Admitted.
 
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
@@ -4268,14 +4277,40 @@ Proof.
         rewrite find_add in IHHstepB.
         specialize (IHHstepB Hpart).
 
-        destruct (step_monotone C T cfg l C' T' cfg' Hstep A) as [ThetaEx1 Hmono1].
+        pose proof (ws_partition_env
+                      A T ThetaA2 ThetaA1 cfg HWS).
+        
+        destruct (step_monotone C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg' IHHstepA HWS A) as [ThetaEx2 Hmono2].
+
+                pose proof (step_monotone C T cfg l C' T' cfg' Hstep HWS A).
+
+
+          as [ThetaEx1 Hmono1].
         destruct (step_monotone C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg' IHHstepA A) as [ThetaEx2 Hmono2].
         rewrite find_add in Hmono2; auto.
 
+        pose proof (step_weakening
+                      C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg'
+                      T1'
+                      (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2)
+                      ThetaA1 A IHHstepA
+          ) as Hsw.
+
+        rewrite find_add in Hsw; auto.
+        rewrite find_add in Hsw; auto.
+
+        specialize (Hsw H8).
+        
+          ).
+          ).
+        
         pose proof (step_weakening C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg' A ThetaA1 IHHstepA) as Hsw.
 
         rewrite find_add in Hsw; auto.
         rewrite addadd2 in Hsw; auto.
+
+        pose proof (concat_partition_eq (ChorEnv.find A T1') ThetaA1 ThetaA2 H8).
+        rewrite H5 in Hsw.
         
 Admitted.
 
