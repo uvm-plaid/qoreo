@@ -796,10 +796,10 @@ Qed.
 
 Lemma partition_lopsided : forall {X : Type} (M1 M2: Var.Map.t X),
     Var.Map.Partition M1 M1 M2 ->
-    Var.Map.Empty M2.
+    Var.Map.Equal M2 (Var.Map.empty X).
 Proof.
   intros.
-  pose proof (Var.Map.Proofs.partition_empty_r _ M1).  
+  pose proof (Var.Map.Proofs.partition_empty_r _ M1).
 Admitted.
 
 Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
@@ -1440,6 +1440,14 @@ Lemma members_dj : forall A B AS1 AS2,
 Proof.
   intros A B AS1 AS2 Hinter HA HB Heq; subst.
   apply (Hinter B).
+  Actor.simplify.
+Qed.
+
+Lemma singleton_nin : forall A B,
+    ~ Actor.FSet.In A (Actor.FSet.singleton B) ->
+    A <> B.
+Proof.
+  intros.
   Actor.simplify.
 Qed.
 
@@ -4161,7 +4169,7 @@ Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
       Actor.FSet.In A (Label.actors l) ->
       Var.Map.Equal (ChorEnv.find A T1) (ChorEnv.find A T2)).
 
-Lemma step_inversion_v4 : forall C1 T1 cfg1 l C2 T2 cfg2,
+Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
     WellScoped T1 cfg1 ->    
     forall G D T1',
@@ -4173,7 +4181,8 @@ Lemma step_inversion_v4 : forall C1 T1 cfg1 l C2 T2 cfg2,
 Proof.
   intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
   induction Hstep.
-  
+
+  (* Case SendB *)
   - intros HWS G D T1' HPex HWT.
 
     inversion HWT; subst.
@@ -4214,8 +4223,7 @@ Proof.
         pose proof (partition_lopsided  (ChorEnv.find A T1') Theta H1) as Hpl. 
         rewrite find_add.
         rewrite find_add.
-        pose proof (Var.Map.Proofs.empty_map_equal Theta Hpl) as Heme.
-        rewrite Heme.
+        rewrite Hpl.
         apply Var.Map.Proofs.partition_empty_r; auto.
       }
       {
@@ -4224,6 +4232,7 @@ Proof.
       }
     }
 
+  (* Case SendC *)
   - intros HWS G D T1' Hpart HWT.
 
     inversion HWT; subst.
@@ -4240,7 +4249,19 @@ Proof.
       intros.
       rewrite H0 in H.
       auto.
-    }      
+    }
+    
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+    - admit.
+
+    (* Case Delay *)
+    - 
 Admitted.
 
 
@@ -6064,28 +6085,43 @@ Proof.
       rewrite empty_to_empty in HWT; auto.
    
     (* Case Delay/Send *)
-    + assert (forall A0 : Actor.t,
-               exists Theta : Var.Map.M.t nat,
-                 Var.Map.Partition (ChorEnv.find A0 T)
-                   (ChorEnv.find A0 (Actor.Map.add A ThetaA2 T)) Theta) as Hpart.
+    + assert (Partition_except l T (Actor.Map.add A ThetaA2 T)) as Hpart.
       {
-        intro.
-        assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
-        tauto.
+        unfold Partition_except.
+        split.
         {
-          rewrite <- HAeqA0 in *.
-          exists ThetaA1.
-          rewrite find_add.
-          pose proof (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A T) ThetaA1 ThetaA2 H2); auto.
+          intros.
+          assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
+          tauto.
+          {
+            rewrite <- HAeqA0 in *.
+            exists ThetaA1.
+            rewrite find_add.
+            pose proof (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A T) ThetaA1 ThetaA2 H2); auto.
+          }
+          {
+            exists (Var.Map.empty _).
+            rewrite find_ab_neq2; auto.
+            apply Var.Map.Proofs.partition_empty_r.
+          }
         }
         {
-          exists (Var.Map.empty _).
+          intros.
+
+          assert (Actor.FSet.In A (Insn.actors (Insn.Send A e B y))) as HAinI.
+          unfold Insn.actors.
+          Actor.simplify.
+          
+          pose proof (members_dj A0 A
+                        (Label.actors l)
+                        (Insn.actors (Insn.Send A e B y)) H12 H3 HAinI).
+          
           rewrite find_ab_neq2; auto.
-          apply Var.Map.Proofs.partition_empty_r.
+          Var.simplify.
         }
       }
-
-      pose proof (step_inversion_v3
+      
+      pose proof (delay_inversion
                     C T cfg1 l C' T2 cfg2 H5 Hscoped
                     (ChorEnv.add B y tau G)
                     (Actor.Map.add A DeltaA2 D)
