@@ -1443,6 +1443,16 @@ Proof.
   Actor.simplify.
 Qed.
 
+Lemma inter_nin : forall A AS1 AS2,
+    Actor.FSet.Empty (Actor.FSet.inter AS1 AS2) ->
+    Actor.FSet.In A AS2 -> 
+    ~ Actor.FSet.In A AS1.
+Proof.
+  intros A AS1 AS2 Hinter Hnin HH; subst.
+  apply (Hinter A).
+  Actor.simplify.
+Qed.
+
 Lemma singleton_nin : forall A B,
     ~ Actor.FSet.In A (Actor.FSet.singleton B) ->
     A <> B.
@@ -1459,8 +1469,19 @@ Proof.
   Var.simplify.
 Qed.
 
+Lemma concat_partition_eq : forall {X : Type} (M M1 M2 : Var.Map.t X),
+    Var.Map.Partition M M1 M2 ->
+    Var.Map.Equal (Var.Map.concat M1 M2) M.
+Proof.
+  intros.
+  pose proof (Var.Map.Proofs.partition_concat M M1 M2).
+  destruct H0.
+  destruct (H0 H).
+  rewrite <- H3.
+  Var.simplify.
+Qed.
 
-(* STOP Easily(?) proven facts *)
+(* STOP Easily(?) proven facts *)  
 
 Lemma wt_disjoint : forall C A G D T,
     WellTyped G D T C ->
@@ -4000,22 +4021,6 @@ Proof.
     { rewrite Heq; auto; try reflexivity. }
 Qed.
 
-(* Defined this helper function Partition_on to mean that find A T == find A T1 ++ ThetaA2 
-  and for all other B <> A, find B T = find B T1
-*)
-Definition Partition_on {X} A (T T1 : ChorEnv.t X) ThetaA2 :=
-  Var.Map.Partition (ChorEnv.find A T) (ChorEnv.find A T1) ThetaA2 
-  /\
-  forall B, A <> B -> Var.Map.Equal (ChorEnv.find B T1) (ChorEnv.find B T).
-
-
-Lemma step_weakening : forall T1 T1' ThetaA2 T T' A C cfg l C' cfg',
-  step C T1 cfg l C' T1' cfg' ->
-  Partition_on A T T1 ThetaA2 ->
-  Partition_on A T' T1' ThetaA2 ->
-  step C T cfg l C' T' cfg'.
-Admitted.
-
 Definition Step_partition_pairs (T1 T1' T2 T2' : ChorEnv.t nat) :=
   forall A Theta,
     Var.Map.Partition (ChorEnv.find A T1) (ChorEnv.find A T1') Theta ->
@@ -4062,104 +4067,6 @@ Proof.
   }
 Qed.
 
-Lemma step_inversion_v2 : forall C1 T1 cfg1 l C2 T2 cfg2,
-    step C1 T1 cfg1 l C2 T2 cfg2 ->
-    WellScoped T1 cfg1 ->    
-    forall G D T1',
-    WellTyped G D T1' C1 ->
-    exists T2',
-      step C1 T1' cfg1 l C2 T2' cfg2 /\
-        Step_partition_pairs T1 T1' T2 T2'.
-Proof.
-  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
-  induction Hstep.
-  
-  - intros HWS G D T1' HWT.
-
-    inversion HWT; subst.
-    
-    
-Admitted.
-
-Lemma step_inversion_v3 : forall C1 T1 cfg1 l C2 T2 cfg2,
-    step C1 T1 cfg1 l C2 T2 cfg2 ->
-    WellScoped T1 cfg1 ->    
-    forall G D T1',
-    (forall A, exists Theta,
-        Var.Map.Partition (ChorEnv.find A T1) (ChorEnv.find A T1') Theta) ->
-    WellTyped G D T1' C1 ->
-    exists T2',
-      step C1 T1' cfg1 l C2 T2' cfg2 /\
-        Step_partition_pairs T1 T1' T2 T2'.
-Proof.
-  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
-  induction Hstep.
-  
-  - intros HWS G D T1' Hpart HWT.
-
-    inversion HWT; subst.
-
-    exists (Actor.Map.add A TA' T1').
-    split.
-    {
-      eapply SendC.
-      {
-        destruct (Hpart A) as [Theta HpartTheta].
-        destruct (partitioning
-                    (ChorEnv.find A T) ThetaA1 Theta (ChorEnv.find A T1') ThetaA2
-                    (@Var.Map.Properties.Partition_sym _
-                       (ChorEnv.find A T) (ChorEnv.find A T1') Theta HpartTheta) H13)              
-          as [HpartA [HpartB [HpartC HpartD]]].
-
-        (* would like to use Expr.step_inversion, but it requires empty Gamma and Delta. *)     
-        admit.
-      }
-      {
-        assert (ChorEnv.Equal (Actor.Map.add A TA' T1') (Actor.Map.add A TA' T1')).
-        Var.simplify.
-        eauto.
-      }
-    }
-    {
-      unfold Step_partition_pairs.
-      intros.
-      rewrite H0.
-      
-      assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
-      tauto.
-      {
-        rewrite <- HAeqA0 in *.
-        rewrite find_add.
-        rewrite find_add.
-        specialize (Hpart A).
-        admit.
-      }
-      {
-        rewrite find_ab_neq2; auto.
-        rewrite find_ab_neq2; auto.
-      }
-    }
-
-  - intros HWS G D T1' Hpart HWT.
-
-    inversion HWT; subst.
-
-    exists T1'.
-    split.
-    {
-      apply SendB.
-      { Var.simplify. }
-      { Var.simplify. }
-    }
-    {
-      unfold Step_partition_pairs.
-      intros.
-      rewrite H0 in H.
-      auto.
-    }      
-Admitted.
-
-
 Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
   (forall A,
     ~ Actor.FSet.In A (Label.actors l) ->
@@ -4168,6 +4075,19 @@ Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
     (forall A,
       Actor.FSet.In A (Label.actors l) ->
       Var.Map.Equal (ChorEnv.find A T1) (ChorEnv.find A T2)).
+
+
+Lemma step_weakening : forall C T1 cfg l C' T1' cfg' A Theta,
+  step C T1 cfg l C' T1' cfg' ->
+  step C (Actor.Map.add A (Var.Map.concat (ChorEnv.find A T1) Theta) T1) cfg l
+    C' (Actor.Map.add A (Var.Map.concat (ChorEnv.find A T1') Theta) T1') cfg'.
+Admitted.
+
+Lemma step_monotone : forall C T cfg l C' T' cfg',
+    step C T cfg l C' T' cfg' ->
+    forall A, exists Theta, Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T) Theta.
+Proof.
+Admitted.
 
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
@@ -4261,9 +4181,112 @@ Proof.
     - admit.
 
     (* Case Delay *)
-    - 
+    - intros HWS G D T1' HPex HWT.
+      
+      inversion HWT; subst.
+      
+      + (* I = EPR *) admit.
+      + (* I = Send *) admit.
+
+      + (* I = LetBang *)           
+        assert (Actor.FSet.In A (Insn.actors (Insn.LetBang A x e))) as HAinI.
+        unfold Insn.actors.
+        Actor.simplify.
+            
+        assert (Partition_except l T (Actor.Map.add A ThetaA2 T1')) as HPex'.
+        {
+          unfold Partition_except in HPex.
+          destruct HPex as [HPexA HPexB].
+          
+          unfold Partition_except.
+          split.
+          {
+            intros.
+            assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
+            tauto.
+            {
+              rewrite <- HAeqA0 in *.
+              rewrite find_add; auto.
+
+              destruct (HPexA A H0) as [Theta HPexAninl].
+
+              exists (Var.Map.concat Theta ThetaA1).
+
+              destruct
+                (partitioning
+                   (ChorEnv.find A T) ThetaA1 Theta (ChorEnv.find A T1') ThetaA2
+                   (@Var.Map.Properties.Partition_sym _
+                      (ChorEnv.find A T) (ChorEnv.find A T1') Theta HPexAninl)
+                   H8) as [HPartA [HPartB [HPartC HPartD]]].
+
+              apply
+                (@Var.Map.Properties.Partition_sym _
+                   (ChorEnv.find A T) (Var.Map.concat Theta ThetaA1) ThetaA2 HPartC).
+            }
+            {
+              destruct (HPexA A0 H0) as [Theta HPexAninl].
+              rewrite find_ab_neq2; eauto.
+            }
+          }
+          {
+            intros.
+
+            specialize (HPexB A0 H0).
+            
+            pose proof (members_dj A0 A
+                          (Label.actors l)
+                          (Insn.actors (Insn.LetBang A x e)) H H0 HAinI).
+            
+            rewrite find_ab_neq2; auto.
+          }
+        }
+
+        specialize (IHHstep HWS
+                      (ChorEnv.add A x tau G)
+                      (Actor.Map.add A DeltaA2 D)
+                      (Actor.Map.add A ThetaA2 T1')
+                      HPex' H3).
+
+        destruct IHHstep as [T2 [IHHstepA IHHstepB]].
+
+        unfold Step_partition_pairs in IHHstepB.
+
+        unfold Partition_except in HPex'.
+
+        destruct HPex'.
+
+        pose proof (inter_nin A (Label.actors l)
+                      (Insn.actors (Insn.LetBang A x e)) H HAinI).
+
+        destruct (H0 A H4) as [Theta Hpart].
+
+        rewrite find_add in Hpart.
+
+        specialize (IHHstepB A Theta).
+
+        
+        rewrite find_add in IHHstepB.
+        specialize (IHHstepB Hpart).
+
+        destruct (step_monotone C T cfg l C' T' cfg' Hstep A) as [ThetaEx1 Hmono1].
+        destruct (step_monotone C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg' IHHstepA A) as [ThetaEx2 Hmono2].
+        rewrite find_add in Hmono2; auto.
+
+        pose proof (step_weakening C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg' A ThetaA1 IHHstepA) as Hsw.
+
+        rewrite find_add in Hsw; auto.
+        rewrite addadd2 in Hsw; auto.
+        
 Admitted.
 
+
+(* Defined this helper function Partition_on to mean that find A T == find A T1 ++ ThetaA2 
+  and for all other B <> A, find B T = find B T1
+*)
+Definition Partition_on {X} A (T T1 : ChorEnv.t X) ThetaA2 :=
+  Var.Map.Partition (ChorEnv.find A T) (ChorEnv.find A T1) ThetaA2 
+  /\
+  forall B, A <> B -> Var.Map.Equal (ChorEnv.find B T1) (ChorEnv.find B T).
 
 Lemma step_inversion' : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
@@ -6097,7 +6120,8 @@ Proof.
             rewrite <- HAeqA0 in *.
             exists ThetaA1.
             rewrite find_add.
-            pose proof (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A T) ThetaA1 ThetaA2 H2); auto.
+            pose proof (@Var.Map.Properties.Partition_sym _
+                          (ChorEnv.find A T) ThetaA1 ThetaA2 H2); auto.
           }
           {
             exists (Var.Map.empty _).
