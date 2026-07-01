@@ -799,8 +799,15 @@ Lemma partition_lopsided : forall {X : Type} (M1 M2: Var.Map.t X),
     Var.Map.Equal M2 (Var.Map.empty X).
 Proof.
   intros.
-  pose proof (Var.Map.Proofs.partition_empty_r _ M1).
-Admitted.
+  rewrite Var.Map.Proofs.partition_concat in H.
+  destruct H as [Hdisj Heq].
+  intros z. specialize (Heq z).
+  Var.simplify.
+  destruct (Var.Map.find z M1) eqn:H1; auto.
+  destruct (Var.Map.find z M2) eqn:H2; auto.
+  exfalso. apply (Hdisj z).
+  split; Var.solve.
+Qed.
 
 Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
     ChorEnv.find A (Actor.Map.add A M CE) = M.
@@ -1497,7 +1504,13 @@ Lemma partition_concat_assoc : forall {X : Type} (M M1 M2 M3 : Var.Map.t X),
     Var.Map.Partition M M1 (Var.Map.concat M2 M3) ->
     Var.Map.Partition M (Var.Map.concat M3 M1) M2.
 Proof.
-Admitted.
+  intros.
+  Var.Map.Tactics.reflect_partition; Var.simplify.
+  rewrite (Var.Map.Proofs.concat_sym M3 M1); auto with extra_var_db.
+  rewrite <- Var.Map.Proofs.concat_assoc.
+  rewrite (Var.Map.Proofs.concat_sym M2 M3); auto.
+  reflexivity.
+Qed.
 (* STOP Easily(?) proven facts *)  
 
 Lemma wt_disjoint : forall C A G D T,
@@ -3962,6 +3975,7 @@ Lemma step_monotone : forall C T cfg l C' T' cfg',
       Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T) Theta /\
         ~ Config.WellScoped Theta cfg.
 Proof.
+  intros ? ? ? ? ? ? ? Hstep.
 Admitted.
 
 (* 
@@ -3974,11 +3988,15 @@ Proof.
 Admitted.
  *)
 
+
+(* Not true. The non-well-scopedness of Theta2 just says that there is some variable z in Theta2 that is >= Config.dim. This does imply that z is not in Theta1, but it doesn't mean that everything in Theta2 is not in Theta1.  *)
 Lemma ws_fresh : forall Theta1 Theta2 cfg,
     Config.WellScoped Theta1 cfg ->
     ~ Config.WellScoped Theta2 cfg ->
     Var.Map.Properties.Disjoint Theta1 Theta2.
 Proof.
+  intros Theta1 Theta2 cfg H1 H2.
+  destruct H1 as [Hqstate Hqrefs].
 Admitted.
 
 Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
@@ -4130,7 +4148,103 @@ Lemma ws_partition_except : forall l (T1 T2 : ChorEnv.t nat) cfg,
     Partition_except l T1 T2 ->
     WellScoped T2 cfg.
 Proof.
-Admitted.
+  intros l T1 T2 cfg Hws [Hpart Heq] A.
+  specialize (Hws A). destruct Hws as [Hwf Hws].
+  split; auto.
+  intros z Hz.
+
+  (* If A is in actors(l) then we're done *)
+
+  (* If not...then z is still in find A T1 *)
+  apply Hws.
+  destruct (Actor.Map.FSetProofs.in_dec A (Label.actors l)) as [Hin | Hin].
+  + rewrite Heq; auto.
+  + apply Hpart in Hin.
+    destruct Hin as [Theta Hpart'].
+    Var.Map.Tactics.reflect_partition.
+    rewrite Heq0.
+    Var.simplify.
+Qed.
+
+
+Lemma epr_part' : forall T1 A B T cfg q1 q2 T' cfg',
+  ChorEnv.epr A B T cfg = (q1, q2, T', cfg') ->
+  Partition_except (Label.EPR A B) T T1 ->
+  WellScoped T cfg ->
+  exists T1', ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') /\
+              Step_partition_pairs T T1 T' T1'.
+Proof.
+  intros T1 A B T cfg q1 q2 T' cfg' Hepr [Hpart Heq] HWS.
+  unfold ChorEnv.epr in *.
+  destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hcfg.
+  inversion Hepr; subst; clear Hepr.
+  exists (ChorEnv.add B q2 q2 (ChorEnv.add A q1 q1 T1)).
+  split; auto.
+  intros D ThetaD HpartD.
+  assert (Hin1 : ~ Var.Map.In q1 ThetaD).
+  {
+    assert (Hin : ~ Var.Map.In q1 (ChorEnv.find D T)).
+      {
+        intros Hin.
+        eapply Config.wf_qrefs in Hin; eauto.
+        inversion Hcfg; subst; clear Hcfg.
+        lia.
+      }
+      intros HinD.
+      apply Hin.
+      Var.Map.Tactics.reflect_partition.
+      rewrite Heq0.
+      Var.simplify.
+  }
+  assert (Hin2 : ~ Var.Map.In q2 ThetaD).
+  {
+    assert (Hin : ~ Var.Map.In q2 (ChorEnv.find D T)).
+      {
+        intros Hin.
+        eapply Config.wf_qrefs in Hin; eauto.
+        inversion Hcfg; subst; clear Hcfg.
+        lia.
+      }
+      intros HinD.
+      apply Hin.
+      Var.Map.Tactics.reflect_partition.
+      rewrite Heq0.
+      Var.simplify.
+  }
+  ChorEnv.simplify.
+  + (* A = D *)
+    apply Var.Map.Proofs.partition_add_l; auto.
+    apply Var.Map.Proofs.partition_add_l; auto.
+
+  + (* B = D *)
+    apply Var.Map.Proofs.partition_add_l; auto.
+  
+  + (* D <> A, D <> B *)
+    apply Var.Map.Proofs.partition_add_l; auto.
+Qed.
+
+
+Lemma partition_functional_2 : forall T (M M1 M2 M2' : Var.Map.t T),
+  Var.Map.Partition M M1 M2 -> Var.Map.Partition M M1 M2' ->
+  Var.Map.Equal M2 M2'.
+Proof.
+  intros T M M1 M2 M2' Hpart Hpart'.
+  Var.Map.Tactics.reflect_partition.
+  Var.reflect_find.
+  specialize (Heq z).
+  Var.simplify.
+  destruct (Var.Map.find z M1) as [v | ] eqn:H1; auto.
+  destruct (Var.Map.find z M2) eqn:H2.
+  {
+    exfalso.
+    apply (Hdisj0 z). split; Var.solve.
+  }
+  destruct (Var.Map.find z M2') eqn:H2'; auto.
+  {
+    exfalso.
+    apply (Hdisj z). split; Var.solve.
+  }
+Qed.
 
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
@@ -4214,7 +4328,28 @@ Proof.
       auto.
     }
     
-    - admit.
+    - (* EPR *)
+      intros HWS G D T1' Hpart HWT.
+      inversion HWT; subst; clear HWT.
+
+      (* T[A] = T1'[A] *)
+      (* T[B] = T1'[B] *)
+      (* for other D: T[D] = T1'[D],ThetaD *)
+
+      edestruct (epr_part' T1') as [T1'' [Hepr' Hpart']]; eauto.
+
+      exists T1''. split; auto.
+      {
+        econstructor; eauto.
+        reflexivity.
+      }
+      {
+        unfold Step_partition_pairs. intros.
+        rewrite H0.
+        apply Hpart'; auto.
+      }
+
+
     - admit.
     - admit.
     - admit.
@@ -4228,10 +4363,169 @@ Proof.
       
       inversion HWT; subst.
       
-      + (* I = EPR *) admit.
-      + (* I = Send *) admit.
+      + (* I = EPR *)
+        apply IHHstep in H3; auto.
+        destruct H3 as [T2' [IHstep IHpart]].
+        eexists.
+        split.
+        { econstructor; eauto. }
+        auto.
 
-      + (* I = LetBang *)           
+      + (* I = Send *)
+        destruct HPex as [HPpart HPeq].
+
+        assert (Hin : ~ Actor.FSet.In A (Label.actors l)).
+        { intros Hin. apply (H A). simpl. Actor.simplify. }
+        apply HPpart in Hin.
+        destruct Hin as [ThetaA HpartA].
+
+        apply IHHstep in H4; auto.
+        2:{
+          split.
+          {
+            intros D0 HD0.
+            apply HPpart in HD0.
+            destruct HD0 as [ThetaD0 Hpart0].
+            Actor.Map.Tactics.compare D0 A.
+            {
+              ChorEnv.simplify.
+              assert (Heq : Var.Map.Equal (ChorEnv.find D0 T) (Var.Map.concat (Var.Map.concat ThetaA1 ThetaA2) ThetaD0)).
+              {
+                Var.Map.Tactics.reflect_partition. rewrite Heq. rewrite Heq1. reflexivity.
+              }
+              assert (Hdisj : Var.Map.Properties.Disjoint ThetaA1 ThetaD0).
+              {
+                Var.Map.Tactics.reflect_partition.
+                rewrite Heq2 in *.
+                Var.simplify.
+              }
+
+              
+              exists (Var.Map.concat ThetaD0 ThetaA1).
+              rewrite Heq.
+              Var.Map.Tactics.reflect_partition;
+                rewrite Heq2 in *;
+                Var.simplify.
+              {
+                split; auto. apply Var.Map.Proofs.disjoint_sym; auto.
+              }
+              {
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- (Var.Map.Proofs.concat_assoc).
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaD0);
+                  auto.
+                reflexivity.
+              }
+            }
+            { (* D0 <> A *)
+              exists ThetaD0.
+              ChorEnv.simplify.
+            }
+          }
+          {
+            intros D0 HD0.
+            assert (D0 <> A).
+            { inversion 1; subst. apply (H A). simpl. Actor.simplify. }
+            ChorEnv.simplify.
+          }
+        }
+
+        destruct H4 as [T2' [IHstep IHpart]].
+
+        Var.Map.Tactics.reflect_partition.
+        rewrite Heq0 in *.
+        ChorEnv.simplify.
+
+
+        eexists.
+        split.
+        { 
+          econstructor; eauto.
+          (* Know: C / (T1',A[ThetaA2]) -l-> C' / T2' *)
+          (* A ∉ l *)
+          (* WTS exists T2'', C / T1' -l-> C' / ??? *)
+          (* Because A ∉ l, we know exists ThetaA, T[A] == T1'[A]+ThetaA *)
+
+          (* step_weakening says that because
+             T1'[A] == ThetaA1 ++ ThetaA2 == ThetaA1 ++ (T1',A[ThetaA2])[A],
+             and C / (T1',A[ThetaA2]) -l-> C' / T2',
+             then whenever ???[A] = ThetaA1 ++ T2'[A],
+             then we can conclude that C / T1' -l-> C' / ???
+          *)
+          eapply step_weakening with (A := A)
+                                     (T1 := Actor.Map.add A ThetaA2 T1')
+                                     (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
+            eauto.
+          { rewrite Heq0. ChorEnv.simplify.
+            Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
+          }
+          {
+            unfold Step_partition_pairs in IHpart.
+            specialize (IHpart A).
+
+            assert (Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T2') (Var.Map.concat ThetaA ThetaA1)).
+            {
+              apply IHpart.
+              ChorEnv.simplify.
+
+              rewrite Heq.
+              { (*associativity and symmetry *)
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA); auto.
+                reflexivity.
+              }
+            }
+            ChorEnv.simplify.
+          }
+        }
+        { (* Step_partition_pairs *)
+          intros D0 ThetaD0 HpartD0.
+          unfold Step_partition_pairs in IHpart.
+          Actor.Map.Tactics.compare D0 A.
+          { (* D0 = A *)
+            assert (HeqAD : Var.Map.Equal ThetaD0 ThetaA).
+            {
+              eapply partition_functional_2; eauto.
+              rewrite Heq0 in *; Var.simplify.
+            }
+            rewrite HeqAD in *; clear ThetaD0 HeqAD HpartD0.
+
+            assert (HpartD0 : Var.Map.Partition (ChorEnv.find D0 T') (ChorEnv.find D0 T2') (Var.Map.concat ThetaA1 ThetaA)).
+            {
+              apply IHpart.
+              ChorEnv.simplify.
+              rewrite Heq.
+              { (* associativity and commutativity *)
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA); auto.
+                reflexivity.
+              }
+            }
+
+            ChorEnv.simplify.
+            {
+              rewrite Heq2.
+              (*commutativity and associativity*)
+                rewrite (Var.Map.Proofs.concat_sym); auto.
+                2:{ Var.simplify. }
+                repeat rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA); auto.
+                2:{ auto with extra_var_db. }
+                reflexivity.
+            }
+            
+          }
+          { (* D0 <> A *)
+            ChorEnv.simplify.
+            apply IHpart.
+            ChorEnv.simplify.
+          }
+
+        }
+
+      + (* I = LetBang *)
         assert (Actor.FSet.In A (Insn.actors (Insn.LetBang A x e))) as HAinI.
         unfold Insn.actors.
         Actor.simplify.
