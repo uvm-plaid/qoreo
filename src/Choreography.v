@@ -4412,9 +4412,13 @@ Proof.
           }
           {
             rewrite find_ab_neq2; auto.
-            
-            
-            (* XXXXXX *)
+            unfold Step_partition_pairs in HSPP.
+            specialize (HSPP A0).
+            rewrite find_ab_neq2 in HSPP; auto.
+          }
+        }
+        
+        (* XXXXXX *)
 
 Admitted.
 
