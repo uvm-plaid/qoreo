@@ -4704,9 +4704,319 @@ Proof.
             rewrite find_ab_neq2 in HSPP2; auto.
           }
         }
-        
-        (* XXXXXX *)
 
+      + (* I = Let *)
+        destruct HPex as [HPpart HPeq].
+
+        assert (Hin : ~ Actor.FSet.In A (Label.actors l)).
+        { intros Hin. apply (H A). simpl. Actor.simplify. }
+        apply HPpart in Hin.
+        destruct Hin as [ThetaA HpartA].
+
+        apply IHHstep in H3; auto.
+        2:{
+          split.
+          {
+            intros D0 HD0.
+            apply HPpart in HD0.
+            destruct HD0 as [ThetaD0 Hpart0].
+            Actor.Map.Tactics.compare D0 A.
+            {
+              ChorEnv.simplify.
+              assert (Heq : Var.Map.Equal (ChorEnv.find D0 T) (Var.Map.concat (Var.Map.concat ThetaA1 ThetaA2) ThetaD0)).
+              {
+                Var.Map.Tactics.reflect_partition. rewrite Heq. rewrite Heq1. reflexivity.
+              }
+              assert (Hdisj : Var.Map.Properties.Disjoint ThetaA1 ThetaD0).
+              {
+                Var.Map.Tactics.reflect_partition.
+                rewrite Heq2 in *.
+                Var.simplify.
+              }
+
+              
+              exists (Var.Map.concat ThetaD0 ThetaA1).
+              rewrite Heq.
+              Var.Map.Tactics.reflect_partition;
+                rewrite Heq2 in *;
+                Var.simplify.
+              {
+                split; auto. apply Var.Map.Proofs.disjoint_sym; auto.
+              }
+              {
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- (Var.Map.Proofs.concat_assoc).
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaD0);
+                  auto.
+                reflexivity.
+              }
+            }
+            { (* D0 <> A *)
+              exists ThetaD0.
+              ChorEnv.simplify.
+            }
+          }
+          {
+            intros D0 HD0.
+            assert (D0 <> A).
+            { inversion 1; subst. apply (H A). simpl. Actor.simplify. }
+            ChorEnv.simplify.
+          }
+        }
+        
+        destruct H3 as [T2' [IHstep IHpart]].
+
+        Var.Map.Tactics.reflect_partition.
+        rewrite Heq0 in *.
+        ChorEnv.simplify.
+
+        
+        eexists.
+        split.
+        { 
+          econstructor; eauto.
+          (* Know: C / (T1',A[ThetaA2]) -l-> C' / T2' *)
+          (* A ∉ l *)
+          (* WTS exists T2'', C / T1' -l-> C' / ??? *)
+          (* Because A ∉ l, we know exists ThetaA, T[A] == T1'[A]+ThetaA *)
+
+          (* step_weakening says that because
+             T1'[A] == ThetaA1 ++ ThetaA2 == ThetaA1 ++ (T1',A[ThetaA2])[A],
+             and C / (T1',A[ThetaA2]) -l-> C' / T2',
+             then whenever ???[A] = ThetaA1 ++ T2'[A],
+             then we can conclude that C / T1' -l-> C' / ???
+          *)
+          eapply step_weakening with (A := A)
+                                     (T1 := Actor.Map.add A ThetaA2 T1')
+                                     (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
+            eauto.
+          { rewrite Heq0. ChorEnv.simplify.
+            Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
+          }
+          {
+            unfold Step_partition_pairs in IHpart.
+            specialize (IHpart A).
+
+            (* ALERT *)
+            assert (Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T2') (Var.Map.concat ThetaA ThetaA1)).
+            {
+              (* ALERT KEY!!! *)
+              apply IHpart.
+              ChorEnv.simplify.
+
+              rewrite Heq.
+              { (*associativity and symmetry *)
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA); auto.
+                reflexivity.
+              }
+            }
+            ChorEnv.simplify.
+          }
+        }
+        { (* Step_partition_pairs *)
+          intros D0 ThetaD0 HpartD0.
+          unfold Step_partition_pairs in IHpart.
+          Actor.Map.Tactics.compare D0 A.
+          { (* D0 = A *)
+            assert (HeqAD : Var.Map.Equal ThetaD0 ThetaA).
+            {
+              eapply partition_functional_2; eauto.
+              rewrite Heq0 in *; Var.simplify.
+            }
+            rewrite HeqAD in *; clear ThetaD0 HeqAD HpartD0.
+
+            assert (HpartD0 : Var.Map.Partition
+                                (ChorEnv.find D0 T') (ChorEnv.find D0 T2') (Var.Map.concat ThetaA1 ThetaA)).
+            {
+              apply IHpart.
+              ChorEnv.simplify.
+              rewrite Heq.
+              { (* associativity and commutativity *)
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA); auto.
+                reflexivity.
+              }
+            }
+
+            ChorEnv.simplify.
+            {
+              rewrite Heq2.
+              (*commutativity and associativity*)
+                rewrite (Var.Map.Proofs.concat_sym); auto.
+                2:{ Var.simplify. }
+                repeat rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA); auto.
+                2:{ auto with extra_var_db. }
+                reflexivity.
+            }
+            
+          }
+          { (* D0 <> A *)
+            ChorEnv.simplify.
+            apply IHpart.
+            ChorEnv.simplify.
+          }
+
+        }
+
+      + (* I = LetPair *)
+        destruct HPex as [HPpart HPeq].
+
+        assert (Hin : ~ Actor.FSet.In A (Label.actors l)).
+        { intros Hin. apply (H A). simpl. Actor.simplify. }
+        apply HPpart in Hin.
+        destruct Hin as [ThetaA HpartA].
+
+        apply IHHstep in H3; auto.
+        2:{
+          split.
+          {
+            intros D0 HD0.
+            apply HPpart in HD0.
+            destruct HD0 as [ThetaD0 Hpart0].
+            Actor.Map.Tactics.compare D0 A.
+            {
+              ChorEnv.simplify.
+              assert (Heq : Var.Map.Equal (ChorEnv.find D0 T) (Var.Map.concat (Var.Map.concat ThetaA1 ThetaA2) ThetaD0)).
+              {
+                Var.Map.Tactics.reflect_partition. rewrite Heq. rewrite Heq1. reflexivity.
+              }
+              assert (Hdisj : Var.Map.Properties.Disjoint ThetaA1 ThetaD0).
+              {
+                Var.Map.Tactics.reflect_partition.
+                rewrite Heq2 in *.
+                Var.simplify.
+              }
+
+              
+              exists (Var.Map.concat ThetaD0 ThetaA1).
+              rewrite Heq.
+              Var.Map.Tactics.reflect_partition;
+                rewrite Heq2 in *;
+                Var.simplify.
+              {
+                split; auto. apply Var.Map.Proofs.disjoint_sym; auto.
+              }
+              {
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- (Var.Map.Proofs.concat_assoc).
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaD0);
+                  auto.
+                reflexivity.
+              }
+            }
+            { (* D0 <> A *)
+              exists ThetaD0.
+              ChorEnv.simplify.
+            }
+          }
+          {
+            intros D0 HD0.
+            assert (D0 <> A).
+            { inversion 1; subst. apply (H A). simpl. Actor.simplify. }
+            ChorEnv.simplify.
+          }
+        }
+        
+        destruct H3 as [T2' [IHstep IHpart]].
+
+        Var.Map.Tactics.reflect_partition.
+        rewrite Heq0 in *.
+        ChorEnv.simplify.
+
+        
+        eexists.
+        split.
+        { 
+          econstructor; eauto.
+          (* Know: C / (T1',A[ThetaA2]) -l-> C' / T2' *)
+          (* A ∉ l *)
+          (* WTS exists T2'', C / T1' -l-> C' / ??? *)
+          (* Because A ∉ l, we know exists ThetaA, T[A] == T1'[A]+ThetaA *)
+
+          (* step_weakening says that because
+             T1'[A] == ThetaA1 ++ ThetaA2 == ThetaA1 ++ (T1',A[ThetaA2])[A],
+             and C / (T1',A[ThetaA2]) -l-> C' / T2',
+             then whenever ???[A] = ThetaA1 ++ T2'[A],
+             then we can conclude that C / T1' -l-> C' / ???
+          *)
+          eapply step_weakening with (A := A)
+                                     (T1 := Actor.Map.add A ThetaA2 T1')
+                                     (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
+            eauto.
+          { rewrite Heq0. ChorEnv.simplify.
+            Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
+          }
+          {
+            unfold Step_partition_pairs in IHpart.
+            specialize (IHpart A).
+
+            (* ALERT *)
+            assert (Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T2') (Var.Map.concat ThetaA ThetaA1)).
+            {
+              (* ALERT KEY!!! *)
+              apply IHpart.
+              ChorEnv.simplify.
+
+              rewrite Heq.
+              { (*associativity and symmetry *)
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA); auto.
+                reflexivity.
+              }
+            }
+            ChorEnv.simplify.
+          }
+        }
+        { (* Step_partition_pairs *)
+          intros D0 ThetaD0 HpartD0.
+          unfold Step_partition_pairs in IHpart.
+          Actor.Map.Tactics.compare D0 A.
+          { (* D0 = A *)
+            assert (HeqAD : Var.Map.Equal ThetaD0 ThetaA).
+            {
+              eapply partition_functional_2; eauto.
+              rewrite Heq0 in *; Var.simplify.
+            }
+            rewrite HeqAD in *; clear ThetaD0 HeqAD HpartD0.
+
+            assert (HpartD0 : Var.Map.Partition
+                                (ChorEnv.find D0 T') (ChorEnv.find D0 T2') (Var.Map.concat ThetaA1 ThetaA)).
+            {
+              apply IHpart.
+              ChorEnv.simplify.
+              rewrite Heq.
+              { (* associativity and commutativity *)
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2); auto.
+                rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA); auto.
+                reflexivity.
+              }
+            }
+
+            ChorEnv.simplify.
+            {
+              rewrite Heq2.
+              (*commutativity and associativity*)
+                rewrite (Var.Map.Proofs.concat_sym); auto.
+                2:{ Var.simplify. }
+                repeat rewrite <- Var.Map.Proofs.concat_assoc.
+                rewrite (Var.Map.Proofs.concat_sym ThetaA); auto.
+                2:{ auto with extra_var_db. }
+                reflexivity.
+            }
+            
+          }
+          { (* D0 <> A *)
+            ChorEnv.simplify.
+            apply IHpart.
+            ChorEnv.simplify.
+          }
+        }
 Admitted.
 
 
