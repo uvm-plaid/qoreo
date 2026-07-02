@@ -3968,37 +3968,6 @@ Lemma step_weakening : forall C T1 cfg l C' T1' cfg' T2 T2' Theta A,
     step C T2 cfg l C' T2' cfg'.
 Admitted.
 
-Lemma step_monotone : forall C T cfg l C' T' cfg',
-    step C T cfg l C' T' cfg' ->
-    WellScoped T cfg ->
-    forall A, exists Theta,
-      Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T) Theta /\
-        ~ Config.WellScoped Theta cfg.
-Proof.
-  intros ? ? ? ? ? ? ? Hstep.
-Admitted.
-
-(* 
-Lemma step_fresh_deterministic : forall C T1 cfg l C' T1' cfg' T2 T2',
-    WellScoped T1 cfg ->
-    WellScoped T1' cfg ->
-    step C T1 cfg l C' T1' cfg' ->
-    step C T2 cfg l C' T2' cfg' ->
-Proof.
-Admitted.
- *)
-
-
-(* Not true. The non-well-scopedness of Theta2 just says that there is some variable z in Theta2 that is >= Config.dim. This does imply that z is not in Theta1, but it doesn't mean that everything in Theta2 is not in Theta1.  *)
-Lemma ws_fresh : forall Theta1 Theta2 cfg,
-    Config.WellScoped Theta1 cfg ->
-    ~ Config.WellScoped Theta2 cfg ->
-    Var.Map.Properties.Disjoint Theta1 Theta2.
-Proof.
-  intros Theta1 Theta2 cfg H1 H2.
-  destruct H1 as [Hqstate Hqrefs].
-Admitted.
-
 Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     A <> B ->
     ChorEnv.epr A B T1 cfg1 = (q1, q2, T2, cfg2) ->
@@ -4143,6 +4112,7 @@ Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
       Actor.FSet.In A (Label.actors l) ->
       Var.Map.Equal (ChorEnv.find A T1) (ChorEnv.find A T2)).
 
+(* Probably not needed *)
 Lemma ws_partition_except : forall l (T1 T2 : ChorEnv.t nat) cfg,
     WellScoped T1 cfg ->
     Partition_except l T1 T2 ->
@@ -4429,14 +4399,14 @@ Proof.
             ChorEnv.simplify.
           }
         }
-
+        
         destruct H4 as [T2' [IHstep IHpart]].
 
         Var.Map.Tactics.reflect_partition.
         rewrite Heq0 in *.
         ChorEnv.simplify.
 
-
+        
         eexists.
         split.
         { 
@@ -4463,8 +4433,10 @@ Proof.
             unfold Step_partition_pairs in IHpart.
             specialize (IHpart A).
 
+            (* ALERT *)
             assert (Var.Map.Partition (ChorEnv.find A T') (ChorEnv.find A T2') (Var.Map.concat ThetaA ThetaA1)).
             {
+              (* ALERT KEY!!! *)
               apply IHpart.
               ChorEnv.simplify.
 
@@ -4529,7 +4501,7 @@ Proof.
         assert (Actor.FSet.In A (Insn.actors (Insn.LetBang A x e))) as HAinI.
         unfold Insn.actors.
         Actor.simplify.
-            
+
         assert (Partition_except l T (Actor.Map.add A ThetaA2 T1')) as HPex'.
         {
           unfold Partition_except in HPex.
@@ -4584,64 +4556,85 @@ Proof.
         destruct IHHstep as [T2 [IHHstepA IHHstepB]].
 
         pose proof IHHstepB as HSPP.
+        pose proof IHHstepB as HSPP2.
         unfold Step_partition_pairs in IHHstepB.
         unfold Partition_except in HPex'.
         destruct HPex' as [HPex'A HPex'B].
 
         destruct (HPex'A A (inter_nin A (Label.actors l)
-                          (Insn.actors (Insn.LetBang A x e)) H HAinI)) as [Theta Hpart].
+                              (Insn.actors (Insn.LetBang A x e)) H HAinI)) as [ThetaEx1 Hpart1].
 
-        rewrite find_add in Hpart.
-        specialize (IHHstepB A Theta).
-        
+        rewrite find_add in Hpart1.
+        specialize (IHHstepB A ThetaEx1).
         rewrite find_add in IHHstepB.
-        specialize (IHHstepB Hpart).
+        specialize (IHHstepB Hpart1).
 
+        specialize (HSPP A ThetaEx1).
+        rewrite find_add in HSPP.
+        specialize (HSPP Hpart1).
+
+        destruct HPex as [HPexA HPexB].
+        specialize (HPexA A (inter_nin A (Label.actors l)
+                               (Insn.actors (Insn.LetBang A x e)) H HAinI)) as [ThetaEx2 Hpart2].
+
+        pose proof Hpart1 as HACCUMULATE.
+
+        destruct (Var.Map.Proofs.partition_concat (ChorEnv.find A T) (ChorEnv.find A T1') ThetaEx2) as [Hpc2 _].
+        destruct (Hpc2 Hpart2) as [Hdj2 Haccume2]; clear Hpc2.
+        destruct (Var.Map.Proofs.partition_concat (ChorEnv.find A T1') ThetaA1 ThetaA2) as [Hpc3 _].
+        destruct (Hpc3 H8) as [Hdj3 Haccume3]; clear Hpc3.
+
+        rewrite Haccume3 in Haccume2.
+        rewrite Haccume2 in HACCUMULATE.
+        rewrite (Var.Map.Proofs.concat_sym ThetaA1 ThetaA2 Hdj3) in HACCUMULATE.
+        rewrite <- Var.Map.Proofs.concat_assoc in HACCUMULATE.
+        rewrite Haccume3 in Hdj2.
+                 
+        pose proof
+          (Var.Map.Proofs.disjoint_sym (Var.Map.concat ThetaA1 ThetaA2) ThetaEx2 Hdj2) as Hdj4.
+        rewrite Var.Map.Proofs.concat_disjoint in Hdj4.
+        destruct Hdj4 as [Hgoal1 Hgoal2].
+
+        assert (Var.Map.Properties.Disjoint (Var.Map.concat ThetaA1 ThetaEx2) ThetaA2) as Hnomono1.
+        {
+          apply dj_concat_dj.
+          apply (Var.Map.Proofs.disjoint_sym ThetaEx2 ThetaA1 Hgoal1).
+          apply (Var.Map.Proofs.disjoint_sym ThetaEx2 ThetaA2 Hgoal2).
+          auto.
+        }
+
+        pose proof (concat_partition ThetaA2 (Var.Map.concat ThetaA1 ThetaEx2)
+                      (Var.Map.Proofs.disjoint_sym (Var.Map.concat ThetaA1 ThetaEx2)
+                         ThetaA2 Hnomono1)) as Hnomono2.
+
+        pose proof (partition_functional_2 nat
+                      (Var.Map.concat ThetaA2 (Var.Map.concat ThetaA1 ThetaEx2))
+                      ThetaA2 ThetaEx1 (Var.Map.concat ThetaA1 ThetaEx2)
+                      HACCUMULATE Hnomono2) as Hnomono3.
+
+        rewrite Hnomono3 in HSPP.
+        
+        destruct (Var.Map.Proofs.partition_concat
+                    (ChorEnv.find A T') (ChorEnv.find A T2) (Var.Map.concat ThetaA1 ThetaEx2)) as [Hpc1 _].
+        destruct (Hpc1 HSPP) as [Hdj1 Haccume1]; clear Hpc1.
+
+        rewrite Var.Map.Proofs.concat_disjoint in Hdj1.
+        destruct Hdj1 as [Hnomono4 _].
+        apply Var.Map.Proofs.disjoint_sym in Hnomono4; auto.
+
+        pose proof (concat_partition ThetaA1 (ChorEnv.find A T2) Hnomono4) as Hcrux.
+        
         pose proof (step_weakening
                       C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg'
                       T1'
                       (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2)
-                      ThetaA1 A IHHstepA
-          ) as Hsw.
+                      ThetaA1 A IHHstepA) as Hsw.
 
+        
         rewrite find_add in Hsw; auto.
         rewrite find_add in Hsw; auto.
 
-        specialize (Hsw H8).
-
-        pose proof (ws_partition_except l T T1' cfg HWS HPex) as Hwpex. 
-        pose proof (ws_partition_env A T1' ThetaA2 ThetaA1 cfg Hwpex
-                      (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A T1') ThetaA1 ThetaA2 H8)) as Hwpe1.
-        pose proof (ws_partition_env A T1' ThetaA1 ThetaA2 cfg Hwpex H8) as Hwpe2.
-        
-        destruct (step_monotone
-                    C (Actor.Map.add A ThetaA2 T1')
-                    cfg l C' T2 cfg' IHHstepA Hwpe1 A) as [ThetaEx2 [HmonoA HmonoB]].
-
-        rewrite find_add in HmonoA.
-
-        unfold WellScoped in Hwpe2.
-        specialize (Hwpe2 A).
-        rewrite find_add in Hwpe2; auto.
-        pose proof (ws_fresh ThetaA1 ThetaEx2 cfg Hwpe2 HmonoB) as Hwsf.
-        
-        destruct (Var.Map.Proofs.partition_concat (ChorEnv.find A T2) ThetaA2 ThetaEx2) as [Hpc1 _].
-        destruct (Hpc1 HmonoA) as [Hpc1A Hpc1B]; clear Hpc1.
-        destruct (Var.Map.Proofs.partition_concat (ChorEnv.find A T1') ThetaA1 ThetaA2) as [Hpc2 _].
-        destruct (Hpc2 H8) as [Hpc2A Hpc2B]; clear Hpc2.
-
-        pose proof (dj_concat_dj ThetaEx2 ThetaA2 ThetaA1 Hpc1A Hwsf
-                      (Var.Map.Proofs.disjoint_sym ThetaA1 ThetaA2 Hpc2A)) as Hdjcdj.
-
-        assert (Var.Map.Partition
-                  (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) ThetaA1 (ChorEnv.find A T2)) as Hvmp.
-        {
-          rewrite <- Hpc1B in Hdjcdj.
-          apply (concat_partition ThetaA1 (ChorEnv.find A T2) 
-                   (Var.Map.Proofs.disjoint_sym (ChorEnv.find A T2) ThetaA1 Hdjcdj)).
-        }
-
-        specialize (Hsw Hvmp).
+        specialize (Hsw H8 Hcrux).
 
         exists (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2).
         split.
@@ -4659,14 +4652,14 @@ Proof.
             rewrite <- HAeqA0 in *.
             rewrite find_add; auto.
 
-            unfold Step_partition_pairs in HSPP.
+            unfold Step_partition_pairs in HSPP2.
 
-            specialize (HSPP A).
+            specialize (HSPP2 A).
 
             assert (Var.Map.Partition
                       (ChorEnv.find A T)
                       (ChorEnv.find A (Actor.Map.add A ThetaA2 T1'))
-                      (Var.Map.concat ThetaEx0 ThetaA1)) as Hcrux.
+                      (Var.Map.concat ThetaEx0 ThetaA1)) as Hcrux2.
             {
               rewrite find_add; auto.
 
@@ -4682,8 +4675,8 @@ Proof.
                             HpC) as HpC_sym.
               auto.
             }
-            specialize (HSPP (Var.Map.concat ThetaEx0 ThetaA1) Hcrux).
-            rewrite find_add in Hcrux.
+            specialize (HSPP2 (Var.Map.concat ThetaEx0 ThetaA1) Hcrux2).
+            rewrite find_add in Hcrux2.
 
             assert (Var.Map.Properties.Disjoint ThetaEx0 ThetaA1).
             {
@@ -4698,17 +4691,17 @@ Proof.
             destruct (Var.Map.Proofs.partition_concat
                         (ChorEnv.find A T') (ChorEnv.find A T2)
                         (Var.Map.concat ThetaEx0 ThetaA1)) as [Hpc _].
-            destruct (Hpc HSPP) as [HpcA _].
+            destruct (Hpc HSPP2) as [HpcA _].
             
             apply (partition_concat_assoc
                      (ChorEnv.find A T') (ChorEnv.find A T2)
-                     ThetaEx0 ThetaA1 HpcA H0 HSPP).
+                     ThetaEx0 ThetaA1 HpcA H0 HSPP2).
           }
           {
             rewrite find_ab_neq2; auto.
-            unfold Step_partition_pairs in HSPP.
-            specialize (HSPP A0).
-            rewrite find_ab_neq2 in HSPP; auto.
+            unfold Step_partition_pairs in HSPP2.
+            specialize (HSPP2 A0).
+            rewrite find_ab_neq2 in HSPP2; auto.
           }
         }
         
