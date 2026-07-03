@@ -2306,7 +2306,7 @@ Module Config.
 
   Definition epr_cfg cfg : nat * nat * t :=
     let d := dim cfg in
-    let bell00 := Quantum.EPRpair † × Quantum.EPRpair in
+    let bell00 := Quantum.EPRpair × (Quantum.EPRpair †) in
     let rho' := kron (qstate cfg) bell00 in
     (d, 1+d, {|
       dim := 2 + dim cfg;

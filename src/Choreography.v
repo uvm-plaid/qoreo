@@ -48,6 +48,16 @@ Module Insn.
         LetPair B y1 y2 e'
     end.
 
+
+    Lemma actors_subst : forall I B x v,
+      Actor.FSet.Equal
+        (actors (subst B x v I))
+        (actors I).
+    Proof.
+      destruct I; intros; Actor.simplify.
+    Qed.
+    #[global] Hint Rewrite actors_subst : actor_db.
+
     Definition bindt : Type := Actor.t * Var.t.
     
     Definition bind_eq  (Ax : bindt) (By: bindt) : Prop := (fst Ax) = (fst By) /\ (snd Ax) = (snd By).
@@ -211,8 +221,11 @@ End Insn.
 Module Choreography.
     Definition t := list Insn.t.
 
-    Definition actors (C : t) : Actor.FSet.t :=
-        List.fold_left (fun X I => Actor.FSet.union X (Insn.actors I)) C Actor.FSet.empty.
+    Fixpoint actors (C : t) : Actor.FSet.t :=
+      match C with
+      | [] => Actor.FSet.empty
+      | I0 :: C' => Actor.FSet.union (Insn.actors I0) (actors C')
+      end.
 
     Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
       match C with
@@ -220,6 +233,17 @@ Module Choreography.
       | (Ins :: C') => (Insn.subst A x v Ins)::(if (Insn.rebound_in A x Ins)
                                                 then C' else (subst A x v C')) 
       end.
+
+    Lemma actors_subst : forall C A x v,
+      Actor.FSet.Equal
+        (actors (subst A x v C))
+        (actors C).
+    Proof.
+      induction C as [ | I C]; intros A x v; simpl; Actor.simplify.
+      destruct (Insn.rebound_in A x I); try reflexivity.
+      rewrite IHC; reflexivity.
+    Qed.
+    #[global] Hint Rewrite actors_subst : actor_db.
 End Choreography.
 
 Module Label.
@@ -6792,4 +6816,221 @@ Proof.
 
 Qed.
 
- 
+
+(** Type safety *)
+
+Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
+| Step0 : forall e Θ cfg, multi_step e Θ cfg e Θ cfg
+| Step1 : forall e1 e2 e3 Θ1 Θ2 Θ3 cfg1 cfg2 cfg3 l,
+  step e1 Θ1 cfg1 l e2 Θ2 cfg2 ->
+  multi_step e2 Θ2 cfg2 e3 Θ3 cfg3 ->
+  multi_step e1 Θ1 cfg1 e3 Θ3 cfg3.
+
+Definition Stuck C Θ ρ :=
+  C <> [] /\ forall C' Θ' ρ' l, ~ Choreography.step C Θ ρ l C' Θ' ρ'.
+Definition GoesWrong N Θ ρ :=
+  exists N' Θ' ρ',
+    multi_step N Θ ρ N' Θ' ρ' /\ Stuck N' Θ' ρ'.
+
+Global Instance WellScopedProper : Proper (ChorEnv.Equal ==> eq ==> iff) WellScoped.
+Proof.
+  intros T1 T2 HT ? cfg ?; subst.
+  split; intros HWS;
+    intros A; specialize (HWS A);
+    rewrite HT in *; auto.
+Qed.
+
+(* This is implementation dependent *)
+Lemma expr_step_dim_monotonic : forall e Θ ρ e' Θ' ρ',
+  Expr.step e Θ ρ e' Θ' ρ' ->
+  Config.dim ρ <= Config.dim ρ'.
+Proof.
+  intros.
+  induction H; auto.
+  * inversion H; subst; simpl; auto.
+  * inversion H0; subst; simpl; auto.
+  * subst; simpl; auto.
+  * subst; simpl; auto.
+Qed.
+
+
+Lemma WellScoped_monotonic : forall cfg cfg' Theta Theta',
+  Config.WellScoped Theta cfg ->
+  Config.WellScoped Theta' cfg' ->
+  Config.dim cfg <= Config.dim cfg' ->
+  Config.WellScoped Theta cfg'.
+Proof.
+  intros ? ? ? ? HWS HWS' Hdim.
+  destruct HWS; destruct HWS'.
+  split; auto.
+  intros x Hin.
+  specialize (wf_qrefs x Hin). lia.
+Qed.
+
+
+From QuantumLib Require Import Matrix Pad Quantum.
+Lemma WF_Matrix_epr : forall A B T cfg q1 q2 T0 cfg',
+  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+  WF_Matrix (Config.qstate cfg) ->
+  WF_Matrix (Config.qstate cfg').
+Proof.
+  intros A B T cfg q1 q2 T0 cfg' H HWF.
+  inversion H; subst; clear H. simpl.
+  assert (WF_Matrix EPRpair).
+  { apply WF_EPRpair. }
+  remember (EPRpair × (EPRpair †)) as rho eqn:Hrho.
+  assert (WF_Matrix rho).
+  { subst. auto with wf_db. }
+  apply WF_kron; auto.
+  {
+    repeat rewrite Nat.add_0_r.
+    repeat rewrite double_pow.
+    replace 4%nat with (2^2)%nat by auto.
+    rewrite <- Nat.pow_add_r.
+    f_equal.
+    lia.
+  }
+  {
+    repeat rewrite Nat.add_0_r.
+    repeat rewrite double_pow.
+    replace 4%nat with (2^2)%nat by auto.
+    rewrite <- Nat.pow_add_r.
+    f_equal.
+    lia.
+  }
+Qed.
+Lemma WellScoped_epr : forall A B T cfg q1 q2 T0 cfg',
+  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+  A <> B ->
+  WellScoped T cfg ->
+  WellScoped T0 cfg'.
+Proof.
+  intros A B T cfg q1 q2 T0 cfg' H Hneq HWS.
+  intros D.
+  specialize (HWS D).
+  destruct HWS as [HWF HWS].
+  split.
+  * eapply WF_Matrix_epr; eauto.
+  * intros y Hy.
+    inversion H; subst; clear H.
+    autorewrite with var_db in Hy.
+    Actor.Map.Tactics.compare D B; subst; simpl.
+    { (* D = B *)
+      ChorEnv.simplify.
+      destruct Hy as [Hy | Hy]; subst.
+      { (* y = S (dim cfg) *)
+        lia.
+      }
+      {
+        (* y ∈ find D T *)
+        apply HWS in Hy.
+        lia.
+      }
+    }
+    Actor.Map.Tactics.compare D A; subst; simpl.
+    { (* D = A *)
+      ChorEnv.simplify.
+      destruct Hy as [Hy | Hy]; subst.
+      { (* y = dim cfg *)
+        lia.
+      }
+      {
+        (* y ∈ find D T *)
+        apply HWS in Hy.
+        lia.
+      }
+    }
+    { (* D <> A, D <> B *)
+      apply HWS in Hy; auto.
+    }
+Qed.
+
+
+Inductive WFInsn : Choreography.Insn.t -> Prop :=
+| WFSend : forall A v B x,
+  A <> B -> WFInsn (Choreography.Insn.Send A v B x)
+| WFEPR : forall A x B y,
+  A <> B -> WFInsn (Choreography.Insn.EPR A x B y)
+| WFLet : forall A x e, WFInsn (Choreography.Insn.Let A x e)
+| WFLetBang : forall A x e, WFInsn (Choreography.Insn.LetBang A x e)
+| WFLetPair : forall A x1 x2 e, WFInsn (Choreography.Insn.LetPair A x1 x2 e)
+.
+Inductive WFChoreography : Choreography.t -> Prop :=
+| WFNil : WFChoreography []
+| WFCons : forall I C,
+  WFInsn I -> WFChoreography C -> WFChoreography (I :: C).
+
+Lemma WellTyped_WellFormed : forall Γ Δ Θ C,
+  WellTyped Γ Δ Θ C ->
+  WFChoreography C.
+Proof.
+  intros ? ? ? ? HWT.
+  induction HWT; constructor; auto; constructor; auto.
+Qed.
+
+Lemma WellScoped_preservation : forall C Θ ρ l C' Θ' ρ',
+  Choreography.step C Θ ρ l C' Θ' ρ' ->
+  WFChoreography C ->
+  WellScoped Θ ρ ->
+  WellScoped Θ' ρ'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros HWT HWS;
+  try match goal with
+  | [ H : ChorEnv.Equal ?A ?B |- _ ] =>
+    rewrite H in *; clear A H
+  end; auto.
+
+  * (* sendC *)
+    unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+
+  * eapply WellScoped_epr; eauto.
+    inversion HWT; subst; clear HWT.
+    inversion H3; subst; auto.
+  * eapply WellScoped_epr; eauto.
+    inversion HWT; subst; clear HWT.
+    inversion H3; subst; auto.
+  * unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+  * unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+  * unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+  * inversion HWT; subst; clear HWT.
+    apply IHHstep; auto.
+Qed.
+
+
+Theorem safety : forall C Θ ρ C' Θ' ρ',
+  multi_step C Θ ρ C' Θ' ρ' ->
+  WellTyped (Actor.Map.empty _) (Actor.Map.empty _) Θ C ->
+  WellScoped Θ ρ ->
+
+  C' = [] \/ exists l C'' Θ'' ρ'', Choreography.step C' Θ' ρ' l C'' Θ'' ρ''.
+Proof.
+  intros C ? ? C' ? ? Hstep.
+  induction Hstep; intros HWT HWS; auto.
+  * eapply progress in HWT; eauto; Actor.simplify.
+  * eapply IHHstep.
+    + eapply preservation; eauto.
+      intros. split; ChorEnv.simplify.
+    + eapply WellScoped_preservation; eauto.
+      eapply WellTyped_WellFormed; eauto.
+Qed. 
