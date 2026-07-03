@@ -28,6 +28,16 @@ Module Insn.
         | Let A _ _ | LetBang A _ _ | LetPair A _ _ _ => Actor.FSet.singleton A
         end.
 
+
+    Inductive WellFormed : t -> Prop :=
+    | WFSend : forall A v B x,
+      A <> B -> WellFormed (Send A v B x)
+    | WFEPR : forall A x B y,
+      A <> B -> WellFormed (EPR A x B y)
+    | WFLet : forall A x e, WellFormed (Let A x e)
+    | WFLetBang : forall A x e, WellFormed (LetBang A x e)
+    | WFLetPair : forall A x1 x2 e, WellFormed (LetPair A x1 x2 e)
+    .
     
     (* substitute the value v for A.x in I *)
     Definition subst (A : Actor.t) (x : Var.t) (v : Expr.t)  (I : t) : t :=
@@ -226,6 +236,11 @@ Module Choreography.
       | [] => Actor.FSet.empty
       | I0 :: C' => Actor.FSet.union (Insn.actors I0) (actors C')
       end.
+    
+    Inductive WellFormed : t -> Prop :=
+    | WFNil : WellFormed []
+    | WFCons : forall I C,
+      Insn.WellFormed I -> WellFormed C -> WellFormed (I :: C).
 
     Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
       match C with
@@ -253,6 +268,11 @@ Module Label.
     | Loc  : Actor.t -> t
     .
 
+    Inductive WellFormed : Label.t -> Prop :=
+    | WFLSend : forall A v B, A <> B -> WellFormed (Send A v B)
+    | WFLEPR : forall A B, A <> B -> WellFormed (EPR A B)
+    | WFLLoc : forall A, WellFormed (Loc A)
+    .
 
     Definition actors (l : t) : Actor.FSet.t :=
         match l with
@@ -586,6 +606,225 @@ Proof.
   destruct H0.
   auto.
 Qed.  
+
+(* Lemmas about well-formedness *)
+
+
+Lemma WellTyped_WellFormed : forall Γ Δ Θ C,
+  WellTyped Γ Δ Θ C ->
+  Choreography.WellFormed C.
+Proof.
+  intros ? ? ? ? HWT.
+  induction HWT; constructor; auto; constructor; auto.
+Qed.
+
+(* TODO: move to ChorEnv module *)
+Definition WellScoped (T : ChorEnv.t nat) (cfg : Config.t) : Prop :=
+  forall A, Config.WellScoped (ChorEnv.find A T) cfg.
+
+Lemma ws_partition : forall M M1 M2 cfg,
+    Config.WellScoped M cfg ->
+    Var.Map.Partition M M1 M2 ->
+    Config.WellScoped M1 cfg.
+Proof.
+  intros M M1 M2 cfg [H H'] Hpart.
+  split; auto.
+  intros x Hin.
+  apply H'.
+  Var.Map.Tactics.reflect_partition.
+  Var.simplify.
+Qed.
+
+
+Global Instance WellScopedProper : Proper (ChorEnv.Equal ==> eq ==> iff) WellScoped.
+Proof.
+  intros T1 T2 HT ? cfg ?; subst.
+  split; intros HWS;
+    intros A; specialize (HWS A);
+    rewrite HT in *; auto.
+Qed.
+
+(* This is implementation dependent *)
+Lemma expr_step_dim_monotonic : forall e Θ ρ e' Θ' ρ',
+  Expr.step e Θ ρ e' Θ' ρ' ->
+  Config.dim ρ <= Config.dim ρ'.
+Proof.
+  intros.
+  induction H; auto.
+  * inversion H; subst; simpl; auto.
+  * inversion H0; subst; simpl; auto.
+  * subst; simpl; auto.
+  * subst; simpl; auto.
+Qed.
+
+
+Lemma ws_partition_env : forall A T ThetaA1 ThetaA2 cfg,
+    WellScoped T cfg ->
+    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+    WellScoped (Actor.Map.add A ThetaA1 T) cfg.
+Proof.
+  intros A T ThetaA1 ThetaA2 cfg Hws Hpart.
+  intros B. ChorEnv.simplify.
+  eapply ws_partition; eauto.
+Qed.
+
+
+(* TODO: move to Config module *)
+Lemma WellScoped_monotonic : forall cfg cfg' Theta Theta',
+  Config.WellScoped Theta cfg ->
+  Config.WellScoped Theta' cfg' ->
+  Config.dim cfg <= Config.dim cfg' ->
+  Config.WellScoped Theta cfg'.
+Proof.
+  intros ? ? ? ? HWS HWS' Hdim.
+  destruct HWS; destruct HWS'.
+  split; auto.
+  intros x Hin.
+  specialize (wf_qrefs x Hin). lia.
+Qed.
+
+From QuantumLib Require Import Matrix Pad Quantum.
+Lemma WF_Matrix_epr : forall A B T cfg q1 q2 T0 cfg',
+  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+  WF_Matrix (Config.qstate cfg) ->
+  WF_Matrix (Config.qstate cfg').
+Proof.
+  intros A B T cfg q1 q2 T0 cfg' H HWF.
+  inversion H; subst; clear H. simpl.
+  assert (WF_Matrix EPRpair).
+  { apply WF_EPRpair. }
+  remember (EPRpair × (EPRpair †)) as rho eqn:Hrho.
+  assert (WF_Matrix rho).
+  { subst. auto with wf_db. }
+  apply WF_kron; auto.
+  {
+    repeat rewrite Nat.add_0_r.
+    repeat rewrite double_pow.
+    replace 4%nat with (2^2)%nat by auto.
+    rewrite <- Nat.pow_add_r.
+    f_equal.
+    lia.
+  }
+  {
+    repeat rewrite Nat.add_0_r.
+    repeat rewrite double_pow.
+    replace 4%nat with (2^2)%nat by auto.
+    rewrite <- Nat.pow_add_r.
+    f_equal.
+    lia.
+  }
+Qed.
+Close Scope R_scope.
+Lemma WellScoped_epr : forall A B T cfg q1 q2 T0 cfg',
+  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+  A <> B ->
+  WellScoped T cfg ->
+  WellScoped T0 cfg'.
+Proof.
+  intros A B T cfg q1 q2 T0 cfg' H Hneq HWS.
+  intros D.
+  specialize (HWS D).
+  destruct HWS as [HWF HWS].
+  split.
+  * eapply WF_Matrix_epr; eauto.
+  * intros y Hy.
+    inversion H; subst; clear H.
+    autorewrite with var_db in Hy.
+    Actor.Map.Tactics.compare D B; subst; simpl.
+    { (* D = B *)
+      ChorEnv.simplify.
+      destruct Hy as [Hy | Hy]; subst.
+      { (* y = S (dim cfg) *)
+        lia.
+      }
+      {
+        (* y ∈ find D T *)
+        apply HWS in Hy.
+        lia.
+      }
+    }
+    Actor.Map.Tactics.compare D A; subst; simpl.
+    { (* D = A *)
+      ChorEnv.simplify.
+      destruct Hy as [Hy | Hy]; subst.
+      { (* y = dim cfg *)
+        lia.
+      }
+      {
+        (* y ∈ find D T *)
+        apply HWS in Hy.
+        lia.
+      }
+    }
+    { (* D <> A, D <> B *)
+      apply HWS in Hy; auto.
+    }
+Qed.
+
+Lemma WellScoped_preservation : forall C Θ ρ l C' Θ' ρ',
+  Choreography.step C Θ ρ l C' Θ' ρ' ->
+  Choreography.WellFormed C ->
+  WellScoped Θ ρ ->
+  WellScoped Θ' ρ'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros HWT HWS;
+  try match goal with
+  | [ H : ChorEnv.Equal ?A ?B |- _ ] =>
+    rewrite H in *; clear A H
+  end; auto.
+
+  * (* sendC *)
+    unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+
+  * eapply WellScoped_epr; eauto.
+    inversion HWT; subst; clear HWT.
+    inversion H3; subst; auto.
+  * eapply WellScoped_epr; eauto.
+    inversion HWT; subst; clear HWT.
+    inversion H3; subst; auto.
+  * unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+  * unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+  * unfold WellScoped in *.
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply WellScoped_monotonic; eauto.
+    eapply expr_step_dim_monotonic; eauto.
+  * inversion HWT; subst; clear HWT.
+    apply IHHstep; auto.
+Qed.
+
+
+Lemma step_wf_label : forall C Θ ρ l C' Θ' ρ',
+  step C Θ ρ l C' Θ' ρ' ->
+  Choreography.WellFormed C ->
+  Label.WellFormed l.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; inversion 1; subst;
+    try constructor;
+    match goal with
+    | [ H : Insn.WellFormed _ |- _ ] => inversion H; subst; clear H; auto
+    end.
+Qed.
+
+
 
 (* A slew of Lemmas for manipulating environment mappings. *)
 
@@ -3865,31 +4104,6 @@ Proof.
       }
 Qed.
 
-Definition WellScoped (T : ChorEnv.t nat) (cfg : Config.t) : Prop :=
-  forall A, Config.WellScoped (ChorEnv.find A T) cfg.
-
-Lemma ws_partition : forall M M1 M2 cfg,
-    Config.WellScoped M cfg ->
-    Var.Map.Partition M M1 M2 ->
-    Config.WellScoped M1 cfg.
-Proof.
-  intros M M1 M2 cfg [H H'] Hpart.
-  split; auto.
-  intros x Hin.
-  apply H'.
-  Var.Map.Tactics.reflect_partition.
-  Var.simplify.
-Qed.
-
-Lemma ws_partition_env : forall A T ThetaA1 ThetaA2 cfg,
-    WellScoped T cfg ->
-    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
-    WellScoped (Actor.Map.add A ThetaA1 T) cfg.
-Proof.
-  intros A T ThetaA1 ThetaA2 cfg Hws Hpart.
-  intros B. ChorEnv.simplify.
-  eapply ws_partition; eauto.
-Qed.
 
 Lemma bangty_inversion : forall Gamma Delta Theta e tau,
     Expr.WellTyped Gamma Delta Theta (Expr.Bang e) (Expr.BANG tau) ->
@@ -3915,7 +4129,7 @@ Proof.
 Qed.
 
 Lemma fresh_empty : forall T,
-  Var.fresh (Var.Map.empty T) = 0.
+  Var.fresh (Var.Map.empty T) = 0%nat.
 Proof.
   intros. unfold Var.fresh.
   rewrite Var.Map.Properties.fold_spec_right.
@@ -3989,6 +4203,7 @@ Qed.
 Lemma step_weakening' : forall C T1 cfg l C' T1' cfg',
     step C T1 cfg l C' T1' cfg' ->
 
+    Label.WellFormed l ->
     forall T2 T2' Theta A0,
     Var.Map.Properties.Disjoint Theta (ChorEnv.find A0 T1) ->
     Var.Map.Properties.Disjoint Theta (ChorEnv.find A0 T1') ->
@@ -3999,7 +4214,7 @@ Lemma step_weakening' : forall C T1 cfg l C' T1' cfg',
     step C T2 cfg l C' T2' cfg'.
 Proof.
   intros ? ? ? ? ? ? ? Hstep.
-  induction Hstep; intros T2 T2' Theta A0 Hpart Hpart' Heq Heq';
+  induction Hstep; intros HWF T2 T2' Theta A0 Hpart Hpart' Heq Heq';
     rewrite Heq, Heq' in *; clear T2 T2' Heq Heq'.
   * (* SendC *)
     rewrite H0 in *; clear T' H0.
@@ -4144,6 +4359,7 @@ Admitted.
 Lemma step_weakening : forall C T1 cfg l C' T1' cfg',
     step C T1 cfg l C' T1' cfg' ->
 
+    Choreography.WellFormed C ->
     forall T2 T2' Theta A0,
     Var.Map.Partition (ChorEnv.find A0 T2) Theta (ChorEnv.find A0 T1) ->
     Var.Map.Partition (ChorEnv.find A0 T2') Theta (ChorEnv.find A0 T1') ->
@@ -4156,6 +4372,7 @@ Proof.
   intros.
   Var.Map.Tactics.reflect_partition.
   eapply step_weakening'; eauto.
+  { eapply step_wf_label; eauto. }
   { intros D. ChorEnv.simplify. }
   { intros D. ChorEnv.simplify. }
 Qed.
@@ -4842,6 +5059,7 @@ Proof.
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
             eauto;
             intros; ChorEnv.simplify.
+          { inversion HWT; subst. eapply WellTyped_WellFormed; eauto. }
           {
             rewrite Heq0.
             Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
@@ -5046,10 +5264,13 @@ Proof.
         { intros B0 HB0. ChorEnv.simplify. }
         assert (Heq' : forall B0, B0 <> A -> Var.Map.Equal (ChorEnv.find B0 (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2)) (ChorEnv.find B0 T2)).
         { intros B0 HB0. ChorEnv.simplify. }
+        assert (HWF : Choreography.WellFormed C).
+        { inversion HWT; subst. eapply WellTyped_WellFormed; eauto. }
 
         pose proof (step_weakening
                       C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg'
                       IHHstepA
+                      HWF
                       T1'
                       (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2)
                       ThetaA1 A) as Hsw.
@@ -5214,6 +5435,7 @@ Proof.
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
             eauto;
             intros; ChorEnv.simplify.
+          { inversion HWT; subst. eapply WellTyped_WellFormed; eauto. }
           { rewrite Heq0. ChorEnv.simplify.
             Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
           }
@@ -5372,6 +5594,8 @@ Proof.
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
             eauto;
             intros; ChorEnv.simplify.
+
+          { inversion HWT; subst. eapply WellTyped_WellFormed; eauto. }
           { rewrite Heq0.
             Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
           }
@@ -6825,197 +7049,6 @@ Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreograp
   step e1 Θ1 cfg1 l e2 Θ2 cfg2 ->
   multi_step e2 Θ2 cfg2 e3 Θ3 cfg3 ->
   multi_step e1 Θ1 cfg1 e3 Θ3 cfg3.
-
-Definition Stuck C Θ ρ :=
-  C <> [] /\ forall C' Θ' ρ' l, ~ Choreography.step C Θ ρ l C' Θ' ρ'.
-Definition GoesWrong N Θ ρ :=
-  exists N' Θ' ρ',
-    multi_step N Θ ρ N' Θ' ρ' /\ Stuck N' Θ' ρ'.
-
-Global Instance WellScopedProper : Proper (ChorEnv.Equal ==> eq ==> iff) WellScoped.
-Proof.
-  intros T1 T2 HT ? cfg ?; subst.
-  split; intros HWS;
-    intros A; specialize (HWS A);
-    rewrite HT in *; auto.
-Qed.
-
-(* This is implementation dependent *)
-Lemma expr_step_dim_monotonic : forall e Θ ρ e' Θ' ρ',
-  Expr.step e Θ ρ e' Θ' ρ' ->
-  Config.dim ρ <= Config.dim ρ'.
-Proof.
-  intros.
-  induction H; auto.
-  * inversion H; subst; simpl; auto.
-  * inversion H0; subst; simpl; auto.
-  * subst; simpl; auto.
-  * subst; simpl; auto.
-Qed.
-
-
-Lemma WellScoped_monotonic : forall cfg cfg' Theta Theta',
-  Config.WellScoped Theta cfg ->
-  Config.WellScoped Theta' cfg' ->
-  Config.dim cfg <= Config.dim cfg' ->
-  Config.WellScoped Theta cfg'.
-Proof.
-  intros ? ? ? ? HWS HWS' Hdim.
-  destruct HWS; destruct HWS'.
-  split; auto.
-  intros x Hin.
-  specialize (wf_qrefs x Hin). lia.
-Qed.
-
-
-From QuantumLib Require Import Matrix Pad Quantum.
-Lemma WF_Matrix_epr : forall A B T cfg q1 q2 T0 cfg',
-  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
-  WF_Matrix (Config.qstate cfg) ->
-  WF_Matrix (Config.qstate cfg').
-Proof.
-  intros A B T cfg q1 q2 T0 cfg' H HWF.
-  inversion H; subst; clear H. simpl.
-  assert (WF_Matrix EPRpair).
-  { apply WF_EPRpair. }
-  remember (EPRpair × (EPRpair †)) as rho eqn:Hrho.
-  assert (WF_Matrix rho).
-  { subst. auto with wf_db. }
-  apply WF_kron; auto.
-  {
-    repeat rewrite Nat.add_0_r.
-    repeat rewrite double_pow.
-    replace 4%nat with (2^2)%nat by auto.
-    rewrite <- Nat.pow_add_r.
-    f_equal.
-    lia.
-  }
-  {
-    repeat rewrite Nat.add_0_r.
-    repeat rewrite double_pow.
-    replace 4%nat with (2^2)%nat by auto.
-    rewrite <- Nat.pow_add_r.
-    f_equal.
-    lia.
-  }
-Qed.
-Lemma WellScoped_epr : forall A B T cfg q1 q2 T0 cfg',
-  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
-  A <> B ->
-  WellScoped T cfg ->
-  WellScoped T0 cfg'.
-Proof.
-  intros A B T cfg q1 q2 T0 cfg' H Hneq HWS.
-  intros D.
-  specialize (HWS D).
-  destruct HWS as [HWF HWS].
-  split.
-  * eapply WF_Matrix_epr; eauto.
-  * intros y Hy.
-    inversion H; subst; clear H.
-    autorewrite with var_db in Hy.
-    Actor.Map.Tactics.compare D B; subst; simpl.
-    { (* D = B *)
-      ChorEnv.simplify.
-      destruct Hy as [Hy | Hy]; subst.
-      { (* y = S (dim cfg) *)
-        lia.
-      }
-      {
-        (* y ∈ find D T *)
-        apply HWS in Hy.
-        lia.
-      }
-    }
-    Actor.Map.Tactics.compare D A; subst; simpl.
-    { (* D = A *)
-      ChorEnv.simplify.
-      destruct Hy as [Hy | Hy]; subst.
-      { (* y = dim cfg *)
-        lia.
-      }
-      {
-        (* y ∈ find D T *)
-        apply HWS in Hy.
-        lia.
-      }
-    }
-    { (* D <> A, D <> B *)
-      apply HWS in Hy; auto.
-    }
-Qed.
-
-
-Inductive WFInsn : Choreography.Insn.t -> Prop :=
-| WFSend : forall A v B x,
-  A <> B -> WFInsn (Choreography.Insn.Send A v B x)
-| WFEPR : forall A x B y,
-  A <> B -> WFInsn (Choreography.Insn.EPR A x B y)
-| WFLet : forall A x e, WFInsn (Choreography.Insn.Let A x e)
-| WFLetBang : forall A x e, WFInsn (Choreography.Insn.LetBang A x e)
-| WFLetPair : forall A x1 x2 e, WFInsn (Choreography.Insn.LetPair A x1 x2 e)
-.
-Inductive WFChoreography : Choreography.t -> Prop :=
-| WFNil : WFChoreography []
-| WFCons : forall I C,
-  WFInsn I -> WFChoreography C -> WFChoreography (I :: C).
-
-Lemma WellTyped_WellFormed : forall Γ Δ Θ C,
-  WellTyped Γ Δ Θ C ->
-  WFChoreography C.
-Proof.
-  intros ? ? ? ? HWT.
-  induction HWT; constructor; auto; constructor; auto.
-Qed.
-
-Lemma WellScoped_preservation : forall C Θ ρ l C' Θ' ρ',
-  Choreography.step C Θ ρ l C' Θ' ρ' ->
-  WFChoreography C ->
-  WellScoped Θ ρ ->
-  WellScoped Θ' ρ'.
-Proof.
-  intros ? ? ? ? ? ? ? Hstep.
-  induction Hstep; intros HWT HWS;
-  try match goal with
-  | [ H : ChorEnv.Equal ?A ?B |- _ ] =>
-    rewrite H in *; clear A H
-  end; auto.
-
-  * (* sendC *)
-    unfold WellScoped in *.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
-
-  * eapply WellScoped_epr; eauto.
-    inversion HWT; subst; clear HWT.
-    inversion H3; subst; auto.
-  * eapply WellScoped_epr; eauto.
-    inversion HWT; subst; clear HWT.
-    inversion H3; subst; auto.
-  * unfold WellScoped in *.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
-  * unfold WellScoped in *.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
-  * unfold WellScoped in *.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
-  * inversion HWT; subst; clear HWT.
-    apply IHHstep; auto.
-Qed.
 
 
 Theorem safety : forall C Θ ρ C' Θ' ρ',

@@ -394,7 +394,7 @@ Qed.
 
 
 Lemma EPP_cons : forall A I C PA,
-  Choreography.WFInsn I ->
+  Choreography.Insn.WellFormed I ->
   EPP A (I :: C) PA <->
   exists PA', PA = eppI A I ++ PA' /\ EPP A C PA'.
 Proof.
@@ -1338,7 +1338,7 @@ Lemma completeness_local : forall PA (refs : Var.Map.t nat) cfg PA' refs' cfg',
   Process.step PA refs cfg PA' refs' cfg' -> 
   forall A N C (Θ : ChorEnv.t nat) Θ',
   EPP_N C N ->
-  Choreography.WFChoreography C ->
+  Choreography.WellFormed C ->
   Actor.Map.MapsTo A PA N ->
   (*Actor.Map.MapsTo A refs Θ ->*)
   Var.Map.Equal refs (ChorEnv.find A Θ) ->
@@ -1609,7 +1609,7 @@ Hint Rewrite fold_uncons_in_iff : actor_db.
 
 
 Lemma completeness_send : forall C N refs cfg A v B N' refs' cfg',
-  Choreography.WFChoreography C ->
+  Choreography.WellFormed C ->
   Network.step N refs cfg (Label.Send A v B) N' refs' cfg' ->
   EPP_N C N ->
   (forall D, Actor.FSet.In D (Choreography.actors C) -> Actor.Map.In D N) ->
@@ -1922,7 +1922,7 @@ Qed.
 Lemma completeness_epr : forall C N refs cfg A B N' refs' cfg',
   Network.step N refs cfg (Label.EPR A B) N' refs' cfg' ->
   EPP_N C N ->
-  Choreography.WFChoreography C ->
+  Choreography.WellFormed C ->
   (forall D, Actor.FSet.In D (Choreography.actors C) -> Actor.Map.In D N) ->
   exists C',
     Choreography.step C refs cfg (Label.EPR A B) C' refs' cfg'  /\
@@ -2148,7 +2148,7 @@ Theorem completeness : forall N refs cfg l N' refs' cfg',
 
     Network.step N refs cfg l N' refs' cfg' ->
 
-    forall C, Choreography.WFChoreography C ->
+    forall C, Choreography.WellFormed C ->
     EPP_N C N ->
     (forall D, Actor.FSet.In D (Choreography.actors C) -> Actor.Map.In D N) ->
     exists C', EPP_N C' N' /\
@@ -2469,7 +2469,7 @@ Ltac reflect_EPP_N_goal :=
 Lemma soundness_local : forall PA C refs cfg A C' refs' cfg' N,
   Choreography.step C refs cfg (Choreography.Label.Loc A) C' refs' cfg' ->
   EPP_N C N ->
-  Choreography.WFChoreography C ->
+  Choreography.WellFormed C ->
   Actor.Map.MapsTo A PA N ->
   exists PA' refsA', Process.step PA (ChorEnv.find A refs) cfg PA' refsA' cfg'
            /\ EPP_N C' (Actor.Map.add A PA' N)
@@ -2674,7 +2674,7 @@ Lemma soundness_send : forall C refs cfg A v B C' refs' cfg',
   (* by induction on step relation *)
   Choreography.step C refs cfg (Choreography.Label.Send A v B) C' refs' cfg' ->
   A <> B ->
-  Choreography.WFChoreography C ->
+  Choreography.WellFormed C ->
   forall N,
   EPP_N C N ->
   Actor.Map.In A N ->
@@ -2777,7 +2777,7 @@ Qed.
 Lemma soundness_epr : forall C refs cfg A B C' refs' cfg',
   Choreography.step C refs cfg (Choreography.Label.EPR A B) C' refs' cfg' ->
   A <> B ->
-  Choreography.WFChoreography C ->
+  Choreography.WellFormed C ->
   forall N,
   EPP_N C N ->
   Actor.Map.In A N ->
@@ -2928,17 +2928,10 @@ Proof.
       discriminate.
 Qed.
 
-
-Inductive WFLabel : Label.t -> Prop :=
-| WFLSend : forall A v B, A <> B -> WFLabel (Label.Send A v B)
-| WFLEPR : forall A B, A <> B -> WFLabel (Label.EPR A B)
-| WFLLoc : forall A, WFLabel (Label.Loc A)
-.
-
 Theorem soundness : forall C C' refs cfg refs' cfg' l,
     Choreography.step C refs cfg l C' refs' cfg' ->
-    Choreography.WFChoreography C ->
-    WFLabel l ->
+    Choreography.WellFormed C ->
+    Label.WellFormed l ->
     forall N,
       (forall D, Actor.FSet.In D (Choreography.Label.actors l) -> Actor.Map.In D N) ->
       EPP_N C N ->
@@ -2977,24 +2970,8 @@ Qed.
 
 Definition EPP_N_complete C N :=
   EPP_N C N /\
-  Choreography.WFChoreography C /\
+  Choreography.WellFormed C /\
   (forall D, Actor.FSet.In D (Choreography.actors C) -> Actor.Map.In D N).
-
-About soundness.
-
-
-Lemma step_wf_label : forall C Θ ρ l C' Θ' ρ',
-  Choreography.step C Θ ρ l C' Θ' ρ' ->
-  Choreography.WFChoreography C ->
-  WFLabel l.
-Proof.
-  intros ? ? ? ? ? ? ? Hstep.
-  induction Hstep; inversion 1; subst;
-    try constructor;
-    match goal with
-    | [ H : Choreography.WFInsn _ |- _ ] => inversion H; subst; clear H; auto
-    end.
-Qed.
 
 
 Lemma EPP_correctness : forall C N Θ ρ l,
@@ -3006,7 +2983,7 @@ Proof.
   split.
   * intros [C' [Θ' [ρ' Hstep]]].
     eapply soundness in Hstep; eauto.
-    2:{ eapply step_wf_label; eauto. }
+    2:{ eapply Choreography.step_wf_label; eauto. }
     2:{ intros D HD. apply Hdomain. eapply step_domain_label_subset; eauto. }
     destruct Hstep as [N' [Hstep HEPP']].
     exists N', Θ', ρ'. auto.
@@ -3052,7 +3029,7 @@ Proof.
     + (* C can take a step *)
       right.
       eapply soundness in Hstep; eauto.
-      2:{ eapply step_wf_label; eauto. }
+      2:{ eapply Choreography.step_wf_label; eauto. }
       2:{
         intros D HD.
         apply Hdomain.
