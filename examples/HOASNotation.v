@@ -109,7 +109,7 @@ Declare Scope example_scope.
   Definition meas (A : Actor.t) (q : Var.t) : Qoreo Var.t :=
     do x ← fresh A ;;
     do _ ← add_insn (Choreography.Insn.Let A x (Meas (Var q)));;
-    ret q.
+    ret x.
 
   (** Send quantum data from actor [A] to actor [B]. *)
   Definition send A (e : Expr.t) B : Qoreo Var.t :=

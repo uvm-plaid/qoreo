@@ -260,7 +260,7 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   (refs0, cfg') = Config.measure b x refs cfg ->
   Var.Map.Equal refs0 refs' ->
 
-  step (Meas (QRef x)) refs cfg (Bit b) refs' cfg'
+  step (Meas (QRef x)) refs cfg (Bang (Bit b)) refs' cfg'
 
 
 (* Unitary *)
@@ -459,7 +459,7 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
 
 | WTMeas : forall Γ Δ Θ e,
   WellTyped Γ Δ Θ e QUBIT ->
-  WellTyped Γ Δ Θ (Meas e) BIT
+  WellTyped Γ Δ Θ (Meas e) (BANG BIT)
 
 | WTQRef : forall Γ Δ Θ q idx,
 
@@ -1349,7 +1349,7 @@ Proof.
 Qed.
 
 Lemma step_inversion : forall e refs ρ e' refs' ρ',
-  
+
   step e refs ρ e' refs' ρ' ->
 
   forall refs1 refs2 τ,
@@ -1646,7 +1646,7 @@ Ltac simplify_val :=
     end
   end.
 
-Lemma preservation : forall Γ Δ Θ e τ,
+Lemma WellTyped_preservation : forall Γ Δ Θ e τ,
   WellTyped Γ Δ Θ e τ ->
 
   forall ρ e' Θ' ρ',
@@ -1775,6 +1775,7 @@ Proof.
       end.
       Var.simplify.
       econstructor; eauto with var_db.
+      econstructor; eauto with var_db.
 
   * (* New *)
     Var.simplify.
@@ -1861,7 +1862,7 @@ Proof.
       eapply wt_subst_bang; eauto with var_db.
 Qed.
 
-Lemma well_scoped_preservation : forall e Θ ρ e' Θ' ρ',
+Lemma WellScoped_preservation : forall e Θ ρ e' Θ' ρ',
   step e Θ ρ e' Θ' ρ' ->
   Config.WellScoped Θ ρ ->
   Config.WellScoped Θ' ρ'.
@@ -1883,7 +1884,7 @@ Proof.
     split; simpl in *.
     + unfold super. auto with wf_db.
     + intros z Hin. Var.simplify.
-  * (* apply_gate *) 
+  * (* apply_gate *)
     subst.
     unfold Config.apply_gate.
     destruct HWS.
@@ -1900,6 +1901,18 @@ Proof.
     Var.reflect_find.
     unfold super.
     destruct g; simpl; auto with wf_db.
+Qed.
+
+Theorem preservation :  forall Θ e τ ρ e' Θ' ρ',
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ e τ ->
+  Config.WellScoped Θ ρ ->
+  step e Θ ρ e' Θ' ρ' ->
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ' e' τ /\ Config.WellScoped Θ' ρ'.
+Proof.
+  intros ? ? ? ? ? ? ? HWT HWS Hstep.
+  split.
+  * eapply WellTyped_preservation; eauto; Var.simplify.
+  * eapply WellScoped_preservation; eauto.
 Qed.
 
 
@@ -2147,3 +2160,32 @@ Proof.
 
 Unshelve. exact true.
 Qed.
+
+(** General type safety *)
+
+Inductive multi_step : t -> Var.Map.t nat -> Config.t -> t -> Var.Map.t nat -> Config.t -> Prop :=
+| Step0 : forall e Θ cfg, multi_step e Θ cfg e Θ cfg
+| Step1 : forall e1 e2 e3 Θ1 Θ2 Θ3 cfg1 cfg2 cfg3,
+  step e1 Θ1 cfg1 e2 Θ2 cfg2 ->
+  multi_step e2 Θ2 cfg2 e3 Θ3 cfg3 ->
+  multi_step e1 Θ1 cfg1 e3 Θ3 cfg3.
+
+Definition can_step e Θ cfg :=
+  exists e' Θ' cfg', step e Θ cfg e' Θ' cfg'.
+
+Theorem safety : forall e Θ cfg e' Θ' cfg',
+  multi_step e Θ cfg e' Θ' cfg' ->
+  forall τ,
+  WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ e τ ->
+  Config.WellScoped Θ cfg ->
+  Val e' \/ can_step e' Θ' cfg'.
+Proof.
+  intros ? ? ? ? ? ? Hstep.
+  induction Hstep; intros τ HWT HWS.
+  * unfold can_step. eapply progress; eauto; Var.simplify.
+  * eapply preservation in H; eauto.
+    destruct H as [HWT' HWS'].
+    eapply IHHstep; eauto.
+Qed.
+
+  
