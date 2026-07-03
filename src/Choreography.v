@@ -3961,12 +3961,181 @@ Proof.
   lia.
 Qed.
 
-Lemma step_weakening : forall C T1 cfg l C' T1' cfg' T2 T2' Theta A,
+
+Lemma step_weakening' : forall C T1 cfg l C' T1' cfg',
     step C T1 cfg l C' T1' cfg' ->
-    Var.Map.Partition (ChorEnv.find A T2) Theta (ChorEnv.find A T1) ->
-    Var.Map.Partition (ChorEnv.find A T2') Theta (ChorEnv.find A T1') ->
+
+    forall T2 T2' Theta A0,
+    Var.Map.Properties.Disjoint Theta (ChorEnv.find A0 T1) ->
+    Var.Map.Properties.Disjoint Theta (ChorEnv.find A0 T1') ->
+
+    ChorEnv.Equal T2 (Actor.Map.add A0 (Var.Map.concat Theta (ChorEnv.find A0 T1)) T1) ->
+    ChorEnv.Equal T2' (Actor.Map.add A0 (Var.Map.concat Theta (ChorEnv.find A0 T1')) T1') ->
+
     step C T2 cfg l C' T2' cfg'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros T2 T2' Theta A0 Hpart Hpart' Heq Heq';
+    rewrite Heq, Heq' in *; clear T2 T2' Heq Heq'.
+  * (* SendC *)
+    rewrite H0 in *; clear T' H0.
+    Actor.Map.Tactics.compare A A0.
+    + ChorEnv.simplify.
+      apply SendC with (TA' := (Var.Map.concat Theta TA')).
+      2:{ intros D. ChorEnv.simplify. }
+
+      eapply Expr.step_weakening_2; eauto.
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+
+    + (* A0 <> A *)
+      ChorEnv.simplify.
+      eapply SendC with (TA' := TA').
+      2:{ intros D. ChorEnv.simplify. }
+      ChorEnv.simplify.
+
+  * (* SendB*)
+    rewrite H0 in *; clear refs H0.
+    ChorEnv.simplify.
+    econstructor; eauto.
+    reflexivity.
+
+  * (* EPRB *)
+    assert (A0 <> B) by admit.
+    rewrite H0 in *; clear T' H0.
+    ChorEnv.simplify.
+    Var.Map.Tactics.reflect_partition.
+
+    unfold ChorEnv.epr in *.
+    destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hepr.
+    inversion H; subst; clear H.
+
+    econstructor; eauto.
+    {
+      unfold ChorEnv.epr in *.
+      rewrite Hepr.
+      reflexivity.
+    }
+    {
+      intros D.
+      ChorEnv.simplify.
+      Var.solve.
+    }
+
+  * (* EPRB' *)
+    assert (A0 <> B) by admit.
+    rewrite H0 in *; clear T' H0.
+    ChorEnv.simplify.
+    Var.Map.Tactics.reflect_partition.
+
+    unfold ChorEnv.epr in *.
+    destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hepr.
+    inversion H; subst; clear H.
+
+    econstructor; eauto.
+    {
+      unfold ChorEnv.epr in *.
+      rewrite Hepr.
+      reflexivity.
+    }
+    {
+      intros D.
+      ChorEnv.simplify.
+      Var.solve.
+    }
+
+  * (* LetC *)
+
+    rewrite H0 in *; clear T' H0.
+    Actor.Map.Tactics.compare A A0.
+    + ChorEnv.simplify.
+      econstructor; eauto.
+      2:{ ChorEnv.simplify. }
+
+      eapply Expr.step_weakening_2; eauto.
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+
+    + (* A0 <> A *)
+      ChorEnv.simplify.
+      eapply LetC with (TA' := TA').
+      2:{ intros D. ChorEnv.simplify. }
+      ChorEnv.simplify.
+
+  * (* LetB *)
+    rewrite H1 in *; clear refs H1.
+    econstructor; eauto.
+    reflexivity.
+
+  * (* LetBangC *) 
+    rewrite H0 in *; clear T' H0.
+    Actor.Map.Tactics.compare A A0.
+    + ChorEnv.simplify.
+      econstructor; eauto.
+      2:{ ChorEnv.simplify. }
+
+      eapply Expr.step_weakening_2; eauto.
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+
+    + (* A0 <> A *)
+      ChorEnv.simplify.
+      eapply LetBangC with (TA' := TA').
+      2:{ intros D. ChorEnv.simplify. }
+      ChorEnv.simplify.
+
+  * (* LetBangB *)
+    rewrite H0 in *; clear refs' H0.
+    econstructor; eauto.
+    reflexivity.
+
+  * (* LetPairC *)
+    rewrite H0 in *; clear T' H0.
+    Actor.Map.Tactics.compare A A0.
+    + ChorEnv.simplify.
+      econstructor; eauto.
+      2:{ ChorEnv.simplify. }
+
+      eapply Expr.step_weakening_2; eauto.
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+      { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
+
+    + (* A0 <> A *)
+      ChorEnv.simplify.
+      eapply LetPairC with (TA' := TA').
+      2:{ intros D. ChorEnv.simplify. }
+      ChorEnv.simplify.
+
+  * (* LetPairB *)
+    rewrite H2 in *; clear refs' H2.
+    econstructor; eauto.
+    reflexivity.
+
+  * (* Delay *)
+    apply Delay; auto.
+    eapply IHHstep; eauto; reflexivity.
 Admitted.
+
+(* This version of step_weakening is equivalent to the previous one, but appears to be easier to use in practice *)
+Lemma step_weakening : forall C T1 cfg l C' T1' cfg',
+    step C T1 cfg l C' T1' cfg' ->
+
+    forall T2 T2' Theta A0,
+    Var.Map.Partition (ChorEnv.find A0 T2) Theta (ChorEnv.find A0 T1) ->
+    Var.Map.Partition (ChorEnv.find A0 T2') Theta (ChorEnv.find A0 T1') ->
+
+    (forall B0, B0 <> A0 -> Var.Map.Equal (ChorEnv.find B0 T2) (ChorEnv.find B0 T1)) ->
+    (forall B0, B0 <> A0 -> Var.Map.Equal (ChorEnv.find B0 T2') (ChorEnv.find B0 T1')) ->
+
+    step C T2 cfg l C' T2' cfg'.
+Proof.
+  intros.
+  Var.Map.Tactics.reflect_partition.
+  eapply step_weakening'; eauto.
+  { intros D. ChorEnv.simplify. }
+  { intros D. ChorEnv.simplify. }
+Qed.
+
 
 Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     A <> B ->
@@ -4644,11 +4813,13 @@ Proof.
              then whenever ???[A] = ThetaA1 ++ T2'[A],
              then we can conclude that C / T1' -l-> C' / ???
           *)
-          eapply step_weakening with (A := A)
+          eapply step_weakening with (A0 := A)
                                      (T1 := Actor.Map.add A ThetaA2 T1')
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
-            eauto.
-          { rewrite Heq0. ChorEnv.simplify.
+            eauto;
+            intros; ChorEnv.simplify.
+          {
+            rewrite Heq0.
             Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
           }
           {
@@ -4847,17 +5018,22 @@ Proof.
 
         pose proof (concat_partition ThetaA1 (ChorEnv.find A T2) Hnomono4) as Hcrux.
         
+        assert (Heq : forall B0, B0 <> A -> Var.Map.Equal (ChorEnv.find B0 T1') (ChorEnv.find B0 (Actor.Map.add A ThetaA2 T1'))).
+        { intros B0 HB0. ChorEnv.simplify. }
+        assert (Heq' : forall B0, B0 <> A -> Var.Map.Equal (ChorEnv.find B0 (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2)) (ChorEnv.find B0 T2)).
+        { intros B0 HB0. ChorEnv.simplify. }
+
         pose proof (step_weakening
                       C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg'
+                      IHHstepA
                       T1'
                       (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2)
-                      ThetaA1 A IHHstepA) as Hsw.
-
+                      ThetaA1 A) as Hsw.
         
         rewrite find_add in Hsw; auto.
         rewrite find_add in Hsw; auto.
 
-        specialize (Hsw H8 Hcrux).
+        specialize (Hsw H8 Hcrux Heq Heq').
 
         exists (Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2)) T2).
         split.
@@ -5009,10 +5185,11 @@ Proof.
              then whenever ???[A] = ThetaA1 ++ T2'[A],
              then we can conclude that C / T1' -l-> C' / ???
           *)
-          eapply step_weakening with (A := A)
+          eapply step_weakening with (A0 := A)
                                      (T1 := Actor.Map.add A ThetaA2 T1')
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
-            eauto.
+            eauto;
+            intros; ChorEnv.simplify.
           { rewrite Heq0. ChorEnv.simplify.
             Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
           }
@@ -5166,11 +5343,12 @@ Proof.
              then whenever ???[A] = ThetaA1 ++ T2'[A],
              then we can conclude that C / T1' -l-> C' / ???
           *)
-          eapply step_weakening with (A := A)
+          eapply step_weakening with (A0 := A)
                                      (T1 := Actor.Map.add A ThetaA2 T1')
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
-            eauto.
-          { rewrite Heq0. ChorEnv.simplify.
+            eauto;
+            intros; ChorEnv.simplify.
+          { rewrite Heq0.
             Var.Map.Tactics.reflect_partition; [ | reflexivity ]; auto.
           }
           {
