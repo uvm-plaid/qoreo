@@ -4240,7 +4240,7 @@ Proof.
     reflexivity.
 
   * (* EPRB *)
-    assert (A0 <> B) by admit.
+    inversion HWF; subst; clear HWF.
     rewrite H0 in *; clear T' H0.
     ChorEnv.simplify.
     Var.Map.Tactics.reflect_partition.
@@ -4259,10 +4259,11 @@ Proof.
       intros D.
       ChorEnv.simplify.
       Var.solve.
+      Var.solve.
     }
 
   * (* EPRB' *)
-    assert (A0 <> B) by admit.
+    inversion HWF; subst; clear HWF.
     rewrite H0 in *; clear T' H0.
     ChorEnv.simplify.
     Var.Map.Tactics.reflect_partition.
@@ -4280,6 +4281,7 @@ Proof.
     {
       intros D.
       ChorEnv.simplify.
+      Var.solve.
       Var.solve.
     }
 
@@ -4353,7 +4355,7 @@ Proof.
   * (* Delay *)
     apply Delay; auto.
     eapply IHHstep; eauto; reflexivity.
-Admitted.
+Qed.
 
 (* This version of step_weakening is equivalent to the previous one, but appears to be easier to use in practice *)
 Lemma step_weakening : forall C T1 cfg l C' T1' cfg',

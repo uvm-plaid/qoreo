@@ -31,7 +31,9 @@ Require Import Lia.
 
 Lemma remove_empty : forall A x T,
   ChorEnv.Equal (ChorEnv.remove A x (empty (Var.Map.t T))) (empty _).
-Admitted.
+Proof.
+  intros. intros B. ChorEnv.simplify.
+Qed.
 Hint Rewrite remove_empty : var_db.
 
 Definition singleton {T} x (tau : T) := Var.Map.add x tau (Var.Map.empty T).
