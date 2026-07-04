@@ -57,6 +57,7 @@ Definition DGZH (As : list Actor.t) (K : list Var.t -> Qoreo unit) : Qoreo unit 
 From QuantumLib Require Import Complex.
 Definition RZ (theta : R) : unitary. Admitted.
 Definition RY (theta : R) : unitary. Admitted.
+
 Record dvar_params := {
     t1 : R ; t2 : R ; t3 : R ; t4 : R ; t5 : R ; t6 : R ; t7 : R ; t8 : R ; t9 : R ; t10 : R
 }.
@@ -103,5 +104,6 @@ Definition DVQA (Alice Bob : Actor.t) (params : dvar_params) (success : Expr.t) 
 
 (** Entanglement swapping *)
 
+(*
 (* Assume that A & B share a bell state, and C & D share a Bell state; after entanglement-swapping, A & D will share a Bell state *)
-Definition swap_entanglement 
+*)
