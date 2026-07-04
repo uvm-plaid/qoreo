@@ -2219,13 +2219,116 @@ Module Var.
   #[global] Hint Extern 4 (Map.Partition (Map.concat _ _) _ _) => Map.Proofs.partition_concat : extra_var_db.
   #[global] Hint Extern 4 (Map.Partition _ (Map.concat _ _) _) => Map.Tactics.partition_concat : extra_var_db.
   #[global] Hint Extern 4 (Map.Partition _ _ (Map.concat _ _)) => Map.Tactics.partition_concat : extra_var_db.
-*)
+  *)
 
   #[global] Hint Rewrite Map.FSetProperties.inter_iff : var_db.
   #[global] Hint Rewrite Map.MProofs.FSetProperties.add_iff: var_db.
   #[global] Hint Rewrite Map.FSetProperties.singleton_iff : var_db.
   #[global] Hint Rewrite Map.FSetProperties.add_iff : var_db.
   #[global] Hint Rewrite Map.FSetProperties.remove_iff : var_db.
+
+  (** Proofs about fresh variables *)
+
+  (* The operations on configurations form Proper relations *)
+  Global Instance freshProper : forall A, 
+      Proper (@Var.Map.Equal A ==> eq) Var.fresh.
+  Proof.
+
+    intros A refs1 refs2 Hrefs.
+    unfold Var.fresh.
+    apply Var.Map.Properties.fold_Equal; auto.
+    + intros ? ? ? ? ? ? ? ? ?; subst; auto.
+      repeat rewrite H1. reflexivity.
+    + intros ? ? ? ? ? ?.
+    
+      destruct (k' + 1 <=? k) eqn:H_k'_k;
+      destruct (a <=? k') eqn:Hk';
+      destruct (a <=? k) eqn:Hk;
+      destruct (k+1 <=? k') eqn:H_k_k';
+      auto;
+        try 
+        (try rewrite Nat.leb_le in *;
+        try rewrite Nat.leb_nle in *;
+        lia).
+      * rewrite H_k'_k; auto. reflexivity.
+      * reflexivity.
+      * rewrite Hk'; reflexivity.
+      * rewrite H_k'_k; reflexivity.
+      * rewrite H_k'_k; auto. rewrite Hk'; auto. reflexivity.
+      * rewrite Hk'; auto. reflexivity.
+  Qed.   
+
+  Lemma fresh_empty : forall T,
+    Var.fresh (Var.Map.empty T) = 0%nat.
+  Proof.
+    intros. unfold Var.fresh.
+    rewrite Var.Map.Properties.fold_spec_right.
+    simpl.
+    auto.
+  Qed.
+
+  Lemma fresh_add : forall T (m : Var.Map.t T) x v,
+    ~ Var.Map.In x m ->
+    Var.fresh (Var.Map.add x v m) = max (x+1) (Var.fresh m).
+  Proof.
+    intros.
+    unfold Var.fresh.
+    rewrite Var.Map.Properties.fold_add; auto.
+    
+    + fold (Var.fresh m).
+      destruct (PeanoNat.Nat.leb (Var.fresh m) x) eqn:Hleb.
+      - apply PeanoNat.Nat.leb_le in Hleb.
+        rewrite max_l; auto.
+        lia.
+
+      - rewrite PeanoNat.Nat.leb_nle in Hleb.
+        rewrite max_r; auto.
+        lia.
+
+    + clear m x v H.
+      intros ? x ? ? ? ? ? z ?; subst; auto.
+    + clear m x v H.
+      intros z1 z2 v1 v2 w Hneq.
+      repeat match goal with
+      | [ H : context[PeanoNat.Nat.leb ?x ?y] |- _ ] =>
+        let H := fresh "H" in
+        destruct (PeanoNat.Nat.leb x y) eqn:H;
+        try rewrite PeanoNat.Nat.leb_le in *;
+        try rewrite PeanoNat.Nat.leb_nle in *
+      | [ |- context[PeanoNat.Nat.leb ?x ?y] ] =>
+        let H := fresh "H" in
+        destruct (PeanoNat.Nat.leb x y) eqn:H;
+        try rewrite PeanoNat.Nat.leb_le in *;
+        try rewrite PeanoNat.Nat.leb_nle in *
+      end;
+      try lia.
+  Qed.
+
+  Lemma fresh_upper_bound : forall T (m : Var.Map.t T),
+    forall x, Var.Map.In x m ->
+      (Var.fresh m > x)%nat.
+  Proof.
+    intros T m.
+    induction m using Var.Map.Properties.map_induction;
+      intros y Hin.
+    * Var.simplify.
+    * Var.simplify.
+      rewrite fresh_add; auto.
+      destruct Hin; subst.
+      { try lia. }
+      apply IHm1 in H0. lia. 
+  Qed.
+
+  Lemma fresh_not_in : forall T (m : Var.Map.t T) x,
+    x = Var.fresh m ->
+    ~ Var.Map.In x m.
+  Proof.
+    intros. subst.
+    intros Hin.
+    apply fresh_upper_bound in Hin.
+    lia.
+  Qed.
+
 
 End Var.
 
@@ -2407,34 +2510,6 @@ Module Config.
     contradiction.
   Qed.
 
-
-  (* The operations on configurations form Proper relations *)
-  Global Instance freshProper : forall A, 
-      Proper (@Var.Map.Equal A ==> eq) Var.fresh.
-  Proof.
-
-    intros A refs1 refs2 Hrefs.
-    unfold Var.fresh.
-    apply Var.Map.Properties.fold_Equal; auto.
-    + intros ? ? ? ? ? ? ? ? ?; subst; auto.
-    + intros ? ? ? ? ? ?.
-    
-      destruct (k' + 1 <=? k) eqn:H_k'_k;
-      destruct (a <=? k') eqn:Hk';
-      destruct (a <=? k) eqn:Hk;
-      destruct (k+1 <=? k') eqn:H_k_k';
-      auto;
-        try 
-        (try rewrite Nat.leb_le in *;
-        try rewrite Nat.leb_nle in *;
-        lia).
-      * rewrite H_k'_k; auto.
-      * rewrite Hk'; auto.
-      * rewrite H_k'_k; auto.
-      * rewrite H_k'_k; auto. rewrite Hk'; auto.
-      * rewrite Hk'; auto.
-  Qed.   
-
   Global Instance findProper : Proper (eq ==> Var.Map.Equal ==> eq) find.
   Proof.
     intros x' x Hx refs1 refs2 Hrefs; subst.
@@ -2504,6 +2579,20 @@ Module Config.
     apply Proper_map; auto.
     intros x. rewrite Hrefs; auto.
   Qed.
+
+  Lemma WellScoped_monotonic : forall cfg cfg' Theta Theta',
+    WellScoped Theta cfg ->
+    WellScoped Theta' cfg' ->
+    (dim cfg <= dim cfg')%nat ->
+    WellScoped Theta cfg'.
+  Proof.
+    intros ? ? ? ? HWS HWS' Hdim.
+    destruct HWS; destruct HWS'.
+    split; auto.
+    intros x Hin.
+    specialize (wf_qrefs0 x Hin). lia.
+  Qed.
+
 
 End Config.
 
@@ -2629,6 +2718,8 @@ Module ChorEnv.
         | None => Var.Map.empty _
         end.
 
+    Definition empty {T} : ChorEnv.t T := Actor.Map.empty _.
+
     (* equivalence of ChorEnv.t *)
     Definition Equal {T} (G1 G2 : t T) : Prop := 
     (*Actor.Map.Equiv (Var.Map.Equal) G1 G2.*)
@@ -2648,6 +2739,10 @@ Module ChorEnv.
     Definition MapsTo {T} (A : Actor.t) (x : Var.t) (tau : T) (G : t T) : Prop :=
       Var.Map.MapsTo x tau (find A G).
 
+
+    Definition WellScoped (T : ChorEnv.t nat) (cfg : Config.t) : Prop :=
+      forall A, Config.WellScoped (ChorEnv.find A T) cfg.
+
     
     Definition epr (A B : Actor.t) (refs : t nat) (cfg : Config.t)
                   : Var.t * Var.t * t nat * Config.t :=
@@ -2662,6 +2757,7 @@ Module ChorEnv.
       end.
 
     Ltac simplify := repeat (Actor.simplify; Var.simplify).
+
 
     (** properties of find *)
 
@@ -2922,6 +3018,80 @@ Module ChorEnv.
     * intros A. rewrite HG. auto.
   Qed.
 
+  (* Interaction between add/remove/empty*)
+
+    Lemma ce_add_empty : forall T (m : ChorEnv.t T) A,
+      ChorEnv.Equal
+        (Actor.Map.add A (Var.Map.empty _) m)
+        (Actor.Map.remove A m).
+    Proof.
+      intros T m A.
+      intros B. ChorEnv.simplify.
+    Qed.
+    #[global] Hint Rewrite ce_add_empty : var_db.
+
+    Lemma addadd1 : forall {T} A (D : ChorEnv.t T) Delta x tau,
+        ChorEnv.Equal (Actor.Map.add A Delta (ChorEnv.add A x tau D)) (Actor.Map.add A Delta D).
+    Proof.
+      intros.
+      unfold ChorEnv.add.
+      Actor.simplify. 
+    Qed.
+    #[global] Hint Rewrite @addadd1 : var_db.
+
+    Lemma addadd2 : forall {X : Type} A (T : ChorEnv.t X) Theta1 Theta2,
+        ChorEnv.Equal (Actor.Map.add A Theta1 (Actor.Map.add A Theta2 T)) 
+                      (Actor.Map.add A Theta1 T).
+    Proof.
+      intros.
+      Actor.simplify.
+    Qed.
+    #[global] Hint Rewrite @addadd2 : var_db.
+
+
+    Lemma find_add_env : forall {X : Type} A (CE : ChorEnv.t X),
+        ChorEnv.Equal (Actor.Map.add A (ChorEnv.find A CE) CE) CE.
+    Proof.
+      intros X A CE B.
+      ChorEnv.simplify.
+    Qed.
+    #[global] Hint Rewrite @find_add_env : var_db.
+
+
+    Lemma remove_empty : forall A x T,
+      ChorEnv.Equal (ChorEnv.remove A x (Actor.Map.empty (Var.Map.t T))) (Actor.Map.empty _).
+    Proof.
+      intros. intros B. ChorEnv.simplify.
+    Qed.
+    #[global] Hint Rewrite remove_empty : var_db.
+
+
+    Lemma actor_remove_empty : forall A,
+        ChorEnv.Equal (Actor.Map.remove A (Actor.Map.empty (Var.Map.t nat))) (Actor.Map.empty _).
+    Proof. intros. ChorEnv.simplify. Qed.
+    #[global] Hint Rewrite actor_remove_empty : var_db.
+
+
+    Lemma ce_actor_add_neq_sym : forall A B X DA DB (T : ChorEnv.t X),
+      A <> B ->
+      ChorEnv.Equal (Actor.Map.add A DA (Actor.Map.add B DB T))
+                    (Actor.Map.add B DB (Actor.Map.add A DA T)).
+    Proof.
+      intros.
+      intros D.
+      ChorEnv.simplify.
+    Qed.
+
+
+    Lemma ce_actor_remove_add : forall {X} A D (m : ChorEnv.t X),
+      ChorEnv.Equal (Actor.Map.remove A (Actor.Map.add A D m))
+                    (Actor.Map.remove A m).
+    Proof.
+      intros. intros B. ChorEnv.simplify.
+    Qed.
+    #[global] Hint Rewrite @ce_actor_remove_add : var_db.
+
+
   (* find, add, remove, mapsto, epr*)
 
 
@@ -2973,5 +3143,125 @@ Module ChorEnv.
     split; split; simpl; unfold RelationPairs.RelCompFun; simpl; auto.
     * rewrite HT. reflexivity.
   Qed.
+
+
+    (** Properties of WellScoped *)
+
+
+    Global Instance WellScopedProper : Proper (ChorEnv.Equal ==> eq ==> iff) WellScoped.
+    Proof.
+      intros T1 T2 HT ? cfg ?; subst.
+      split; intros HWS;
+        intros A; specialize (HWS A);
+        specialize (HT A);
+        rewrite HT in *; auto.
+    Qed.
+
+
+    Lemma ws_partition : forall M M1 M2 cfg,
+        Config.WellScoped M cfg ->
+        Var.Map.Partition M M1 M2 ->
+        Config.WellScoped M1 cfg.
+    Proof.
+      intros M M1 M2 cfg [H H'] Hpart.
+      split; auto.
+      intros x Hin.
+      apply H'.
+      Var.Map.Tactics.reflect_partition.
+      Var.simplify.
+    Qed.
+
+
+    Lemma ws_partition_env : forall A T ThetaA1 ThetaA2 cfg,
+        WellScoped T cfg ->
+        Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+        WellScoped (Actor.Map.add A ThetaA1 T) cfg.
+    Proof.
+      intros A T ThetaA1 ThetaA2 cfg Hws Hpart.
+      intros B. ChorEnv.simplify.
+      eapply ws_partition; eauto.
+    Qed.
+
+
+    (*From QuantumLib Require Import Matrix Pad Quantum.*)
+    Lemma WF_Matrix_epr : forall A B T cfg q1 q2 T0 cfg',
+      ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+      WF_Matrix (Config.qstate cfg) ->
+      WF_Matrix (Config.qstate cfg').
+    Proof.
+      intros A B T cfg q1 q2 T0 cfg' H HWF.
+      inversion H; subst; clear H. simpl.
+      assert (WF_Matrix EPRpair).
+      { apply WF_EPRpair. }
+      remember (EPRpair × (EPRpair †)) as rho eqn:Hrho.
+      assert (WF_Matrix rho).
+      { subst. auto with wf_db. }
+      apply WF_kron; auto.
+      {
+        repeat rewrite Nat.add_0_r.
+        repeat rewrite double_pow.
+        replace 4%nat with (2^2)%nat by auto.
+        rewrite <- Nat.pow_add_r.
+        f_equal.
+        lia.
+      }
+      {
+        repeat rewrite Nat.add_0_r.
+        repeat rewrite double_pow.
+        replace 4%nat with (2^2)%nat by auto.
+        rewrite <- Nat.pow_add_r.
+        f_equal.
+        lia.
+      }
+    Qed.
+  Close Scope R_scope.
+
+
+  Lemma WellScoped_epr : forall A B T cfg q1 q2 T0 cfg',
+    ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+    A <> B ->
+    WellScoped T cfg ->
+    WellScoped T0 cfg'.
+  Proof.
+    intros A B T cfg q1 q2 T0 cfg' H Hneq HWS.
+    intros D.
+    specialize (HWS D).
+    destruct HWS as [HWF HWS].
+    split.
+    * eapply WF_Matrix_epr; eauto.
+    * intros y Hy.
+      inversion H; subst; clear H.
+      autorewrite with var_db in Hy.
+      Actor.Map.Tactics.compare D B; subst; simpl.
+      { (* D = B *)
+        ChorEnv.simplify.
+        destruct Hy as [Hy | Hy]; subst.
+        { (* y = S (dim cfg) *)
+          lia.
+        }
+        {
+          (* y ∈ find D T *)
+          apply HWS in Hy.
+          lia.
+        }
+      }
+      Actor.Map.Tactics.compare D A; subst; simpl.
+      { (* D = A *)
+        ChorEnv.simplify.
+        destruct Hy as [Hy | Hy]; subst.
+        { (* y = dim cfg *)
+          lia.
+        }
+        {
+          (* y ∈ find D T *)
+          apply HWS in Hy.
+          lia.
+        }
+      }
+      { (* D <> A, D <> B *)
+        apply HWS in Hy; auto.
+      }
+  Qed.
+
 
 End ChorEnv.

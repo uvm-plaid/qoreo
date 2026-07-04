@@ -607,7 +607,7 @@ Proof.
   auto.
 Qed.  
 
-(* Lemmas about well-formedness *)
+(** * Lemmas about well-formedness and well-scopedness *)
 
 
 Lemma WellTyped_WellFormed : forall Γ Δ Θ C,
@@ -618,154 +618,12 @@ Proof.
   induction HWT; constructor; auto; constructor; auto.
 Qed.
 
-(* TODO: move to ChorEnv module *)
-Definition WellScoped (T : ChorEnv.t nat) (cfg : Config.t) : Prop :=
-  forall A, Config.WellScoped (ChorEnv.find A T) cfg.
-
-Lemma ws_partition : forall M M1 M2 cfg,
-    Config.WellScoped M cfg ->
-    Var.Map.Partition M M1 M2 ->
-    Config.WellScoped M1 cfg.
-Proof.
-  intros M M1 M2 cfg [H H'] Hpart.
-  split; auto.
-  intros x Hin.
-  apply H'.
-  Var.Map.Tactics.reflect_partition.
-  Var.simplify.
-Qed.
-
-
-Global Instance WellScopedProper : Proper (ChorEnv.Equal ==> eq ==> iff) WellScoped.
-Proof.
-  intros T1 T2 HT ? cfg ?; subst.
-  split; intros HWS;
-    intros A; specialize (HWS A);
-    rewrite HT in *; auto.
-Qed.
-
-(* This is implementation dependent *)
-Lemma expr_step_dim_monotonic : forall e Θ ρ e' Θ' ρ',
-  Expr.step e Θ ρ e' Θ' ρ' ->
-  Config.dim ρ <= Config.dim ρ'.
-Proof.
-  intros.
-  induction H; auto.
-  * inversion H; subst; simpl; auto.
-  * inversion H0; subst; simpl; auto.
-  * subst; simpl; auto.
-  * subst; simpl; auto.
-Qed.
-
-
-Lemma ws_partition_env : forall A T ThetaA1 ThetaA2 cfg,
-    WellScoped T cfg ->
-    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
-    WellScoped (Actor.Map.add A ThetaA1 T) cfg.
-Proof.
-  intros A T ThetaA1 ThetaA2 cfg Hws Hpart.
-  intros B. ChorEnv.simplify.
-  eapply ws_partition; eauto.
-Qed.
-
-
-(* TODO: move to Config module *)
-Lemma WellScoped_monotonic : forall cfg cfg' Theta Theta',
-  Config.WellScoped Theta cfg ->
-  Config.WellScoped Theta' cfg' ->
-  Config.dim cfg <= Config.dim cfg' ->
-  Config.WellScoped Theta cfg'.
-Proof.
-  intros ? ? ? ? HWS HWS' Hdim.
-  destruct HWS; destruct HWS'.
-  split; auto.
-  intros x Hin.
-  specialize (wf_qrefs x Hin). lia.
-Qed.
-
-From QuantumLib Require Import Matrix Pad Quantum.
-Lemma WF_Matrix_epr : forall A B T cfg q1 q2 T0 cfg',
-  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
-  WF_Matrix (Config.qstate cfg) ->
-  WF_Matrix (Config.qstate cfg').
-Proof.
-  intros A B T cfg q1 q2 T0 cfg' H HWF.
-  inversion H; subst; clear H. simpl.
-  assert (WF_Matrix EPRpair).
-  { apply WF_EPRpair. }
-  remember (EPRpair × (EPRpair †)) as rho eqn:Hrho.
-  assert (WF_Matrix rho).
-  { subst. auto with wf_db. }
-  apply WF_kron; auto.
-  {
-    repeat rewrite Nat.add_0_r.
-    repeat rewrite double_pow.
-    replace 4%nat with (2^2)%nat by auto.
-    rewrite <- Nat.pow_add_r.
-    f_equal.
-    lia.
-  }
-  {
-    repeat rewrite Nat.add_0_r.
-    repeat rewrite double_pow.
-    replace 4%nat with (2^2)%nat by auto.
-    rewrite <- Nat.pow_add_r.
-    f_equal.
-    lia.
-  }
-Qed.
-Close Scope R_scope.
-Lemma WellScoped_epr : forall A B T cfg q1 q2 T0 cfg',
-  ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
-  A <> B ->
-  WellScoped T cfg ->
-  WellScoped T0 cfg'.
-Proof.
-  intros A B T cfg q1 q2 T0 cfg' H Hneq HWS.
-  intros D.
-  specialize (HWS D).
-  destruct HWS as [HWF HWS].
-  split.
-  * eapply WF_Matrix_epr; eauto.
-  * intros y Hy.
-    inversion H; subst; clear H.
-    autorewrite with var_db in Hy.
-    Actor.Map.Tactics.compare D B; subst; simpl.
-    { (* D = B *)
-      ChorEnv.simplify.
-      destruct Hy as [Hy | Hy]; subst.
-      { (* y = S (dim cfg) *)
-        lia.
-      }
-      {
-        (* y ∈ find D T *)
-        apply HWS in Hy.
-        lia.
-      }
-    }
-    Actor.Map.Tactics.compare D A; subst; simpl.
-    { (* D = A *)
-      ChorEnv.simplify.
-      destruct Hy as [Hy | Hy]; subst.
-      { (* y = dim cfg *)
-        lia.
-      }
-      {
-        (* y ∈ find D T *)
-        apply HWS in Hy.
-        lia.
-      }
-    }
-    { (* D <> A, D <> B *)
-      apply HWS in Hy; auto.
-    }
-Qed.
 
 Lemma WellScoped_preservation : forall C Θ ρ l C' Θ' ρ',
   Choreography.step C Θ ρ l C' Θ' ρ' ->
   Choreography.WellFormed C ->
-  WellScoped Θ ρ ->
-  WellScoped Θ' ρ'.
+  ChorEnv.WellScoped Θ ρ ->
+  ChorEnv.WellScoped Θ' ρ'.
 Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros HWT HWS;
@@ -775,37 +633,37 @@ Proof.
   end; auto.
 
   * (* sendC *)
-    unfold WellScoped in *.
+    unfold ChorEnv.WellScoped in *.
     assert (Config.WellScoped TA' cfg').
     { eapply Expr.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
 
-  * eapply WellScoped_epr; eauto.
+  * eapply ChorEnv.WellScoped_epr; eauto.
     inversion HWT; subst; clear HWT.
     inversion H3; subst; auto.
-  * eapply WellScoped_epr; eauto.
+  * eapply ChorEnv.WellScoped_epr; eauto.
     inversion HWT; subst; clear HWT.
     inversion H3; subst; auto.
-  * unfold WellScoped in *.
+  * unfold ChorEnv.WellScoped in *.
     assert (Config.WellScoped TA' cfg').
     { eapply Expr.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
-  * unfold WellScoped in *.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
+  * unfold ChorEnv.WellScoped in *.
     assert (Config.WellScoped TA' cfg').
     { eapply Expr.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
-  * unfold WellScoped in *.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
+  * unfold ChorEnv.WellScoped in *.
     assert (Config.WellScoped TA' cfg').
     { eapply Expr.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
-    eapply WellScoped_monotonic; eauto.
-    eapply expr_step_dim_monotonic; eauto.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
   * inversion HWT; subst; clear HWT.
     apply IHHstep; auto.
 Qed.
@@ -824,958 +682,937 @@ Proof.
     end.
 Qed.
 
-
-
 (* A slew of Lemmas for manipulating environment mappings. *)
+Module HelperLemmas.
 
-(* START *)
+    (* START *)
 
-Lemma extension : forall A G x (tau : Expr.typ),
-    ChorEnv.MapsTo A x tau G <-> Var.Map.MapsTo x tau (ChorEnv.find A G).
-Proof.
-  intros A G x tau.
-  split.
-  auto.
-  auto.
-Qed.
+    Lemma extension : forall A G x (tau : Expr.typ),
+        ChorEnv.MapsTo A x tau G <-> Var.Map.MapsTo x tau (ChorEnv.find A G).
+    Proof.
+      intros A G x tau.
+      split.
+      auto.
+      auto.
+    Qed.
 
-Lemma empty_dj : forall {X : Type} (CE1 : ChorEnv.t X) CE2 A,
-    ChorEnv.Empty CE2 ->
-    Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2).
-Proof.
-  intros X CE1 CE2 A Hempty.
-  intros z [Hin1 Hin2].
-  unfold ChorEnv.Empty in Hempty.
-  rewrite Hempty in Hin2.
-  Var.simplify.
-Qed.
-    
-Lemma nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
-    Var.Map.Properties.Disjoint M1 M2 ->
-    Var.Map.In x M2 ->
-    ~ Var.Map.In x M1.
-Proof.
-  intros X x M1 M2 Hdisj Hin1 Hin2.
-  apply (Hdisj x); auto.
-Qed.
+    Lemma empty_dj : forall {X : Type} (CE1 : ChorEnv.t X) CE2 A,
+        ChorEnv.Empty CE2 ->
+        Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2).
+    Proof.
+      intros X CE1 CE2 A Hempty.
+      intros z [Hin1 Hin2].
+      unfold ChorEnv.Empty in Hempty.
+      rewrite Hempty in Hin2.
+      Var.simplify.
+    Qed.
+        
+    Lemma nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
+        Var.Map.Properties.Disjoint M1 M2 ->
+        Var.Map.In x M2 ->
+        ~ Var.Map.In x M1.
+    Proof.
+      intros X x M1 M2 Hdisj Hin1 Hin2.
+      apply (Hdisj x); auto.
+    Qed.
 
-Lemma remove_nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
-    Var.Map.Properties.Disjoint M1 (Var.Map.remove x M2) ->
-    ~ Var.Map.In x M1 ->
-    Var.Map.Properties.Disjoint M1 M2.
-Proof.
-  intros X x M1 M2 Hdisj Hin.
-  intros z [Hin1 Hin2].
-  Var.Map.Tactics.compare x z.
-  {
-    apply (Hdisj z).
-    split; auto.
-    Var.simplify.
-  }
-Qed.
+    Lemma remove_nin_dj : forall  {X : Type} x (M1 : Var.Map.t X) M2,
+        Var.Map.Properties.Disjoint M1 (Var.Map.remove x M2) ->
+        ~ Var.Map.In x M1 ->
+        Var.Map.Properties.Disjoint M1 M2.
+    Proof.
+      intros X x M1 M2 Hdisj Hin.
+      intros z [Hin1 Hin2].
+      Var.Map.Tactics.compare x z.
+      {
+        apply (Hdisj z).
+        split; auto.
+        Var.simplify.
+      }
+    Qed.
 
-Lemma partition_dj : forall  {X : Type} (M : Var.Map.t X) M1 M2 M3,
-    Var.Map.Properties.Disjoint M M1 ->
-    Var.Map.Partition M1 M2 M3  ->
-    Var.Map.Properties.Disjoint M M2.
-Proof.
-  intros X M M1 M2 M3 Hdisj Hpart.
-  Var.Map.Tactics.reflect_partition.
-  Var.simplify.
-Qed.
+    Lemma partition_dj : forall  {X : Type} (M : Var.Map.t X) M1 M2 M3,
+        Var.Map.Properties.Disjoint M M1 ->
+        Var.Map.Partition M1 M2 M3  ->
+        Var.Map.Properties.Disjoint M M2.
+    Proof.
+      intros X M M1 M2 M3 Hdisj Hpart.
+      Var.Map.Tactics.reflect_partition.
+      Var.simplify.
+    Qed.
 
-Lemma partition_concat_dj : forall  {X : Type} (M : Var.Map.t X) M1 M2 M3,
-    Var.Map.Partition M1 M2 M3  ->
-    Var.Map.Properties.Disjoint M M2 ->
-    Var.Map.Properties.Disjoint M M3 ->
-    Var.Map.Properties.Disjoint M M1.
-Proof.
-  intros.
-  Var.Map.Tactics.reflect_partition.
-  Var.simplify.
-Qed.
+    Lemma partition_concat_dj : forall  {X : Type} (M : Var.Map.t X) M1 M2 M3,
+        Var.Map.Partition M1 M2 M3  ->
+        Var.Map.Properties.Disjoint M M2 ->
+        Var.Map.Properties.Disjoint M M3 ->
+        Var.Map.Properties.Disjoint M M1.
+    Proof.
+      intros.
+      Var.Map.Tactics.reflect_partition.
+      Var.simplify.
+    Qed.
 
-(* follows by partition_dj in case A = B, immediate otherwise *)
-Lemma partition_dj_env : forall  {X : Type} A B (CE1 : ChorEnv.t X) CE2 M1 M2,
-    Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) ->
-    Var.Map.Partition (ChorEnv.find B CE2) M1 M2 ->
-    Var.Map.Properties.Disjoint (ChorEnv.find A CE1)
-      (ChorEnv.find A (Actor.Map.add B M2 CE2)).
-Proof.
-  intros X A B CE1 CE2 M1 M2 Hdisj Hpart.
-  Var.Map.Tactics.reflect_partition.
-  Var.simplify.
-  Actor.Map.Tactics.compare A B; auto.
-  rewrite Heq in Hdisj.
-  Var.simplify.
-Qed.
+    (* follows by partition_dj in case A = B, immediate otherwise *)
+    Lemma partition_dj_env : forall  {X : Type} A B (CE1 : ChorEnv.t X) CE2 M1 M2,
+        Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) ->
+        Var.Map.Partition (ChorEnv.find B CE2) M1 M2 ->
+        Var.Map.Properties.Disjoint (ChorEnv.find A CE1)
+          (ChorEnv.find A (Actor.Map.add B M2 CE2)).
+    Proof.
+      intros X A B CE1 CE2 M1 M2 Hdisj Hpart.
+      Var.Map.Tactics.reflect_partition.
+      Var.simplify.
+      Actor.Map.Tactics.compare A B; auto.
+      rewrite Heq in Hdisj.
+      Var.simplify.
+    Qed.
 
-Lemma remove_dj : forall  (M1 : Var.Map.t Expr.typ) M2 x tau,
-    Var.Map.Properties.Disjoint (Var.Map.add x tau M1) M2 -> 
-    Var.Map.Properties.Disjoint M1 M2.
-Proof.
-  intros M1 M2 x tau Hdisj.
-  Var.simplify.
-Qed.
+    Lemma remove_dj : forall  (M1 : Var.Map.t Expr.typ) M2 x tau,
+        Var.Map.Properties.Disjoint (Var.Map.add x tau M1) M2 -> 
+        Var.Map.Properties.Disjoint M1 M2.
+    Proof.
+      intros M1 M2 x tau Hdisj.
+      Var.simplify.
+    Qed.
 
-Lemma remove_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x,
-    Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) -> 
-    Var.Map.Properties.Disjoint
-      (ChorEnv.find A (ChorEnv.remove B x CE1))
-      (ChorEnv.find A CE2).
-Proof.
-  intros.
-  intros D. intros [Hin1 Hin2].
-  
-  (* Because D in find A (remove B x CE1), we know A <> B *)
-  assert (A <> B).
-  {
-    intros ?; subst.
-    unfold ChorEnv.remove, ChorEnv.find in Hin1.
-    Actor.simplify.
-    destruct (Actor.Map.find B CE1) as [CB1 | ] eqn:HB1.
-    2:{ Var.simplify. }
-    Var.simplify.
-    apply (H D). split; auto.
-    unfold ChorEnv.find. rewrite HB1. auto.
-  }
-  Var.simplify.
-  destruct (Actor.eq_dec A B) as [Heq | ].
-  { unfold Actor.eq in Heq. subst; contradiction. }
-  apply (H D); auto.
-Qed.
+    Lemma remove_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x,
+        Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) -> 
+        Var.Map.Properties.Disjoint
+          (ChorEnv.find A (ChorEnv.remove B x CE1))
+          (ChorEnv.find A CE2).
+    Proof.
+      intros.
+      intros D. intros [Hin1 Hin2].
+      
+      (* Because D in find A (remove B x CE1), we know A <> B *)
+      assert (A <> B).
+      {
+        intros ?; subst.
+        unfold ChorEnv.remove, ChorEnv.find in Hin1.
+        Actor.simplify.
+        destruct (Actor.Map.find B CE1) as [CB1 | ] eqn:HB1.
+        2:{ Var.simplify. }
+        Var.simplify.
+        apply (H D). split; auto.
+        unfold ChorEnv.find. rewrite HB1. auto.
+      }
+      Var.simplify.
+      destruct (Actor.eq_dec A B) as [Heq | ].
+      { unfold Actor.eq in Heq. subst; contradiction. }
+      apply (H D); auto.
+    Qed.
 
-Lemma remove_add_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x tau,
-    Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) ->
-    Var.Map.Properties.Disjoint
-      (ChorEnv.find A (ChorEnv.remove B x CE1))
-      (ChorEnv.find A (ChorEnv.add B x tau CE2)).
-Proof.
-  intros.
-  Var.simplify.
-  Actor.Map.Tactics.compare A B; auto.
-  {
-    intros z [Hin1 Hin2].
-    Var.simplify.
-    destruct Hin2 as [? | Hin2]; [contradiction | ].
-    apply (H z); auto.
-  }
-Qed.
+    Lemma remove_add_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x tau,
+        Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) ->
+        Var.Map.Properties.Disjoint
+          (ChorEnv.find A (ChorEnv.remove B x CE1))
+          (ChorEnv.find A (ChorEnv.add B x tau CE2)).
+    Proof.
+      intros.
+      Var.simplify.
+      Actor.Map.Tactics.compare A B; auto.
+      {
+        intros z [Hin1 Hin2].
+        Var.simplify.
+        destruct Hin2 as [? | Hin2]; [contradiction | ].
+        apply (H z); auto.
+      }
+    Qed.
 
-Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
-    ~ ChorEnv.Empty (ChorEnv.add A x tau D).
-Proof.
-  intros. intros Hempty.
-  unfold ChorEnv.add in Hempty.
-  unfold ChorEnv.Empty in Hempty.
-  specialize (Hempty A).
-  ChorEnv.simplify.
-  specialize (Hempty x).
-  Var.simplify.
-Qed.
+    Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
+        ~ ChorEnv.Empty (ChorEnv.add A x tau D).
+    Proof.
+      intros. intros Hempty.
+      unfold ChorEnv.add in Hempty.
+      unfold ChorEnv.Empty in Hempty.
+      specialize (Hempty A).
+      ChorEnv.simplify.
+      specialize (Hempty x).
+      Var.simplify.
+    Qed.
 
-Lemma empty_is_empty : forall {X : Type} A,
-    Var.Map.Empty (ChorEnv.find A (Actor.Map.empty (Var.Map.t X))).
-Proof.
-  intros.
-  unfold ChorEnv.find.
-  Actor.simplify.
-  Var.simplify.
-Qed.
+    Lemma empty_is_empty : forall {X : Type} A,
+        Var.Map.Empty (ChorEnv.find A (Actor.Map.empty (Var.Map.t X))).
+    Proof.
+      intros.
+      unfold ChorEnv.find.
+      Actor.simplify.
+      Var.simplify.
+    Qed.
 
-Lemma empty_eq_env  : forall  {X : Type} (CE : ChorEnv.t X),
-    Actor.Map.Empty CE ->
-    ChorEnv.Equal CE (Actor.Map.empty (Var.Map.t X)).
-Proof.
-  intros.
-  unfold ChorEnv.Equal.
-  intros.
-  unfold ChorEnv.find.
-  Actor.simplify.
-  rewrite H.
-  Actor.simplify.
-Qed.
-  
-Lemma empty_map_empty : forall {X : Type}, Var.Map.Empty (Var.Map.empty X).
-Proof.
-  intros.
-  Var.simplify.
-Qed.
+    Lemma empty_eq_env  : forall  {X : Type} (CE : ChorEnv.t X),
+        Actor.Map.Empty CE ->
+        ChorEnv.Equal CE (Actor.Map.empty (Var.Map.t X)).
+    Proof.
+      intros.
+      unfold ChorEnv.Equal.
+      intros.
+      unfold ChorEnv.find.
+      Actor.simplify.
+      rewrite H.
+      Actor.simplify.
+    Qed.
+      
+    Lemma empty_map_empty : forall {X : Type}, Var.Map.Empty (Var.Map.empty X).
+    Proof.
+      intros.
+      Var.simplify.
+    Qed.
 
+    Lemma empty_to_empty : forall  {X : Type} A (CE : ChorEnv.t X) (M : Var.Map.t X),
+        Var.Map.Empty M ->
+        Var.Map.Empty (ChorEnv.find A CE) -> 
+        ChorEnv.Equal (Actor.Map.add A M CE) CE.
+    Proof.
+      intros. intros B.
+      ChorEnv.simplify.
+      rewrite H0.
+      reflexivity.
+    Qed.
 
-Lemma find_add_env : forall {X : Type} A (CE : ChorEnv.t X),
-    ChorEnv.Equal (Actor.Map.add A (ChorEnv.find A CE) CE) CE.
-Proof.
-  intros X A CE B.
-  ChorEnv.simplify.
-Qed.
-#[global] Hint Rewrite @find_add_env : var_db.
+    Lemma empty_to_empty_old : forall  {X : Type} A (M : Var.Map.t X),
+        Var.Map.Empty M ->
+        ChorEnv.Equal
+          (Actor.Map.add A M (Actor.Map.empty (Var.Map.t X)))
+          (Actor.Map.empty (Var.Map.t X)).
+    Proof.
+      intros. 
+      pose proof (H0 := Var.Map.Proofs.empty_map_equal M H).
+      rewrite H0.
+      intros D. ChorEnv.simplify.
+    Qed.
 
-Lemma empty_to_empty : forall  {X : Type} A (CE : ChorEnv.t X) (M : Var.Map.t X),
-    Var.Map.Empty M ->
-    Var.Map.Empty (ChorEnv.find A CE) -> 
-    ChorEnv.Equal (Actor.Map.add A M CE) CE.
-Proof.
-  intros.
-  ChorEnv.simplify.
-  rewrite <- H0.
-  ChorEnv.simplify.
-Qed.
+    Lemma find_empty : forall {X : Type} A,
+        (ChorEnv.find A (Actor.Map.empty (Var.Map.t X))) =  (Var.Map.empty X).
+    Proof.
+      intros.
+      unfold ChorEnv.find.
+      Actor.simplify.
+    Qed.
 
-Lemma empty_to_empty_old : forall  {X : Type} A (M : Var.Map.t X),
-    Var.Map.Empty M ->
-    ChorEnv.Equal
-      (Actor.Map.add A M (Actor.Map.empty (Var.Map.t X)))
-      (Actor.Map.empty (Var.Map.t X)).
-Proof.
-  intros. 
-  pose proof (H0 := Var.Map.Proofs.empty_map_equal M H).
-  rewrite H0.
-  intros D. ChorEnv.simplify.
-Qed.
+    Lemma empty_partition : forall (M M1 M2 : Var.Map.t Expr.typ),
+        Var.Map.Empty M ->
+        Var.Map.Partition M M1 M2 ->
+        Var.Map.Empty M1.
+    Proof.
+      intros; Var.simplify.
+    Qed.
 
-Lemma find_empty : forall {X : Type} A,
-    (ChorEnv.find A (Actor.Map.empty (Var.Map.t X))) =  (Var.Map.empty X).
-Proof.
-  intros.
-  unfold ChorEnv.find.
-  Actor.simplify.
-Qed.
+    Lemma lopsided_partition : forall {X : Type} (M M1 : Var.Map.t X),
+        Var.Map.Partition M (Var.Map.empty X) M1 ->
+        Var.Map.Equal M M1.
+    Proof.
+      intros; Var.simplify.
+    Qed.
 
-Lemma empty_partition : forall (M M1 M2 : Var.Map.t Expr.typ),
-    Var.Map.Empty M ->
-    Var.Map.Partition M M1 M2 ->
-    Var.Map.Empty M1.
-Proof.
-  intros; Var.simplify.
-Qed.
+    Lemma partition_lopsided : forall {X : Type} (M1 M2: Var.Map.t X),
+        Var.Map.Partition M1 M1 M2 ->
+        Var.Map.Equal M2 (Var.Map.empty X).
+    Proof.
+      intros.
+      rewrite Var.Map.Proofs.partition_concat in H.
+      destruct H as [Hdisj Heq].
+      intros z. specialize (Heq z).
+      Var.simplify.
+      destruct (Var.Map.find z M1) eqn:H1; auto.
+      destruct (Var.Map.find z M2) eqn:H2; auto.
+      exfalso. apply (Hdisj z).
+      split; Var.solve.
+    Qed.
 
-Lemma lopsided_partition : forall {X : Type} (M M1 : Var.Map.t X),
-    Var.Map.Partition M (Var.Map.empty X) M1 ->
-    Var.Map.Equal M M1.
-Proof.
-  intros; Var.simplify.
-Qed.
+    Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
+        ChorEnv.find A (Actor.Map.add A M CE) = M.
+    Proof.
+      intros.
+      unfold ChorEnv.find.
+      Actor.simplify.
+    Qed.
 
-Lemma partition_lopsided : forall {X : Type} (M1 M2: Var.Map.t X),
-    Var.Map.Partition M1 M1 M2 ->
-    Var.Map.Equal M2 (Var.Map.empty X).
-Proof.
-  intros.
-  rewrite Var.Map.Proofs.partition_concat in H.
-  destruct H as [Hdisj Heq].
-  intros z. specialize (Heq z).
-  Var.simplify.
-  destruct (Var.Map.find z M1) eqn:H1; auto.
-  destruct (Var.Map.find z M2) eqn:H2; auto.
-  exfalso. apply (Hdisj z).
-  split; Var.solve.
-Qed.
-
-Lemma find_add : forall {X : Type} A M (CE : ChorEnv.t X),
-    ChorEnv.find A (Actor.Map.add A M CE) = M.
-Proof.
-  intros.
-  unfold ChorEnv.find.
-  Actor.simplify.
-Qed.
-
-Lemma find_add_map : forall A x tau (CE : ChorEnv.t Expr.typ),
-    Var.Map.Equal
-      (ChorEnv.find A (ChorEnv.add A x tau CE))
-      (Var.Map.add x tau (ChorEnv.find A CE)).
-Proof.
-  intros.
-  unfold ChorEnv.find.
-  unfold ChorEnv.add.
-  Actor.simplify.
-Qed.      
+    Lemma find_add_map : forall A x tau (CE : ChorEnv.t Expr.typ),
+        Var.Map.Equal
+          (ChorEnv.find A (ChorEnv.add A x tau CE))
+          (Var.Map.add x tau (ChorEnv.find A CE)).
+    Proof.
+      intros.
+      unfold ChorEnv.find.
+      unfold ChorEnv.add.
+      Actor.simplify.
+    Qed.
 
 
-Lemma find_ab_neq1 : forall {X : Type} A B x tau (CE : ChorEnv.t X),
-    A <> B ->
-    (ChorEnv.find A (ChorEnv.add B x tau CE)) = (ChorEnv.find A CE).
-Proof.
-  intros X A B x tau CE Hneq.
-  unfold ChorEnv.find. unfold ChorEnv.add.
-  Actor.simplify.
-Qed.
+    Lemma find_ab_neq1 : forall {X : Type} A B x tau (CE : ChorEnv.t X),
+        A <> B ->
+        (ChorEnv.find A (ChorEnv.add B x tau CE)) = (ChorEnv.find A CE).
+    Proof.
+      intros X A B x tau CE Hneq.
+      unfold ChorEnv.find. unfold ChorEnv.add.
+      Actor.simplify.
+    Qed.
 
-Lemma find_ab_neq2 : forall {X : Type} A B M (CE : ChorEnv.t X),
-    A <> B ->
-    (ChorEnv.find A (Actor.Map.add B M CE)) = (ChorEnv.find A CE).
-Proof.
-  intros.
-  unfold ChorEnv.find.
-  Actor.simplify.
-Qed.
+    Lemma find_ab_neq2 : forall {X : Type} A B M (CE : ChorEnv.t X),
+        A <> B ->
+        (ChorEnv.find A (Actor.Map.add B M CE)) = (ChorEnv.find A CE).
+    Proof.
+      intros.
+      unfold ChorEnv.find.
+      Actor.simplify.
+    Qed.
 
-Lemma find_ab_neq3 : forall {X : Type} A B x (CE : ChorEnv.t X),
-    A <> B ->
-    (ChorEnv.find A (ChorEnv.remove B x CE)) = (ChorEnv.find A CE).
-Proof.
-  intros X A B x CE Hneq.
-  unfold ChorEnv.find. unfold ChorEnv.remove.
-  Actor.simplify.
-Qed.
+    Lemma find_ab_neq3 : forall {X : Type} A B x (CE : ChorEnv.t X),
+        A <> B ->
+        (ChorEnv.find A (ChorEnv.remove B x CE)) = (ChorEnv.find A CE).
+    Proof.
+      intros X A B x CE Hneq.
+      unfold ChorEnv.find. unfold ChorEnv.remove.
+      Actor.simplify.
+    Qed.
 
-Lemma find_nbeq : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
-    Insn.bind_eqb (A, x) (B, y) = false -> 
-    ~ Var.Map.In x (ChorEnv.find A CE) ->
-    ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE)).
-Proof.
-  intros CE A x B y tau Heq Hin.
-  Var.simplify.
-  unfold Insn.bind_eqb, Insn.bind_eq_dec in Heq; simpl in Heq.
-  Actor.Map.Tactics.compare A B.
-  * (* A = B*)
-    Var.Map.Tactics.compare x y; try discriminate.
-    (* x <> y *)
-    Var.simplify.
-  * (* A <> B *) auto.
-Qed.
+    Lemma find_nbeq : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+        Insn.bind_eqb (A, x) (B, y) = false -> 
+        ~ Var.Map.In x (ChorEnv.find A CE) ->
+        ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE)).
+    Proof.
+      intros CE A x B y tau Heq Hin.
+      Var.simplify.
+      unfold Insn.bind_eqb, Insn.bind_eq_dec in Heq; simpl in Heq.
+      Actor.Map.Tactics.compare A B.
+      * (* A = B*)
+        Var.Map.Tactics.compare x y; try discriminate.
+        (* x <> y *)
+        Var.simplify.
+      * (* A <> B *) auto.
+    Qed.
 
-Lemma add_find : forall (CE : ChorEnv.t Expr.typ) A x tau,
-    (ChorEnv.find A (ChorEnv.add A x tau CE)) = (Var.Map.add x tau (ChorEnv.find A CE)).
-Proof.
-  intros.
-  unfold ChorEnv.find, ChorEnv.add.
-  Actor.simplify.
-Qed.
+    Lemma add_find : forall (CE : ChorEnv.t Expr.typ) A x tau,
+        (ChorEnv.find A (ChorEnv.add A x tau CE)) = (Var.Map.add x tau (ChorEnv.find A CE)).
+    Proof.
+      intros.
+      unfold ChorEnv.find, ChorEnv.add.
+      Actor.simplify.
+    Qed.
 
-Lemma remove_find : forall (CE : ChorEnv.t Expr.typ) A x,
-    (ChorEnv.find A (ChorEnv.remove A x CE)) = (Var.Map.remove x (ChorEnv.find A CE)).
-Proof.
-  intros.
-  Var.simplify.
-  Actor.simplify.
-Qed.
-
-Lemma add_remove : forall (CE : ChorEnv.t Expr.typ) M A x tau,
-    Var.Map.MapsTo x tau M ->
-    ChorEnv.Equal
-      (ChorEnv.add A x tau (Actor.Map.add A (Var.Map.remove x M) CE))
-      (Actor.Map.add A M CE).
-Proof.
-  intros.
-  unfold ChorEnv.add.
-  Var.simplify. Actor.simplify.
-  Var.simplify.
-  rewrite Var.Map.Proofs.add_mapsto; auto.
-  apply ChorEnv.actor_map_Equal.
-  Actor.simplify.
-Qed.
-
-Lemma nin_remove : forall (M : Var.Map.t Expr.typ) x,
-    ~ (Var.Map.In x (Var.Map.remove x M)).
-Proof.
-  intros.
-  Var.simplify.
-Qed.
-
-(* This is needed for dealing with classical variable shadowing *)
-Lemma nin_remove_ce : forall (CE : ChorEnv.t Expr.typ) A x B y,
-    ~ (Var.Map.In x (ChorEnv.find A CE)) ->
-    ~ (Var.Map.In x (ChorEnv.find A (ChorEnv.remove B y CE))).
-Proof.
-  intros.
-  Var.simplify. Actor.simplify.
-  Var.simplify.
-Qed.
-
-Lemma nin_partition : forall x (M M1 M2 : Var.Map.t Expr.typ),
-    ~ Var.Map.In x M ->
-    Var.Map.Partition M M1 M2 ->
-    ~ Var.Map.In x M1.
-Proof.
-  intros.
-  pose proof (Var.Map.Proofs.partition_not_in_inversion Expr.typ M M1 M2 x H0) as Hpni.
-  destruct Hpni as [Hpni _].
-  destruct (Hpni H).
-  auto.
-Qed.
-
-Lemma partition_remove_all : forall (CE1 : ChorEnv.t Expr.typ) CE2 CE3 A B x,
-    Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
-    Var.Map.Partition (ChorEnv.find A (ChorEnv.remove B x CE1))
-      (ChorEnv.find A (ChorEnv.remove B x CE2))
-      (ChorEnv.find A (ChorEnv.remove B x CE3)).
-Proof.
-  intros.
-  Var.simplify.
-  Actor.simplify.
-  Var.simplify.
-Qed.
-  
-Lemma partition_remove : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
-    Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
-    ~ Var.Map.In x Delta ->
-    ~ Var.Map.In x Delta1 ->
-    Var.Map.Partition Delta Delta1 (Var.Map.remove x Delta2).
-Proof.
-  intros Delta Delta1 Delta2 x tau Hpart H H1.
-  apply Var.Map.Proofs.partition_add_inversion in Hpart; auto.
-  destruct Hpart as [[Hmapsto [Hin2 Hpart]] | [Hin1 [Hmapsto2 Hpart]]].
-  * contradict H1. exists tau; auto.
-  * auto.
-Qed.  
-
-Lemma remove_add : forall x tau (Delta1 : Var.Map.t Expr.typ) Delta2,
-    ~ Var.Map.In x Delta1 ->
-    Var.Map.Equal Delta2 (Var.Map.add x tau Delta1) ->
-    Var.Map.Equal (Var.Map.remove x Delta2) Delta1.
-Proof.
-  intros.
-  Var.simplify.
-  apply Var.Map.Proofs.remove_not_in; auto.
-Qed.
-
-Lemma addadd1 : forall A (D : ChorEnv.t Expr.typ) Delta x tau,
-    ChorEnv.Equal (Actor.Map.add A Delta (ChorEnv.add A x tau D)) (Actor.Map.add A Delta D).
-Proof.
-  intros.
-  unfold ChorEnv.add.
-  Actor.simplify. 
-Qed.
-
-Lemma addadd2 : forall {X : Type} A (T : ChorEnv.t X) Theta1 Theta2,
-    ChorEnv.Equal (Actor.Map.add A Theta1 (Actor.Map.add A Theta2 T)) 
-                  (Actor.Map.add A Theta1 T).
-Proof.
-  intros.
-  Actor.simplify.
-Qed.
-
-Lemma addadd3 :  forall (CE : ChorEnv.t Expr.typ) A x tau B M,
-  A <> B -> 
-  ChorEnv.Equal (Actor.Map.add B M (ChorEnv.add A x tau CE))
-                (ChorEnv.add A x tau (Actor.Map.add B M CE)).
-Proof.
-  intros.
-  unfold ChorEnv.add.
-  Var.simplify. Actor.simplify.
-  rewrite Actor.Map.Proofs.add_neq_sym; auto.
-  reflexivity.
-Qed.
-
-Lemma addadd4 :  forall {X : Type} (CE : ChorEnv.t X) A MA B MB,
-  A <> B -> 
-  ChorEnv.Equal (Actor.Map.add B MB (Actor.Map.add A MA CE))
-                (Actor.Map.add A MA (Actor.Map.add B MB CE)).
-Proof.
-  intros.
-  rewrite Actor.Map.Proofs.add_neq_sym; auto.
-  reflexivity.
-Qed.
-
-Lemma addadd5 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
-    Insn.bind_eqb (B, y) (A, x) = false ->
-    ChorEnv.Equal (ChorEnv.add A x taux (ChorEnv.add B y tauy CE))
-                  (ChorEnv.add B y tauy (ChorEnv.add A x taux CE)).
-Proof.
-  intros.
-  unfold Insn.bind_eqb, Insn.bind_eq_dec in H; simpl in H.
-  Actor.simplify.
-  2:{ unfold ChorEnv.add.
-      rewrite Actor.Map.Proofs.add_neq_sym; auto.
+    Lemma remove_find : forall (CE : ChorEnv.t Expr.typ) A x,
+        (ChorEnv.find A (ChorEnv.remove A x CE)) = (Var.Map.remove x (ChorEnv.find A CE)).
+    Proof.
+      intros.
       Var.simplify.
       Actor.simplify.
-  }
-  Var.simplify.
-  unfold ChorEnv.add.
-  repeat (Actor.simplify; Var.simplify).
-  rewrite Var.Map.Proofs.add_neq_sym; auto.
-  reflexivity.
-Qed.
+    Qed.
 
-(* this lemma may help prove the preceding lemma. *)
-Lemma addadd6 : forall {X : Type} x taux y tauy (M : Var.Map.t X),
-    x <> y -> 
-    Var.Map.Equal (Var.Map.add y tauy (Var.Map.add x taux M))
-                  (Var.Map.add x taux (Var.Map.add y tauy M)).
-Proof.
-  intros.
-  rewrite Var.Map.Proofs.add_neq_sym; auto.
-  reflexivity.
-Qed.
+    Lemma add_remove : forall (CE : ChorEnv.t Expr.typ) M A x tau,
+        Var.Map.MapsTo x tau M ->
+        ChorEnv.Equal
+          (ChorEnv.add A x tau (Actor.Map.add A (Var.Map.remove x M) CE))
+          (Actor.Map.add A M CE).
+    Proof.
+      intros.
+      unfold ChorEnv.add.
+      Var.simplify. Actor.simplify.
+      Var.simplify.
+      rewrite Var.Map.Proofs.add_mapsto; auto.
+      apply ChorEnv.actor_map_Equal.
+      Actor.simplify.
+    Qed.
 
-Lemma addadd8 : forall (CE : ChorEnv.t Expr.typ) A x tau M, 
-    ChorEnv.Equal
-      (Actor.Map.add A (Var.Map.add x tau M) CE)
-      (ChorEnv.add A x tau (Actor.Map.add A M CE)).
-Proof.
-  intros.
-  unfold ChorEnv.add.
-  repeat (Var.simplify; Actor.simplify).
-Qed.
+    Lemma nin_remove : forall (M : Var.Map.t Expr.typ) x,
+        ~ (Var.Map.In x (Var.Map.remove x M)).
+    Proof.
+      intros.
+      Var.simplify.
+    Qed.
 
-Lemma addadd9 : forall (CE : ChorEnv.t Expr.typ) A x taux y tauy,
-    y <> x ->
-    ChorEnv.Equal (ChorEnv.add A x taux (ChorEnv.add A y tauy CE))
-                  (ChorEnv.add A y tauy (ChorEnv.add A x taux CE)).
-Proof.
-  intros.
-  assert (Insn.bind_eqb (A, y) (A, x) = false).
-  destruct (Insn.bind_eqb_false (A, y) (A, x)).
-  assert (~ Insn.bind_eq (A, y) (A, x)).
-  unfold Insn.bind_eq.
-  tauto.
-  tauto.
-  apply addadd5; auto.
-Qed.
+    (* This is needed for dealing with classical variable shadowing *)
+    Lemma nin_remove_ce : forall (CE : ChorEnv.t Expr.typ) A x B y,
+        ~ (Var.Map.In x (ChorEnv.find A CE)) ->
+        ~ (Var.Map.In x (ChorEnv.find A (ChorEnv.remove B y CE))).
+    Proof.
+      intros.
+      Var.simplify. Actor.simplify.
+      Var.simplify.
+    Qed.
 
-Lemma overwrite : forall (CE : ChorEnv.t Expr.typ) A x tau1 tau2,
-    ChorEnv.Equal
-      (ChorEnv.add A x tau1 (ChorEnv.add A x tau2 CE))
-      (ChorEnv.add A x tau1 CE).
-Proof.
-  intros.
-  unfold ChorEnv.add.
-  repeat (Actor.simplify; Var.simplify).
-Qed.
+    Lemma nin_partition : forall x (M M1 M2 : Var.Map.t Expr.typ),
+        ~ Var.Map.In x M ->
+        Var.Map.Partition M M1 M2 ->
+        ~ Var.Map.In x M1.
+    Proof.
+      intros.
+      pose proof (Var.Map.Proofs.partition_not_in_inversion Expr.typ M M1 M2 x H0) as Hpni.
+      destruct Hpni as [Hpni _].
+      destruct (Hpni H).
+      auto.
+    Qed.
 
-Lemma remrem :  forall (CE : ChorEnv.t Expr.typ) A x y,
-    ChorEnv.Equal
-      (ChorEnv.remove A x (ChorEnv.remove A y CE))
-      (ChorEnv.remove A y (ChorEnv.remove A x CE)).      
-Proof.
-  intros.
-  unfold ChorEnv.remove.
-  repeat (Var.simplify; Actor.simplify).
-  intros D. ChorEnv.simplify.
-  rewrite Var.Map.Proofs.remove_swap.
-  reflexivity.
-Qed.
-
-Lemma rmadd1 : forall (CE : ChorEnv.t Expr.typ) A x tau,
-    ChorEnv.Equal
-      (ChorEnv.remove A x (ChorEnv.add A x tau CE))
-      (ChorEnv.remove A x CE).
-Proof.
-  intros.
-  unfold ChorEnv.remove, ChorEnv.add.
-  repeat (Actor.simplify; Var.simplify).
-Qed.
-
-Lemma rmadd2 : forall (CE : ChorEnv.t Expr.typ) A B x y tau,
-    Insn.bind_eqb (A, x) (B, y) = false ->
-    ChorEnv.Equal
-      (ChorEnv.remove B y (ChorEnv.add A x tau CE))
-      (ChorEnv.add A x tau (ChorEnv.remove B y CE)).
-Proof.
-  intros CE A B x y tau Heq.
-  rewrite Insn.bind_eqb_false in Heq.
-  unfold Insn.bind_eq in Heq; simpl in Heq.
-  
-  unfold ChorEnv.remove, ChorEnv.add.
-  repeat (Actor.simplify; Var.simplify).
-
-  rewrite Actor.Map.Proofs.add_neq_sym; auto.
-  reflexivity.
-Qed.
-
-Lemma nin_mapl : forall (M : Var.Map.t Expr.typ)  x y tau,
-    x <> y ->
-    ~ Var.Map.In x M ->
-    ~ Var.Map.In x (Var.Map.add y tau M).
-Proof.
-  intros.
-  Var.solve.
-Qed.
-
-Lemma nin_mapr : forall (M : Var.Map.t Expr.typ)  x y tau,
-    x <> y ->
-    ~ Var.Map.In x (Var.Map.add y tau M) ->
-    ~ Var.Map.In x M.
-Proof.
-  intros.
-  Var.solve.
-Qed.
-
-Lemma nin_nxeq : forall (M : Var.Map.t Expr.typ)  x y tau,
-    ~ Var.Map.In x (Var.Map.add y tau M) -> x <> y.
-Proof.
-  intros.
-  Var.solve.
-Qed.
-
-(* contrapositive of nin_mapl with mapsto rewrite *)
-Lemma map_in : forall (M : Var.Map.t Expr.typ)  x tau,
-    Var.Map.MapsTo x tau M ->
-    Var.Map.In x M.
-Proof.
-  intros.
-  Var.solve.
-Qed.
+    Lemma partition_remove_all : forall (CE1 : ChorEnv.t Expr.typ) CE2 CE3 A B x,
+        Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
+        Var.Map.Partition (ChorEnv.find A (ChorEnv.remove B x CE1))
+          (ChorEnv.find A (ChorEnv.remove B x CE2))
+          (ChorEnv.find A (ChorEnv.remove B x CE3)).
+    Proof.
+      intros.
+      Var.simplify.
+      Actor.simplify.
+      Var.simplify.
+    Qed.
       
+    Lemma partition_remove : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
+        Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
+        ~ Var.Map.In x Delta ->
+        ~ Var.Map.In x Delta1 ->
+        Var.Map.Partition Delta Delta1 (Var.Map.remove x Delta2).
+    Proof.
+      intros Delta Delta1 Delta2 x tau Hpart H H1.
+      apply Var.Map.Proofs.partition_add_inversion in Hpart; auto.
+      destruct Hpart as [[Hmapsto [Hin2 Hpart]] | [Hin1 [Hmapsto2 Hpart]]].
+      * contradict H1. exists tau; auto.
+      * auto.
+    Qed.  
 
-Lemma nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
-    ~ Var.Map.In y (ChorEnv.find B (ChorEnv.add A x tau CE)) ->
-    Insn.bind_eqb (A, x) (B, y) = false.
-Proof.
-  intros.
-  apply Insn.bind_eqb_false.
-  intros [? ?]; simpl in *; subst.
-  repeat (Var.simplify; Actor.simplify).
-Qed.
+    Lemma remove_add : forall x tau (Delta1 : Var.Map.t Expr.typ) Delta2,
+        ~ Var.Map.In x Delta1 ->
+        Var.Map.Equal Delta2 (Var.Map.add x tau Delta1) ->
+        Var.Map.Equal (Var.Map.remove x Delta2) Delta1.
+    Proof.
+      intros.
+      Var.simplify.
+      apply Var.Map.Proofs.remove_not_in; auto.
+    Qed.
+
+
+    Lemma addadd3 :  forall (CE : ChorEnv.t Expr.typ) A x tau B M,
+      A <> B -> 
+      ChorEnv.Equal (Actor.Map.add B M (ChorEnv.add A x tau CE))
+                    (ChorEnv.add A x tau (Actor.Map.add B M CE)).
+    Proof.
+      intros.
+      unfold ChorEnv.add.
+      Var.simplify. Actor.simplify.
+      rewrite Actor.Map.Proofs.add_neq_sym; auto.
+      reflexivity.
+    Qed.
+
+    Lemma addadd4 :  forall {X : Type} (CE : ChorEnv.t X) A MA B MB,
+      A <> B -> 
+      ChorEnv.Equal (Actor.Map.add B MB (Actor.Map.add A MA CE))
+                    (Actor.Map.add A MA (Actor.Map.add B MB CE)).
+    Proof.
+      intros.
+      rewrite Actor.Map.Proofs.add_neq_sym; auto.
+      reflexivity.
+    Qed.
+
+    Lemma addadd5 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
+        Insn.bind_eqb (B, y) (A, x) = false ->
+        ChorEnv.Equal (ChorEnv.add A x taux (ChorEnv.add B y tauy CE))
+                      (ChorEnv.add B y tauy (ChorEnv.add A x taux CE)).
+    Proof.
+      intros.
+      unfold Insn.bind_eqb, Insn.bind_eq_dec in H; simpl in H.
+      Actor.simplify.
+      2:{ unfold ChorEnv.add.
+          rewrite Actor.Map.Proofs.add_neq_sym; auto.
+          Var.simplify.
+          Actor.simplify.
+      }
+      Var.simplify.
+      unfold ChorEnv.add.
+      repeat (Actor.simplify; Var.simplify).
+      rewrite Var.Map.Proofs.add_neq_sym; auto.
+      reflexivity.
+    Qed.
+
+    (* this lemma may help prove the preceding lemma. *)
+    Lemma addadd6 : forall {X : Type} x taux y tauy (M : Var.Map.t X),
+        x <> y -> 
+        Var.Map.Equal (Var.Map.add y tauy (Var.Map.add x taux M))
+                      (Var.Map.add x taux (Var.Map.add y tauy M)).
+    Proof.
+      intros.
+      rewrite Var.Map.Proofs.add_neq_sym; auto.
+      reflexivity.
+    Qed.
+
+    Lemma addadd8 : forall (CE : ChorEnv.t Expr.typ) A x tau M, 
+        ChorEnv.Equal
+          (Actor.Map.add A (Var.Map.add x tau M) CE)
+          (ChorEnv.add A x tau (Actor.Map.add A M CE)).
+    Proof.
+      intros.
+      unfold ChorEnv.add.
+      repeat (Var.simplify; Actor.simplify).
+    Qed.
+
+    Lemma addadd9 : forall (CE : ChorEnv.t Expr.typ) A x taux y tauy,
+        y <> x ->
+        ChorEnv.Equal (ChorEnv.add A x taux (ChorEnv.add A y tauy CE))
+                      (ChorEnv.add A y tauy (ChorEnv.add A x taux CE)).
+    Proof.
+      intros.
+      assert (Insn.bind_eqb (A, y) (A, x) = false).
+      destruct (Insn.bind_eqb_false (A, y) (A, x)).
+      assert (~ Insn.bind_eq (A, y) (A, x)).
+      unfold Insn.bind_eq.
+      tauto.
+      tauto.
+      apply addadd5; auto.
+    Qed.
+
+    Lemma overwrite : forall (CE : ChorEnv.t Expr.typ) A x tau1 tau2,
+        ChorEnv.Equal
+          (ChorEnv.add A x tau1 (ChorEnv.add A x tau2 CE))
+          (ChorEnv.add A x tau1 CE).
+    Proof.
+      intros.
+      unfold ChorEnv.add.
+      repeat (Actor.simplify; Var.simplify).
+    Qed.
+
+    Lemma remrem :  forall (CE : ChorEnv.t Expr.typ) A x y,
+        ChorEnv.Equal
+          (ChorEnv.remove A x (ChorEnv.remove A y CE))
+          (ChorEnv.remove A y (ChorEnv.remove A x CE)).      
+    Proof.
+      intros.
+      unfold ChorEnv.remove.
+      repeat (Var.simplify; Actor.simplify).
+      intros D. ChorEnv.simplify.
+      rewrite Var.Map.Proofs.remove_swap.
+      reflexivity.
+    Qed.
+
+    Lemma rmadd1 : forall (CE : ChorEnv.t Expr.typ) A x tau,
+        ChorEnv.Equal
+          (ChorEnv.remove A x (ChorEnv.add A x tau CE))
+          (ChorEnv.remove A x CE).
+    Proof.
+      intros.
+      unfold ChorEnv.remove, ChorEnv.add.
+      repeat (Actor.simplify; Var.simplify).
+    Qed.
+
+    Lemma rmadd2 : forall (CE : ChorEnv.t Expr.typ) A B x y tau,
+        Insn.bind_eqb (A, x) (B, y) = false ->
+        ChorEnv.Equal
+          (ChorEnv.remove B y (ChorEnv.add A x tau CE))
+          (ChorEnv.add A x tau (ChorEnv.remove B y CE)).
+    Proof.
+      intros CE A B x y tau Heq.
+      rewrite Insn.bind_eqb_false in Heq.
+      unfold Insn.bind_eq in Heq; simpl in Heq.
       
+      unfold ChorEnv.remove, ChorEnv.add.
+      repeat (Actor.simplify; Var.simplify).
 
-Lemma  contra_nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
-    Insn.bind_eqb (A, x) (B, y) = true ->
-    Var.Map.In y (ChorEnv.find B (ChorEnv.add A x tau CE)).
-Proof.
-  intros CE A x tau B y H.
-  apply Insn.bind_eqb_true in H.
-  unfold Insn.bind_eq in H; simpl in H.
-  destruct H; subst.
-  repeat (Var.simplify; Actor.simplify).
-Qed.
+      rewrite Actor.Map.Proofs.add_neq_sym; auto.
+      reflexivity.
+    Qed.
 
-Lemma in_add : forall (M : Var.Map.t Expr.typ)  x tau,
-    Var.Map.In x (Var.Map.add x tau M).
-Proof.
-  intros.
-  Var.simplify.
-Qed.
-    
-Lemma in_beq : forall (CE : ChorEnv.t Expr.typ) A x tau,
-    Var.Map.In x (ChorEnv.find A (ChorEnv.add A x tau CE)).
-Proof.
-  intros.
-  pose proof (contra_nin_nbeq CE A x tau A x).
-  destruct (Insn.bind_eqb_true (A, x) (A, x)).
-  destruct (Insn.beq (A,x) (A,x)).
-  assert (Insn.bind_eqb (A, x) (A, x) = true).
-  apply H1.
-  apply H3.
-  simpl.
-  auto.
-  apply (H H4). 
-Qed.
+    Lemma nin_mapl : forall (M : Var.Map.t Expr.typ)  x y tau,
+        x <> y ->
+        ~ Var.Map.In x M ->
+        ~ Var.Map.In x (Var.Map.add y tau M).
+    Proof.
+      intros.
+      Var.solve.
+    Qed.
 
-Lemma nin_nbeq_add1 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
-    Insn.bind_eqb (A, x) (B, y) = false ->
-    ~ Var.Map.In x (ChorEnv.find A CE) ->
-      ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE)).
-Proof.
-  intros CE A x B y tau Heq Hin.
-  apply Insn.bind_eqb_false in Heq.
-  unfold Insn.bind_eq in Heq; simpl in Heq.
-  repeat (Var.simplify; Actor.simplify).
-Qed.
+    Lemma nin_mapr : forall (M : Var.Map.t Expr.typ)  x y tau,
+        x <> y ->
+        ~ Var.Map.In x (Var.Map.add y tau M) ->
+        ~ Var.Map.In x M.
+    Proof.
+      intros.
+      Var.solve.
+    Qed.
 
-Lemma nin_nbeq_add2 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
-    Insn.bind_eqb (A, x) (B, y) = false ->
-    ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE))->
-    ~ Var.Map.In x (ChorEnv.find A CE).
-Proof.
-  intros CE A x B y tau Heq Hin.
-  apply Insn.bind_eqb_false in Heq.
-  unfold Insn.bind_eq in Heq; simpl in Heq.
-  repeat (Var.simplify; Actor.simplify).
-Qed.
+    Lemma nin_nxeq : forall (M : Var.Map.t Expr.typ)  x y tau,
+        ~ Var.Map.In x (Var.Map.add y tau M) -> x <> y.
+    Proof.
+      intros.
+      Var.solve.
+    Qed.
 
-Lemma nin_nbeq_add3 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
-    Insn.bind_eqb (A, x) (B, y) = false ->
-    ChorEnv.MapsTo A x taux CE ->
-    ChorEnv.MapsTo A x taux (ChorEnv.add B y tauy CE).
-Proof.
-  intros CE A x taux B y tauy Heq Hin.
-  apply Insn.bind_eqb_false in Heq.
-  unfold Insn.bind_eq in Heq; simpl in Heq.
-  unfold ChorEnv.MapsTo in *.
-  repeat (Var.simplify; Actor.simplify).
-  right. split; auto.
-Qed.
+    (* contrapositive of nin_mapl with mapsto rewrite *)
+    Lemma map_in : forall (M : Var.Map.t Expr.typ)  x tau,
+        Var.Map.MapsTo x tau M ->
+        Var.Map.In x M.
+    Proof.
+      intros.
+      Var.solve.
+    Qed.
+          
 
-Lemma ini : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
-    Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
-    ~ (Var.Map.In x Delta1) ->
-    (Var.Map.MapsTo x tau Delta2).
-Proof.
-  intros Delta Delta1 Delta2 x tau Hpart Hin.
-  Var.reflect_find.
-  Var.Map.Tactics.reflect_partition.
-  specialize (Heq x). Var.simplify.
-  rewrite Hin in Heq.
-  Var.solve.
-Qed.
+    Lemma nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
+        ~ Var.Map.In y (ChorEnv.find B (ChorEnv.add A x tau CE)) ->
+        Insn.bind_eqb (A, x) (B, y) = false.
+    Proof.
+      intros.
+      apply Insn.bind_eqb_false.
+      intros [? ?]; simpl in *; subst.
+      repeat (Var.simplify; Actor.simplify).
+    Qed.
+          
 
-Lemma inin : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
-    Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
-    (Var.Map.In x Delta1) ->
-    (Var.Map.MapsTo x tau Delta1).
-Proof.
-  intros ? ? ? ? ? Hpart Hin.
-  Var.reflect_find.
-  Var.Map.Tactics.reflect_partition.
-  specialize (Heq x). Var.simplify.
-  rewrite Hin in Heq. auto.
-Qed.
+    Lemma  contra_nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
+        Insn.bind_eqb (A, x) (B, y) = true ->
+        Var.Map.In y (ChorEnv.find B (ChorEnv.add A x tau CE)).
+    Proof.
+      intros CE A x tau B y H.
+      apply Insn.bind_eqb_true in H.
+      unfold Insn.bind_eq in H; simpl in H.
+      destruct H; subst.
+      repeat (Var.simplify; Actor.simplify).
+    Qed.
 
-Lemma nin : forall (Delta : Var.Map.t Expr.typ) Delta1' Delta1 Delta2 x tau,
-    Var.Map.Equal (Var.Map.add x tau Delta1') Delta1 ->
-    Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
-    ~ (Var.Map.In x Delta) ->
-    ~ (Var.Map.In x Delta1') ->
-    ~ (Var.Map.In x Delta2) /\ Var.Map.Partition Delta Delta1' Delta2.
-Proof.
-  intros ? ? ? ? ? ? Heq Hpart Hnin Hnin1. Var.simplify.
-  apply Var.Map.Proofs.partition_add_inversion in Hpart; auto.
-  destruct Hpart as [[? [? ?]] | [Hcontra _]].
-  2:{
-    contradict Hcontra.
-    Var.simplify.
-  }
-  split; auto.
-  Var.simplify.
-  rewrite Var.Map.Proofs.remove_not_in in H1; auto.
-Qed.
-
-Lemma mapsto_destruct : forall {X : Type} x tau (M : Var.Map.t X) ,
-    Var.Map.MapsTo x tau M ->
-    (exists M', Var.Map.Equal M (Var.Map.add x tau M') /\ ~ Var.Map.In x M').
-Proof.
-  intros.
-  exists (Var.Map.remove x M).
-  split.
-  * Var.simplify. rewrite Var.Map.Proofs.add_mapsto; auto. reflexivity. 
-  * Var.simplify.
-Qed.
-
-Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
-    Var.Map.Partition M M1 M2 ->
-    Var.Map.Partition M2 M0 M3 ->
-    Var.Map.Partition (Var.Map.concat M1 M0) M1 M0 /\
-      Var.Map.Partition (Var.Map.concat M1 M3) M1 M3 /\      
-      Var.Map.Partition M (Var.Map.concat M1 M0) M3 /\
-      Var.Map.Partition M M0 (Var.Map.concat M1 M3).
-Proof.
-  intros.
-  Var.Map.Tactics.reflect_partition. Var.simplify.
-  split; [ | split; [ | split] ].
-  * Var.Map.Tactics.reflect_partition; auto; reflexivity.
-  * Var.Map.Tactics.reflect_partition; auto; reflexivity.
-  * Var.Map.Tactics.reflect_partition; Var.simplify.
-    rewrite Var.Map.Proofs.concat_assoc. reflexivity.
-  * apply Var.Map.Properties.Disjoint_sym in H; auto.
-    Var.Map.Tactics.reflect_partition; Var.simplify.
-    repeat rewrite Var.Map.Proofs.concat_assoc.
-    rewrite (Var.Map.Proofs.concat_sym M0 M1); auto; try reflexivity.
-Qed.
-
-Lemma map_partition_map : forall x tau (M : Var.Map.t Expr.typ) M1 M2,
-    Var.Map.MapsTo x tau M2 ->
-    Var.Map.Partition M M1 M2 ->
-    Var.Map.MapsTo x tau M.
-Proof.
-  intros x tau M M1 M2 HM2 Hpart.
-  Var.Map.Tactics.reflect_partition.
-  Var.solve.
-  destruct (Var.Map.find x M1) eqn:HM1; auto.
-  { (* x in M1 *)
-    exfalso. apply (Hdisj x).
-    split; Var.solve.
-  }
-Qed.
-
-Lemma readd_eq: forall A x tau (CE : ChorEnv.t Expr.typ),
-    Var.Map.MapsTo x tau (ChorEnv.find A CE) ->
-    ChorEnv.Equal (ChorEnv.add A x tau CE) CE.
-Proof.
-  intros A x tau CE Hmapsto.
-  unfold ChorEnv.add, ChorEnv.find in *.
-  destruct (Actor.Map.find A CE) as [ctx | ] eqn:Hfind.
-  2:{ Var.simplify. }
-  ChorEnv.solve.
-  unfold ChorEnv.find.
-  rewrite Hfind. Var.solve.
-Qed.
-
-Lemma remove_add_partition : forall (CE1 CE2 CE3: ChorEnv.t Expr.typ) A B x tau,
-    Var.Map.Partition (ChorEnv.find A CE1)
-      (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
-    Var.Map.MapsTo x tau (ChorEnv.find B CE1) ->
-    Var.Map.Partition (ChorEnv.find A CE1)
-      (ChorEnv.find A (ChorEnv.add B x tau CE2))
-      (ChorEnv.find A (ChorEnv.remove B x CE3)).
-Proof.
-  intros ? ? ? ? ? ? ? Hpart Hmapsto.
-  unfold ChorEnv.remove, ChorEnv.add, ChorEnv.find in *.
-  Actor.simplify. Var.simplify.
-    destruct (Actor.Map.find B CE1) as [ctx1 | ] eqn:HB1;
-    destruct (Actor.Map.find B CE2) as [ctx2 | ] eqn:HB2;
-    destruct (Actor.Map.find B CE3) as [ctx3 | ] eqn:HB3;
+    Lemma in_add : forall (M : Var.Map.t Expr.typ)  x tau,
+        Var.Map.In x (Var.Map.add x tau M).
+    Proof.
+      intros.
       Var.simplify.
-  * Var.Map.Tactics.reflect_partition.
-    2:{
+    Qed.
+        
+    Lemma in_beq : forall (CE : ChorEnv.t Expr.typ) A x tau,
+        Var.Map.In x (ChorEnv.find A (ChorEnv.add A x tau CE)).
+    Proof.
+      intros.
+      pose proof (contra_nin_nbeq CE A x tau A x).
+      destruct (Insn.bind_eqb_true (A, x) (A, x)).
+      destruct (Insn.beq (A,x) (A,x)).
+      assert (Insn.bind_eqb (A, x) (A, x) = true).
+      apply H1.
+      apply H3.
+      simpl.
+      auto.
+      apply (H H4). 
+    Qed.
+
+    Lemma nin_nbeq_add1 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+        Insn.bind_eqb (A, x) (B, y) = false ->
+        ~ Var.Map.In x (ChorEnv.find A CE) ->
+          ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE)).
+    Proof.
+      intros CE A x B y tau Heq Hin.
+      apply Insn.bind_eqb_false in Heq.
+      unfold Insn.bind_eq in Heq; simpl in Heq.
+      repeat (Var.simplify; Actor.simplify).
+    Qed.
+
+    Lemma nin_nbeq_add2 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+        Insn.bind_eqb (A, x) (B, y) = false ->
+        ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE))->
+        ~ Var.Map.In x (ChorEnv.find A CE).
+    Proof.
+      intros CE A x B y tau Heq Hin.
+      apply Insn.bind_eqb_false in Heq.
+      unfold Insn.bind_eq in Heq; simpl in Heq.
+      repeat (Var.simplify; Actor.simplify).
+    Qed.
+
+    Lemma nin_nbeq_add3 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
+        Insn.bind_eqb (A, x) (B, y) = false ->
+        ChorEnv.MapsTo A x taux CE ->
+        ChorEnv.MapsTo A x taux (ChorEnv.add B y tauy CE).
+    Proof.
+      intros CE A x taux B y tauy Heq Hin.
+      apply Insn.bind_eqb_false in Heq.
+      unfold Insn.bind_eq in Heq; simpl in Heq.
+      unfold ChorEnv.MapsTo in *.
+      repeat (Var.simplify; Actor.simplify).
+      right. split; auto.
+    Qed.
+
+    Lemma ini : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
+        Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
+        ~ (Var.Map.In x Delta1) ->
+        (Var.Map.MapsTo x tau Delta2).
+    Proof.
+      intros Delta Delta1 Delta2 x tau Hpart Hin.
+      Var.reflect_find.
+      Var.Map.Tactics.reflect_partition.
+      specialize (Heq x). Var.simplify.
+      rewrite Hin in Heq.
+      Var.solve.
+    Qed.
+
+    Lemma inin : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
+        Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
+        (Var.Map.In x Delta1) ->
+        (Var.Map.MapsTo x tau Delta1).
+    Proof.
+      intros ? ? ? ? ? Hpart Hin.
+      Var.reflect_find.
+      Var.Map.Tactics.reflect_partition.
+      specialize (Heq x). Var.simplify.
+      rewrite Hin in Heq. auto.
+    Qed.
+
+    Lemma nin : forall (Delta : Var.Map.t Expr.typ) Delta1' Delta1 Delta2 x tau,
+        Var.Map.Equal (Var.Map.add x tau Delta1') Delta1 ->
+        Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
+        ~ (Var.Map.In x Delta) ->
+        ~ (Var.Map.In x Delta1') ->
+        ~ (Var.Map.In x Delta2) /\ Var.Map.Partition Delta Delta1' Delta2.
+    Proof.
+      intros ? ? ? ? ? ? Heq Hpart Hnin Hnin1. Var.simplify.
+      apply Var.Map.Proofs.partition_add_inversion in Hpart; auto.
+      destruct Hpart as [[? [? ?]] | [Hcontra _]].
+      2:{
+        contradict Hcontra.
+        Var.simplify.
+      }
+      split; auto.
       Var.simplify.
-      intros D. Var.simplify.
-      Var.reflect_find. auto.
-    }
+      rewrite Var.Map.Proofs.remove_not_in in H1; auto.
+    Qed.
 
-    rewrite Var.Map.MProofs.Proofs.disjoint_add_1.
-    split; auto.
-    { apply Var.Map.Proofs.disjoint_remove_2; auto. }
-    Var.simplify.
+    Lemma mapsto_destruct : forall {X : Type} x tau (M : Var.Map.t X) ,
+        Var.Map.MapsTo x tau M ->
+        (exists M', Var.Map.Equal M (Var.Map.add x tau M') /\ ~ Var.Map.In x M').
+    Proof.
+      intros.
+      exists (Var.Map.remove x M).
+      split.
+      * Var.simplify. rewrite Var.Map.Proofs.add_mapsto; auto. reflexivity. 
+      * Var.simplify.
+    Qed.
 
-  * Var.Map.Tactics.reflect_partition.
-    2:{
+    Lemma partitioning : forall  {X : Type} (M : Var.Map.t X) M0 M1 M2 M3,
+        Var.Map.Partition M M1 M2 ->
+        Var.Map.Partition M2 M0 M3 ->
+        Var.Map.Partition (Var.Map.concat M1 M0) M1 M0 /\
+          Var.Map.Partition (Var.Map.concat M1 M3) M1 M3 /\      
+          Var.Map.Partition M (Var.Map.concat M1 M0) M3 /\
+          Var.Map.Partition M M0 (Var.Map.concat M1 M3).
+    Proof.
+      intros.
+      Var.Map.Tactics.reflect_partition. Var.simplify.
+      split; [ | split; [ | split] ].
+      * Var.Map.Tactics.reflect_partition; auto; reflexivity.
+      * Var.Map.Tactics.reflect_partition; auto; reflexivity.
+      * Var.Map.Tactics.reflect_partition; Var.simplify.
+        rewrite Var.Map.Proofs.concat_assoc. reflexivity.
+      * apply Var.Map.Properties.Disjoint_sym in H; auto.
+        Var.Map.Tactics.reflect_partition; Var.simplify.
+        repeat rewrite Var.Map.Proofs.concat_assoc.
+        rewrite (Var.Map.Proofs.concat_sym M0 M1); auto; try reflexivity.
+    Qed.
+
+    Lemma map_partition_map : forall x tau (M : Var.Map.t Expr.typ) M1 M2,
+        Var.Map.MapsTo x tau M2 ->
+        Var.Map.Partition M M1 M2 ->
+        Var.Map.MapsTo x tau M.
+    Proof.
+      intros x tau M M1 M2 HM2 Hpart.
+      Var.Map.Tactics.reflect_partition.
+      Var.solve.
+      destruct (Var.Map.find x M1) eqn:HM1; auto.
+      { (* x in M1 *)
+        exfalso. apply (Hdisj x).
+        split; Var.solve.
+      }
+    Qed.
+
+    Lemma readd_eq: forall A x tau (CE : ChorEnv.t Expr.typ),
+        Var.Map.MapsTo x tau (ChorEnv.find A CE) ->
+        ChorEnv.Equal (ChorEnv.add A x tau CE) CE.
+    Proof.
+      intros A x tau CE Hmapsto.
+      unfold ChorEnv.add, ChorEnv.find in *.
+      destruct (Actor.Map.find A CE) as [ctx | ] eqn:Hfind.
+      2:{ Var.simplify. }
+      ChorEnv.solve.
+      unfold ChorEnv.find.
+      rewrite Hfind. Var.solve.
+    Qed.
+
+    Lemma remove_add_partition : forall (CE1 CE2 CE3: ChorEnv.t Expr.typ) A B x tau,
+        Var.Map.Partition (ChorEnv.find A CE1)
+          (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
+        Var.Map.MapsTo x tau (ChorEnv.find B CE1) ->
+        Var.Map.Partition (ChorEnv.find A CE1)
+          (ChorEnv.find A (ChorEnv.add B x tau CE2))
+          (ChorEnv.find A (ChorEnv.remove B x CE3)).
+    Proof.
+      intros ? ? ? ? ? ? ? Hpart Hmapsto.
+      unfold ChorEnv.remove, ChorEnv.add, ChorEnv.find in *.
+      Actor.simplify. Var.simplify.
+        destruct (Actor.Map.find B CE1) as [ctx1 | ] eqn:HB1;
+        destruct (Actor.Map.find B CE2) as [ctx2 | ] eqn:HB2;
+        destruct (Actor.Map.find B CE3) as [ctx3 | ] eqn:HB3;
+          Var.simplify.
+      * Var.Map.Tactics.reflect_partition.
+        2:{
+          Var.simplify.
+          intros D. Var.simplify.
+          Var.reflect_find. auto.
+        }
+
+        rewrite Var.Map.MProofs.Proofs.disjoint_add_1.
+        split; auto.
+        { apply Var.Map.Proofs.disjoint_remove_2; auto. }
+        Var.simplify.
+
+      * Var.Map.Tactics.reflect_partition.
+        2:{
+          Var.simplify.
+          intros y. Var.reflect_find; auto.
+          destruct (Var.Map.find y ctx1); auto.
+        }
+        apply Var.Map.Proofs.disjoint_empty_2.
+
+      * Var.Map.Tactics.reflect_partition.
+        2:{
+          Var.simplify.
+          intros y. Var.reflect_find; auto.
+        }
+        Var.simplify. split; [ | intros [? ?]; contradiction].
+        Var.simplify.
+    Qed.
+
+      
+    Lemma map_subset_add' : forall A B y tau (CE1 : ChorEnv.t Expr.typ) CE2 CE3,
+        ~ Var.Map.In y (ChorEnv.find B CE3) ->
+        Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
+        Var.Map.Partition
+          (ChorEnv.find A (ChorEnv.add B y tau CE1))
+          (ChorEnv.find A (ChorEnv.add B y tau CE2)) (ChorEnv.find A CE3).
+    Proof.
+      intros.
       Var.simplify.
-      intros y. Var.reflect_find; auto.
-      destruct (Var.Map.find y ctx1); auto.
-    }
-    apply Var.Map.Proofs.disjoint_empty_2.
+      Actor.Map.Tactics.compare A B; subst; auto.
+      apply Var.Map.Proofs.partition_add_l; auto.
+    Qed.
 
-  * Var.Map.Tactics.reflect_partition.
-    2:{
+    Lemma map_subset_add : forall A B y tau (CE1 : ChorEnv.t Expr.typ) CE2 CE3,
+        Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
+        Var.Map.Partition
+          (ChorEnv.find A (ChorEnv.add B y tau CE1))
+          (ChorEnv.find A (ChorEnv.add B y tau CE2)) (ChorEnv.find A (ChorEnv.remove B y CE3)).
+    Proof.
+      intros.
       Var.simplify.
-      intros y. Var.reflect_find; auto.
-    }
-    Var.simplify. split; [ | intros [? ?]; contradiction].
-    Var.simplify.
-Qed.
+      Actor.Map.Tactics.compare A B; subst; auto.
+      Var.Map.Tactics.reflect_partition.
+      * Var.simplify. 
+        split; [ | intros [? ?]; try contradiction].
+        intros z [Hin1 Hin2].
+        Var.simplify.
+        apply (Hdisj z); auto.
+      * Var.simplify.
+        rewrite Heq.
+        Var.solve.
+    Qed.
 
-  
-Lemma map_subset_add' : forall A B y tau (CE1 : ChorEnv.t Expr.typ) CE2 CE3,
-    ~ Var.Map.In y (ChorEnv.find B CE3) ->
-    Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
-    Var.Map.Partition
-      (ChorEnv.find A (ChorEnv.add B y tau CE1))
-      (ChorEnv.find A (ChorEnv.add B y tau CE2)) (ChorEnv.find A CE3).
-Proof.
-  intros.
-  Var.simplify.
-  Actor.Map.Tactics.compare A B; subst; auto.
-  apply Var.Map.Proofs.partition_add_l; auto.
-Qed.
+    Lemma add_mapsto : forall x (tau : Expr.typ) m,
+        Var.Map.MapsTo x tau m ->
+        Var.Map.Equal (Var.Map.add x tau m) m.
+    Proof.
+      intros. Var.solve.
+    Qed.
 
-Lemma map_subset_add : forall A B y tau (CE1 : ChorEnv.t Expr.typ) CE2 CE3,
-    Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
-    Var.Map.Partition
-      (ChorEnv.find A (ChorEnv.add B y tau CE1))
-      (ChorEnv.find A (ChorEnv.add B y tau CE2)) (ChorEnv.find A (ChorEnv.remove B y CE3)).
-Proof.
-  intros.
-  Var.simplify.
-  Actor.Map.Tactics.compare A B; subst; auto.
-  Var.Map.Tactics.reflect_partition.
-  * Var.simplify. 
-    split; [ | intros [? ?]; try contradiction].
-    intros z [Hin1 Hin2].
-    Var.simplify.
-    apply (Hdisj z); auto.
-  * Var.simplify.
-    rewrite Heq.
-    Var.solve.
-Qed.
+    Lemma rem_empty : forall {X : Type} A x,
+        ChorEnv.Equal
+          (ChorEnv.remove A x (Actor.Map.empty (Var.Map.t X)))
+          (Actor.Map.empty (Var.Map.t X)).
+    Proof.
+      intros.
+      unfold ChorEnv.Equal.
+      intro.
+      unfold ChorEnv.remove.
+      Var.simplify.
+      Actor.simplify.
+      Var.simplify.
+    Qed.
 
-Lemma add_mapsto : forall x (tau : Expr.typ) m,
-    Var.Map.MapsTo x tau m ->
-    Var.Map.Equal (Var.Map.add x tau m) m.
-Proof.
-  intros. Var.solve.
-Qed.
+    Lemma rem_empty2 : forall {X : Type} A x (CE : ChorEnv.t X),
+        Var.Map.Empty (ChorEnv.find A CE) -> 
+        ChorEnv.Equal (ChorEnv.remove A x CE) CE.
+    Proof.
+      intros X A x CE H.
+      intros B.
+      ChorEnv.simplify.
+      rewrite H.
+      Var.simplify.
+    Qed.
 
-Lemma rem_empty : forall {X : Type} A x,
-    ChorEnv.Equal
-      (ChorEnv.remove A x (Actor.Map.empty (Var.Map.t X)))
-      (Actor.Map.empty (Var.Map.t X)).
-Proof.
-  intros.
-  unfold ChorEnv.Equal.
-  intro.
-  unfold ChorEnv.remove.
-  Var.simplify.
-  Actor.simplify.
-  Var.simplify.
-Qed.
+    Lemma members_dj : forall A B AS1 AS2,
+        Actor.FSet.Empty (Actor.FSet.inter AS1 AS2) ->
+        Actor.FSet.In A AS1 -> 
+        Actor.FSet.In B AS2 ->
+        A <> B.
+    Proof.
+      intros A B AS1 AS2 Hinter HA HB Heq; subst.
+      apply (Hinter B).
+      Actor.simplify.
+    Qed.
 
-Lemma rem_empty2 : forall {X : Type} A x (CE : ChorEnv.t X),
-    Var.Map.Empty (ChorEnv.find A CE) -> 
-    ChorEnv.Equal (ChorEnv.remove A x CE) CE.
-Proof.
-  intros X A x CE H.
-  intros B.
-  ChorEnv.simplify.
-  rewrite H.
-  Var.simplify.
-Qed.
+    Lemma inter_nin : forall A AS1 AS2,
+        Actor.FSet.Empty (Actor.FSet.inter AS1 AS2) ->
+        Actor.FSet.In A AS2 -> 
+        ~ Actor.FSet.In A AS1.
+    Proof.
+      intros A AS1 AS2 Hinter Hnin HH; subst.
+      apply (Hinter A).
+      Actor.simplify.
+    Qed.
 
-Lemma members_dj : forall A B AS1 AS2,
-    Actor.FSet.Empty (Actor.FSet.inter AS1 AS2) ->
-    Actor.FSet.In A AS1 -> 
-    Actor.FSet.In B AS2 ->
-    A <> B.
-Proof.
-  intros A B AS1 AS2 Hinter HA HB Heq; subst.
-  apply (Hinter B).
-  Actor.simplify.
-Qed.
+    Lemma singleton_nin : forall A B,
+        ~ Actor.FSet.In A (Actor.FSet.singleton B) ->
+        A <> B.
+    Proof.
+      intros.
+      Actor.simplify.
+    Qed.
 
-Lemma inter_nin : forall A AS1 AS2,
-    Actor.FSet.Empty (Actor.FSet.inter AS1 AS2) ->
-    Actor.FSet.In A AS2 -> 
-    ~ Actor.FSet.In A AS1.
-Proof.
-  intros A AS1 AS2 Hinter Hnin HH; subst.
-  apply (Hinter A).
-  Actor.simplify.
-Qed.
+    Lemma concat_partition : forall {X : Type} (M1 M2 : Var.Map.t X),
+        Var.Map.Properties.Disjoint M1 M2 ->
+        Var.Map.Partition (Var.Map.concat M1 M2) M1 M2.
+    Proof.
+      intros.
+      Var.simplify.
+    Qed.
 
-Lemma singleton_nin : forall A B,
-    ~ Actor.FSet.In A (Actor.FSet.singleton B) ->
-    A <> B.
-Proof.
-  intros.
-  Actor.simplify.
-Qed.
+    Lemma concat_partition_eq : forall {X : Type} (M M1 M2 : Var.Map.t X),
+        Var.Map.Partition M M1 M2 ->
+        Var.Map.Equal (Var.Map.concat M1 M2) M.
+    Proof.
+      intros.
+      pose proof (Var.Map.Proofs.partition_concat M M1 M2).
+      destruct H0. 
+      destruct (H0 H).
+      rewrite <- H3.
+      Var.simplify.
+    Qed.
 
-Lemma concat_partition : forall {X : Type} (M1 M2 : Var.Map.t X),
-    Var.Map.Properties.Disjoint M1 M2 ->
-    Var.Map.Partition (Var.Map.concat M1 M2) M1 M2.
-Proof.
-  intros.
-  Var.simplify.
-Qed.
+    Lemma dj_concat_dj : forall {X : Type} (M M1 M2 : Var.Map.t X),
+        Var.Map.Properties.Disjoint M1 M ->
+        Var.Map.Properties.Disjoint M2 M ->
+        Var.Map.Properties.Disjoint M1 M2 ->
+        Var.Map.Properties.Disjoint (Var.Map.concat M1 M) M2.
+    Proof.
+      intros.
+      Var.simplify.
+    Qed.
 
-Lemma concat_partition_eq : forall {X : Type} (M M1 M2 : Var.Map.t X),
-    Var.Map.Partition M M1 M2 ->
-    Var.Map.Equal (Var.Map.concat M1 M2) M.
-Proof.
-  intros.
-  pose proof (Var.Map.Proofs.partition_concat M M1 M2).
-  destruct H0. 
-  destruct (H0 H).
-  rewrite <- H3.
-  Var.simplify.
-Qed.
+    Lemma partition_concat_assoc : forall {X : Type} (M M1 M2 M3 : Var.Map.t X),
+        Var.Map.Properties.Disjoint M1 (Var.Map.concat M2 M3) ->
+        Var.Map.Properties.Disjoint M2 M3 ->
+        Var.Map.Partition M M1 (Var.Map.concat M2 M3) ->
+        Var.Map.Partition M (Var.Map.concat M3 M1) M2.
+    Proof.
+      intros.
+      Var.Map.Tactics.reflect_partition; Var.simplify.
+      rewrite (Var.Map.Proofs.concat_sym M3 M1); auto with extra_var_db.
+      rewrite <- Var.Map.Proofs.concat_assoc.
+      rewrite (Var.Map.Proofs.concat_sym M2 M3); auto.
+      reflexivity.
+    Qed.
+    (* STOP Easily(?) proven facts *)  
 
-Lemma dj_concat_dj : forall {X : Type} (M M1 M2 : Var.Map.t X),
-    Var.Map.Properties.Disjoint M1 M ->
-    Var.Map.Properties.Disjoint M2 M ->
-    Var.Map.Properties.Disjoint M1 M2 ->
-    Var.Map.Properties.Disjoint (Var.Map.concat M1 M) M2.
-Proof.
-  intros.
-  Var.simplify.
-Qed.
+End HelperLemmas.
+Import HelperLemmas.
 
-Lemma partition_concat_assoc : forall {X : Type} (M M1 M2 M3 : Var.Map.t X),
-    Var.Map.Properties.Disjoint M1 (Var.Map.concat M2 M3) ->
-    Var.Map.Properties.Disjoint M2 M3 ->
-    Var.Map.Partition M M1 (Var.Map.concat M2 M3) ->
-    Var.Map.Partition M (Var.Map.concat M3 M1) M2.
-Proof.
-  intros.
-  Var.Map.Tactics.reflect_partition; Var.simplify.
-  rewrite (Var.Map.Proofs.concat_sym M3 M1); auto with extra_var_db.
-  rewrite <- Var.Map.Proofs.concat_assoc.
-  rewrite (Var.Map.Proofs.concat_sym M2 M3); auto.
-  reflexivity.
-Qed.
-(* STOP Easily(?) proven facts *)  
-
+(** * Proofs about well-typedness *)
 Lemma wt_disjoint : forall C A G D T,
     WellTyped G D T C ->
     Var.Map.Properties.Disjoint (ChorEnv.find A G) (ChorEnv.find A D).
@@ -2281,7 +2118,7 @@ Proof.
       { auto. }
 Qed.
 
-
+(*** Substitution lemma for non-linear variables *)
 Lemma wt_subst_bang : forall C tau G D T A x v,
     WellTyped (ChorEnv.add A x tau G) D T C ->
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) (Var.Map.empty _) v tau ->
@@ -2774,6 +2611,7 @@ Proof.
          }
 Qed.        
 
+(** Substitution is the identity for variables that don't occur free in C *)
 Lemma subst_not_in : forall C A x v G D T,
     WellTyped G D T C ->
     ~ (Var.Map.In x (ChorEnv.find A D)) ->
@@ -3114,6 +2952,7 @@ Proof.
       auto.
 Qed.
 
+(** Substitution lemma for linear varibles *)
 Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) ThetaA1 v tau ->
     WellTyped G (ChorEnv.add A x tau D) (Actor.Map.add A ThetaA2 T) C ->
@@ -3173,8 +3012,8 @@ Proof.
           specialize (HWTS HPartitionA HninG HDA'B).
           
           (* prepare witness for choreography C typing *)
-          rewrite -> (addadd1 A D DeltaA2 x tau) in H9.
-          rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H9.
+          rewrite -> (ChorEnv.addadd1 A D DeltaA2 x tau) in H9.
+          rewrite -> (ChorEnv.addadd2 A T ThetaA3 ThetaA2) in H9.
           
           (* prepare hypotheses for partitioning requirements *)
           assert (H : Var.Map.Equal (Var.Map.add x tau DeltaA1') DeltaA1).
@@ -3272,9 +3111,9 @@ Proof.
                   + 
                     rewrite add_remove; auto.
                     unfold ChorEnv.add.
-                    rewrite addadd2.
+                    rewrite ChorEnv.addadd2.
                     reflexivity.
-                  + rewrite addadd2. rewrite addadd2. reflexivity. 
+                  + rewrite ChorEnv.addadd2. rewrite ChorEnv.addadd2. reflexivity. 
                 }
                 specialize (IHC IHWT).
                 rewrite -> (find_add A (Var.Map.concat ThetaA1 ThetaA3) T) in IHC.
@@ -3453,8 +3292,8 @@ Proof.
           specialize (HWTS HPartitionA HninG HDA'B).
 
           (* prepare witness for choreography C typing *)
-          rewrite -> (addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7. 
-          rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
+          rewrite -> (ChorEnv.addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7. 
+          rewrite -> (ChorEnv.addadd2 A T ThetaA3 ThetaA2) in H7.
 
           (* prepare hypotheses for partitioning requirements *)
           assert (Var.Map.Equal (Var.Map.add x tau DeltaA1') DeltaA1).
@@ -3533,8 +3372,8 @@ Proof.
                 (* Note to ces: This case is provable constructively as follows, but instantiates
                    existential variables that falsify the hypotheses for subsequent case. *)
                 (*
-                  rewrite -> (addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7.
-                  rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
+                  rewrite -> (ChorEnv.addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7.
+                  rewrite -> (ChorEnv.addadd2 A T ThetaA3 ThetaA2) in H7.
                   eauto.
                  *)
                 pose proof (beqeq A x y Heq).
@@ -3545,10 +3384,10 @@ Proof.
               (* case x <> y *)
               {
                 (* prepare C typing. *)
-                rewrite -> (addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7.
+                rewrite -> (ChorEnv.addadd1 A D (Var.Map.add y tau0 DeltaA2) x tau) in H7.
                 rewrite -> HDA2A in H7.
                 rewrite -> (addadd6 x tau y tau0 DeltaA2') in H7.
-                rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
+                rewrite -> (ChorEnv.addadd2 A T ThetaA3 ThetaA2) in H7.
                 
                                
                 (* specialize and apply IH. *)
@@ -3560,8 +3399,8 @@ Proof.
                 
                 unfold ChorEnv.add in IHC.
                 rewrite -> (find_add A (Var.Map.add y tau0 DeltaA2') D) in IHC.
-                rewrite -> (addadd2 A D (Var.Map.add x tau (Var.Map.add y tau0 DeltaA2'))) in IHC.
-                rewrite -> (addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
+                rewrite -> (ChorEnv.addadd2 A D (Var.Map.add x tau (Var.Map.add y tau0 DeltaA2'))) in IHC.
+                rewrite -> (ChorEnv.addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
                 specialize (IHC H7).
 
                 unfold Insn.rebound_in in Heq.
@@ -3646,8 +3485,8 @@ Proof.
       {
         rewrite <- HCasesAeqA'L in *.
 
-        rewrite -> (addadd1 A D DeltaA2 x tau) in H7.
-        rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H7.
+        rewrite -> (ChorEnv.addadd1 A D DeltaA2 x tau) in H7.
+        rewrite -> (ChorEnv.addadd2 A T ThetaA3 ThetaA2) in H7.
         
         assert (Var.Map.In x DeltaA1 \/ ~ Var.Map.In x DeltaA1) as HESL.
         tauto.
@@ -3769,7 +3608,7 @@ Proof.
                               Hv).
 
                 rewrite <- HCasesAeqA'L in IHC.
-                rewrite -> (addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
+                rewrite -> (ChorEnv.addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
                 rewrite -> (find_add A (Var.Map.concat ThetaA1 ThetaA3) T) in IHC.
                 rewrite -> (find_add A DeltaA2' D) in IHC.
                 pose proof (nin_nbeq_add1 G A x A y tau0 Heq HninG) as HninGy.
@@ -3856,8 +3695,8 @@ Proof.
       {
         rewrite <- HCasesAeqA'L in *.
 
-        rewrite -> (addadd1 A D (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) x tau) in H5.
-        rewrite -> (addadd2 A T ThetaA3 ThetaA2) in H5.
+        rewrite -> (ChorEnv.addadd1 A D (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2)) x tau) in H5.
+        rewrite -> (ChorEnv.addadd2 A T ThetaA3 ThetaA2) in H5.
         
         assert (Var.Map.In x DeltaA1 \/ ~ Var.Map.In x DeltaA1) as HESL.
         tauto.
@@ -4007,7 +3846,7 @@ Proof.
                               (Actor.Map.add A (Var.Map.concat ThetaA1 ThetaA3) T)
                               A x v Hv).
 
-                rewrite -> (addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
+                rewrite -> (ChorEnv.addadd2 A T ThetaA3 (Var.Map.concat ThetaA1 ThetaA3)) in IHC.
                 rewrite -> (find_add A (Var.Map.concat ThetaA1 ThetaA3) T) in IHC.
                 rewrite -> (find_add A (Var.Map.add y tau1 (Var.Map.add z tau2 DeltaA2')) D) in IHC.
 
@@ -4128,78 +3967,8 @@ Proof.
   eapply Expr.WTQRef; eauto.
 Qed.
 
-Lemma fresh_empty : forall T,
-  Var.fresh (Var.Map.empty T) = 0%nat.
-Proof.
-  intros. unfold Var.fresh.
-  rewrite Var.Map.Properties.fold_spec_right.
-  simpl.
-  auto.
-Qed.
 
-Lemma fresh_add : forall T (m : Var.Map.t T) x v,
-  ~ Var.Map.In x m ->
-  Var.fresh (Var.Map.add x v m) = max (x+1) (Var.fresh m).
-Proof.
-  intros.
-  unfold Var.fresh.
-  rewrite Var.Map.Properties.fold_add; auto.
-  
-  + fold (Var.fresh m).
-    destruct (PeanoNat.Nat.leb (Var.fresh m) x) eqn:Hleb.
-    - apply PeanoNat.Nat.leb_le in Hleb.
-      rewrite max_l; auto.
-      lia.
-
-    - rewrite PeanoNat.Nat.leb_nle in Hleb.
-      rewrite max_r; auto.
-      lia.
-
-  + clear m x v H.
-    intros ? x ? ? ? ? ? z ?; subst; auto.
-  + clear m x v H.
-    intros z1 z2 v1 v2 w Hneq.
-    repeat match goal with
-    | [ H : context[PeanoNat.Nat.leb ?x ?y] |- _ ] =>
-      let H := fresh "H" in
-      destruct (PeanoNat.Nat.leb x y) eqn:H;
-      try rewrite PeanoNat.Nat.leb_le in *;
-      try rewrite PeanoNat.Nat.leb_nle in *
-    | [ |- context[PeanoNat.Nat.leb ?x ?y] ] =>
-      let H := fresh "H" in
-      destruct (PeanoNat.Nat.leb x y) eqn:H;
-      try rewrite PeanoNat.Nat.leb_le in *;
-      try rewrite PeanoNat.Nat.leb_nle in *
-    end;
-    try lia.
-Qed.
-
-Lemma fresh_upper_bound : forall T (m : Var.Map.t T),
-  forall x, Var.Map.In x m ->
-    Var.fresh m > x.
-Proof.
-  intros T m.
-  induction m using Var.Map.Properties.map_induction;
-    intros y Hin.
-  * Var.simplify.
-  * Var.simplify.
-  rewrite fresh_add; auto.
-  destruct Hin; subst.
-  { try lia. }
-  apply IHm1 in H0. lia. 
-Qed.
-
-Lemma fresh_not_in : forall T (m : Var.Map.t T) x,
-  x = Var.fresh m ->
-  ~ Var.Map.In x m.
-Proof.
-  intros. subst.
-  intros Hin.
-  apply fresh_upper_bound in Hin.
-  lia.
-Qed.
-
-
+(** Weakening *)
 Lemma step_weakening' : forall C T1 cfg l C' T1' cfg',
     step C T1 cfg l C' T1' cfg' ->
 
@@ -4383,7 +4152,7 @@ Qed.
 Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     A <> B ->
     ChorEnv.epr A B T1 cfg1 = (q1, q2, T2, cfg2) ->
-    WellScoped T1 cfg1 ->
+    ChorEnv.WellScoped T1 cfg1 ->
     (exists idx1 idx2,
         Var.Map.Partition (ChorEnv.find A T2) (ChorEnv.find A T1)
 	  (Var.Map.add q1 idx1 (Var.Map.empty _)) /\
@@ -4413,7 +4182,7 @@ Proof.
   {
     intros Hin.
     inversion Eqnepr; subst; clear Eqnepr.
-    unfold WellScoped in HWS.
+    unfold ChorEnv.WellScoped in HWS.
     apply (Config.wf_qrefs _ cfg1) in Hin; auto.
     lia.
   }
@@ -4421,7 +4190,7 @@ Proof.
   {
     intros Hin.
     inversion Eqnepr; subst; clear Eqnepr.
-    unfold WellScoped in HWS.
+    unfold ChorEnv.WellScoped in HWS.
     apply (Config.wf_qrefs _ cfg1) in Hin; auto.
     lia.
   }
@@ -4469,6 +4238,7 @@ Proof.
     { rewrite Heq; auto; try reflexivity. }
 Qed.
 
+(* Step_partition_pairs asserts that T1 differs from T1' by the same context that T2 differs from T2' *)
 Definition Step_partition_pairs (T1 T1' T2 T2' : ChorEnv.t nat) :=
   forall A Theta,
     Var.Map.Partition (ChorEnv.find A T1) (ChorEnv.find A T1') Theta ->
@@ -4515,6 +4285,9 @@ Proof.
   }
 Qed.
 
+(* Partition_except l T1 T2
+  says that T1 and T2 are the same on all the actors in l, and T2 is a subset of T1 on all other actors
+*)
 Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
   (forall A,
     ~ Actor.FSet.In A (Label.actors l) ->
@@ -4526,9 +4299,9 @@ Definition Partition_except l (T1 T2 : ChorEnv.t nat) :=
 
 (* Probably not needed *)
 Lemma ws_partition_except : forall l (T1 T2 : ChorEnv.t nat) cfg,
-    WellScoped T1 cfg ->
+    ChorEnv.WellScoped T1 cfg ->
     Partition_except l T1 T2 ->
-    WellScoped T2 cfg.
+    ChorEnv.WellScoped T2 cfg.
 Proof.
   intros l T1 T2 cfg Hws [Hpart Heq] A.
   specialize (Hws A). destruct Hws as [Hwf Hws].
@@ -4552,7 +4325,7 @@ Qed.
 Lemma epr_part' : forall T1 A B T cfg q1 q2 T' cfg',
   ChorEnv.epr A B T cfg = (q1, q2, T', cfg') ->
   Partition_except (Label.EPR A B) T T1 ->
-  WellScoped T cfg ->
+  ChorEnv.WellScoped T cfg ->
   exists T1', ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') /\
               Step_partition_pairs T T1 T' T1'.
 Proof.
@@ -4630,7 +4403,7 @@ Qed.
 
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
-    WellScoped T1 cfg1 ->    
+    ChorEnv.WellScoped T1 cfg1 ->    
     forall G D T1',
       Partition_except l T1 T1' ->
       WellTyped G D T1' C1 ->
@@ -5670,11 +5443,12 @@ Proof.
         }
 Qed.
 
-Theorem preservation : forall G D T1 C1,
+(** Preservation *)
+Theorem WellTyped_preservation : forall G D T1 C1,
     WellTyped G D T1 C1 ->
     forall cfg1 l C2 T2 cfg2, 
       step C1 T1 cfg1 l C2 T2 cfg2 ->
-      WellScoped T1 cfg1 ->
+      ChorEnv.WellScoped T1 cfg1 ->
         (forall A, Actor.FSet.In A (Label.actors l) ->
                    Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
         WellTyped G D T2 C2.
@@ -5916,7 +5690,7 @@ Proof.
     inversion HStep; subst.
    
     (* Case SendC *)
-    + unfold  WellScoped in Hscoped.
+    + unfold  ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
       
       assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
@@ -5947,12 +5721,12 @@ Proof.
         { rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); eauto. }
         { rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); Var.simplify. }
         { Var.simplify. }
-        { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H2). }
+        { apply (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H2). }
         { eauto. }
       }
       {
         rewrite H15.
-        rewrite addadd2.
+        rewrite ChorEnv.addadd2.
         eauto.
       }
       {
@@ -5993,7 +5767,7 @@ Proof.
       eapply wt_subst_bang; eauto.
       
       rewrite <- (lopsided_partition (ChorEnv.find A T) ThetaA2 H2) in HWT.
-      rewrite find_add_env in HWT; auto.
+      rewrite ChorEnv.find_add_env in HWT; auto.
       rewrite empty_to_empty in HWT; auto.
    
     (* Case Delay/Send *)
@@ -6045,7 +5819,7 @@ Proof.
       
       specialize (IHHWT cfg1 l C' T2' cfg2 HsiA).
       
-      pose proof (ws_partition_env
+      pose proof (ChorEnv.ws_partition_env
                     A T ThetaA2 ThetaA1 cfg1 Hscoped
                     (@Var.Map.Properties.Partition_sym _
                        (ChorEnv.find A T) ThetaA1 ThetaA2 H2)) as Hwspe.
@@ -6105,7 +5879,7 @@ Proof.
     inversion HStep; subst.
 
     (* Case LetBangC *)
-    + unfold  WellScoped in Hscoped.
+    + unfold  ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
       
       assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
@@ -6130,12 +5904,12 @@ Proof.
         rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty).
         eapply Expr.preservation.
         { eauto. }
-        { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
+        { apply (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
         { eauto. }
       }
       {
         rewrite H13.
-        rewrite addadd2.
+        rewrite ChorEnv.addadd2.
         eauto.
       }
       { auto. }
@@ -6169,7 +5943,7 @@ Proof.
       
       rewrite empty_to_empty in HWT; auto.
       rewrite <- (lopsided_partition (ChorEnv.find A T) ThetaA2 H1) in HWT.
-      rewrite find_add_env in HWT; auto.
+      rewrite ChorEnv.find_add_env in HWT; auto.
       
       eapply wt_subst_bang; eauto.
 
@@ -6222,7 +5996,7 @@ Proof.
       
       specialize (IHHWT cfg1 l C' T2' cfg2 HsiA).
       
-      pose proof (ws_partition_env
+      pose proof (ChorEnv.ws_partition_env
                     A T ThetaA2 ThetaA1 cfg1 Hscoped
                     (@Var.Map.Properties.Partition_sym _
                        (ChorEnv.find A T) ThetaA1 ThetaA2 H1)) as Hwspe.
@@ -6273,7 +6047,7 @@ Proof.
     inversion HStep; subst.
 
     (* Case LetC *)
-    + unfold  WellScoped in Hscoped.
+    + unfold  ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
 
       assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
@@ -6301,13 +6075,13 @@ Proof.
         }
         { auto. }
         { auto. }
-        { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
+        { apply (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
         { eauto. }
       }
       {
         instantiate (1 := ThetaA2).
         rewrite H14.
-        rewrite addadd2.
+        rewrite ChorEnv.addadd2.
         auto.
       }
       {
@@ -6396,7 +6170,7 @@ Proof.
       
       specialize (IHHWT cfg1 l C' T2' cfg2 HsiA).
       
-      pose proof (ws_partition_env
+      pose proof (ChorEnv.ws_partition_env
                     A T ThetaA2 ThetaA1 cfg1 Hscoped
                     (@Var.Map.Properties.Partition_sym _
                        (ChorEnv.find A T) ThetaA1 ThetaA2 H1)) as Hwspe.
@@ -6448,7 +6222,7 @@ Proof.
     inversion HStep; subst.
 
     (* Case LetPairC *)
-    + unfold  WellScoped in Hscoped.
+    + unfold  ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
       assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
       unfold Label.actors.
@@ -6471,12 +6245,12 @@ Proof.
         rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty); auto.
         eapply Expr.preservation.
         { eauto. }
-        { apply (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
+        { apply (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1). }
         { eauto. }
       }
       {
         rewrite H17.
-        rewrite addadd2.
+        rewrite ChorEnv.addadd2.
         eauto.
       }
       { auto. }
@@ -6525,7 +6299,7 @@ Proof.
                     (Actor.Map.add A (Var.Map.concat ThetaA2 Θ2) T)
                     A x2 v2 H13).
       
-      rewrite addadd2 in Hwtslinx2; auto.
+      rewrite ChorEnv.addadd2 in Hwtslinx2; auto.
       rewrite find_add in Hwtslinx2; auto.
       
       destruct (partitioning
@@ -6627,7 +6401,7 @@ Proof.
       
       specialize (IHHWT cfg1 l C' T2' cfg2 HsiA).
       
-      pose proof (ws_partition_env
+      pose proof (ChorEnv.ws_partition_env
                     A T ThetaA2 ThetaA1 cfg1 Hscoped
                     (@Var.Map.Properties.Partition_sym _
                        (ChorEnv.find A T) ThetaA1 ThetaA2 H1)) as Hwspe.
@@ -6680,6 +6454,22 @@ Proof.
       { auto. }
       { auto. }
 Qed.
+
+Lemma preservation : forall G D T1 C1,
+    WellTyped G D T1 C1 ->
+    forall cfg1 l C2 T2 cfg2, 
+      step C1 T1 cfg1 l C2 T2 cfg2 ->
+      ChorEnv.WellScoped T1 cfg1 ->
+        (forall A, Actor.FSet.In A (Label.actors l) ->
+                   Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
+        WellTyped G D T2 C2 /\ ChorEnv.WellScoped T2 cfg2.
+Proof.
+  intros.
+  split.
+  * eapply WellTyped_preservation; eauto.
+  * eapply WellScoped_preservation; eauto.
+    eapply WellTyped_WellFormed; eauto.
+Qed. 
 
 
 Lemma bangval_inversion : forall Gamma Delta Theta e tau,
@@ -6735,10 +6525,11 @@ Proof.
   Var.simplify.
 Qed.
        
+(** Progress *)
 Theorem progress : forall G D T1 C1,
     WellTyped G D T1 C1 ->
     forall cfg1,
-      WellScoped T1 cfg1 ->
+      ChorEnv.WellScoped T1 cfg1 ->
       Actor.Map.Empty G ->
       Actor.Map.Empty D ->
       C1 = [] \/ exists l C2 T2 cfg2, step C1 T1 cfg1 l C2 T2 cfg2.
@@ -6788,9 +6579,9 @@ Proof.
       Var.simplify.
     }
     { 
-      unfold WellScoped in Hscoped.
+      unfold ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
-      pose proof (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H2) as Hpart.
+      pose proof (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H2) as Hpart.
       
       pose proof
         (Expr.progress e (Expr.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H0 cfg1 Hpart) as Heprog.
@@ -6859,9 +6650,9 @@ Proof.
       Var.simplify.
     }
     { 
-      unfold WellScoped in Hscoped.
+      unfold ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
-      pose proof (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
+      pose proof (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
       
       pose proof
         (Expr.progress e (Expr.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
@@ -6924,9 +6715,9 @@ Proof.
       Var.simplify.
     }
     { 
-      unfold WellScoped in Hscoped.
+      unfold ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
-      pose proof (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
+      pose proof (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
       
       pose proof
         (Expr.progress e tau (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
@@ -6993,9 +6784,9 @@ Proof.
       Var.simplify.
     }
     { 
-      unfold WellScoped in Hscoped.
+      unfold ChorEnv.WellScoped in Hscoped.
       specialize (Hscoped A).
-      pose proof (ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
+      pose proof (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
       
       pose proof
         (Expr.progress
@@ -7043,7 +6834,7 @@ Proof.
 Qed.
 
 
-(** Type safety *)
+(** ** Type safety *)
 
 Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
 | Step0 : forall e Θ cfg, multi_step e Θ cfg e Θ cfg
@@ -7056,7 +6847,7 @@ Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreograp
 Theorem safety : forall C Θ ρ C' Θ' ρ',
   multi_step C Θ ρ C' Θ' ρ' ->
   WellTyped (Actor.Map.empty _) (Actor.Map.empty _) Θ C ->
-  WellScoped Θ ρ ->
+  ChorEnv.WellScoped Θ ρ ->
 
   C' = [] \/ exists l C'' Θ'' ρ'', Choreography.step C' Θ' ρ' l C'' Θ'' ρ''.
 Proof.
@@ -7064,7 +6855,7 @@ Proof.
   induction Hstep; intros HWT HWS; auto.
   * eapply progress in HWT; eauto; Actor.simplify.
   * eapply IHHstep.
-    + eapply preservation; eauto.
+    + eapply WellTyped_preservation; eauto.
       intros. split; ChorEnv.simplify.
     + eapply WellScoped_preservation; eauto.
       eapply WellTyped_WellFormed; eauto.

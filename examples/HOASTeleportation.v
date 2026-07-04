@@ -26,74 +26,23 @@ Definition teleport (Alice Bob : Actor.t) (q : Var.t) : Qoreo Var.t :=
       do b ← Bob [- If x (Unitary X b) b -];;
       ret b.
 
-Import Actor.Map.
-Require Import Lia.
-
-Lemma remove_empty : forall A x T,
-  ChorEnv.Equal (ChorEnv.remove A x (empty (Var.Map.t T))) (empty _).
-Proof.
-  intros. intros B. ChorEnv.simplify.
-Qed.
-Hint Rewrite remove_empty : var_db.
-
-Definition singleton {T} x (tau : T) := Var.Map.add x tau (Var.Map.empty T).
-Lemma wtqvar : forall x (τ : typ),
-  Expr.WellTyped (Var.Map.empty _) (Var.Map.add x τ (Var.Map.empty _)) (Var.Map.empty _) (Expr.Var x) τ.
-Proof.
-  intros. econstructor; eauto; Var.simplify.
-Qed.
-Lemma wtbit : forall Γ b,
-  Expr.WellTyped Γ (Var.Map.empty _) (Var.Map.empty _) (Bit b) BIT.
-Proof. intros. econstructor; eauto; Var.simplify. Qed.
-
-Lemma wtqref : forall Γ q (idx : nat),
-  Expr.WellTyped Γ (Var.Map.empty _) (Var.Map.add q idx (Var.Map.empty _)) (QRef q) QUBIT.
-Proof. intros. econstructor; eauto; Var.simplify. Qed.
-
-
-Ltac solve_wt :=
-  match goal with
-  | [ |- Expr.WellTyped _ _ _ (Expr.Var ?q) _ ] => apply wtqvar
-  | [ |- Expr.WellTyped _ _ _ (Bit _) _] => apply wtbit
-  | [ |- Expr.WellTyped _ _ _ (QRef _) _] => apply wtqref
-  | [ |- Expr.WellTyped _ _ _ _ _] => econstructor; auto; try reflexivity
-  | [ |- Choreography.WellTyped _ _ _ _] => econstructor; auto; try reflexivity
-
-  | [ |- Var.Map.Partition _ _ _ ] => Var.Map.Tactics.reflect_partition
-  | [ |- _ /\ _ ] => split; auto
-  | [ |- ~ (_ \/ _)] => intros [? | ?]; subst; try contradiction
-  end.
-
-
-Lemma ce_add_empty : forall T (m : ChorEnv.t T) A,
-  ChorEnv.Equal
-    (Actor.Map.add A (Var.Map.empty _) m)
-    (Actor.Map.remove A m).
-Proof.
-  intros T m A.
-  intros B. ChorEnv.simplify.
-Qed.
-Hint Rewrite ce_add_empty : var_db.
-Hint Rewrite @Choreography.addadd2 : var_db.
-
-Lemma ce_remove_empty : forall A,
-    ChorEnv.Equal (Actor.Map.remove A (Actor.Map.empty (Var.Map.t nat))) (Actor.Map.empty _).
-Proof. intros. ChorEnv.simplify. Qed.
-Hint Rewrite ce_remove_empty : var_db.
+Definition fresh_in_teleport q := q = 10.
 
 (* TODO: improve tactics for typechecking! *)
 Lemma WellTyped_teleport : forall Alice Bob q C,
   Alice <> Bob ->
-  q = 10 (* ensure q is fresh in teleport *) ->
-  WellTyped (empty _) (ChorEnv.add Bob q QUBIT (empty _)) (empty _) C ->
-  WellTyped (empty _) (ChorEnv.add Alice q QUBIT (empty _)) (empty _)
+  fresh_in_teleport q (* ensure q is fresh in teleport *) ->
+  WellTyped ChorEnv.empty (ChorEnv.add Bob q QUBIT ChorEnv.empty) ChorEnv.empty C ->
+  WellTyped ChorEnv.empty (ChorEnv.add Alice q QUBIT ChorEnv.empty) ChorEnv.empty
     (mk (teleport Alice Bob q) ++ C)%list.
 Proof.
   intros Alice Bob q C Hneq Hfresh HWT.
   remember (mk (teleport Alice Bob q)) as C0 eqn:HC0.
   cbv in HC0. subst.
+  unfold fresh_in_teleport in Hfresh; subst.
 
-  solve_wt; ChorEnv.simplify.
+  unfold ChorEnv.empty in *.
+  solve_wt ; ChorEnv.simplify.
 
   econstructor.
   { repeat (solve_wt; ChorEnv.simplify). }
@@ -110,9 +59,11 @@ Proof.
   }
   2:{ Var.simplify. }
   2:{ Var.simplify. }
+  2:{ auto. }
 
 
   ChorEnv.simplify.
+  right_associate Alice. ChorEnv.simplify. 
   econstructor.
   { repeat (solve_wt; ChorEnv.simplify). }
   2:{
@@ -126,10 +77,9 @@ Proof.
   }
   2:{ Var.simplify. }
 
-
-  ChorEnv.simplify.
+  right_associate Alice. ChorEnv.simplify.
   econstructor.
-  { repeat solve_wt. }
+  { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
     instantiate (1 := (Var.Map.add 3 QUBIT (Var.Map.empty typ))).
@@ -138,16 +88,10 @@ Proof.
   2:{ ChorEnv.simplify. auto with var_db. }
   2:{ Var.simplify. }
 
-  ChorEnv.simplify.
-  match goal with
-  | [ |- WellTyped _ ?D _ _ ] =>
-    assert (Heq : ChorEnv.Equal D (ChorEnv.add Alice 5 (BANG BIT) (ChorEnv.add Alice 3 QUBIT (ChorEnv.add Bob 1 QUBIT (empty (Var.Map.t _))))))
-  end.
-  { intros D. ChorEnv.simplify. }
-  rewrite Heq. clear Heq.
+  right_associate Alice. ChorEnv.simplify.  
 
   econstructor.
-  { repeat solve_wt. }
+  { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
     instantiate (1 := (Var.Map.add 5 (BANG BIT) (Var.Map.empty typ))).
@@ -158,10 +102,10 @@ Proof.
   2:{ ChorEnv.simplify. auto with var_db. }
   2:{ Var.simplify. }
 
-  ChorEnv.simplify. unfold ChorEnv.add. ChorEnv.simplify.
+  right_associate Alice. ChorEnv.simplify.
 
   econstructor; auto.
-  { repeat solve_wt. }
+  { ChorEnv.simplify. repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
     instantiate (1 := (Var.Map.add 6 (BANG BIT) (Var.Map.empty typ))).
@@ -170,7 +114,7 @@ Proof.
   }
   2:{ ChorEnv.simplify. auto with var_db. }
 
-  ChorEnv.simplify.
+  right_associate Alice. ChorEnv.simplify.
   econstructor; auto.
   { ChorEnv.simplify.
     solve_wt.
@@ -183,13 +127,8 @@ Proof.
   2:{ ChorEnv.simplify. auto with var_db. }
 
 
-  ChorEnv.simplify.
-  match goal with
-  | [ |- WellTyped _ ?D _ _ ] =>
-    assert (Heq : ChorEnv.Equal D (ChorEnv.add Bob 1 QUBIT (empty _)))
-  end.
-  { intros B. ChorEnv.simplify. }
-  rewrite Heq. clear Heq.
+  right_associate Alice. ChorEnv.simplify.
+Require Import Lia.
   econstructor; auto.
   {
     ChorEnv.simplify.
@@ -233,22 +172,20 @@ Proof.
   2:{ ChorEnv.simplify. auto with var_db. }
   2:{ Var.simplify. }
 
-  ChorEnv.simplify.
-  match goal with
-  | [ |- WellTyped ?G ?D _ _ ] =>
-    assert (Heq : ChorEnv.Equal G (ChorEnv.add Bob 8 BIT (ChorEnv.add Bob 7 BIT (Actor.Map.empty _))));
-    [ | assert (Heq' : ChorEnv.Equal D (ChorEnv.add Bob 10 QUBIT (empty _)))]
-  end.
-  { intros B. ChorEnv.simplify. }
-  { intros B. ChorEnv.simplify. }
-  rewrite Heq, Heq'. clear Heq Heq'.
+  unfold ChorEnv.remove. ChorEnv.simplify.
 
-  eapply Choreography.weakening_gen with (G := empty (Var.Map.t typ)) (G0 := ChorEnv.add Bob 8 BIT (ChorEnv.add Bob 7 BIT (empty _))).
+  eapply Choreography.weakening_gen with (G := Actor.Map.empty (Var.Map.t typ)) (G0 := ChorEnv.add Bob 8 BIT (ChorEnv.add Bob 7 BIT (Actor.Map.empty _))).
   2:{
     intros B. split. ChorEnv.simplify; auto with var_db.
     ChorEnv.simplify. repeat solve_wt; auto with var_db; lia.
   }
-  auto.
+
+  ChorEnv.simplify.
+  assert (Heq' :ChorEnv.Equal (Actor.Map.remove Alice (Actor.Map.empty (Var.Map.t typ)))
+                (Actor.Map.empty (Var.Map.t typ))).
+  { ChorEnv.solve. }
+  rewrite Heq'; clear Heq'.
+
   auto.
 Qed.
 
