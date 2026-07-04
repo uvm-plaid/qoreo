@@ -107,6 +107,13 @@ Declare Scope example_scope.
     do _ ← add_insn (Choreography.Insn.LetPair A x1 x2 e);;
     ret (x1, x2).
 
+
+  (** Bind the expression [e] to !x , and return x *)
+  Definition localBang A e : Qoreo Var.t :=
+    do x ← fresh A ;;
+    do _ ← add_insn (Choreography.Insn.LetBang A x e);;
+    ret x.
+
   (** Measure qubit [q] owned by [A] in the computational basis. *)
   Definition meas (A : Actor.t) (q : Var.t) : Qoreo Var.t :=
     do x ← fresh A ;;
@@ -131,6 +138,9 @@ Declare Scope example_scope.
     (local A e)
     (no associativity, at level 50) : example_scope.
   Notation "A '[--' e '-]'" :=
+    (localPair A e)
+    (no associativity, at level 50) : example_scope.
+  Notation "A '[!-' e '-]'" :=
     (localPair A e)
     (no associativity, at level 50) : example_scope.
 

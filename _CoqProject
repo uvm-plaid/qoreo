@@ -10,3 +10,4 @@ examples/HOASNotation.v
 examples/HOASTeleportation.v
 examples/Teleportation.v
 examples/MeasureSend.v
+examples/Protocols.v
