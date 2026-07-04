@@ -2,6 +2,8 @@ From Stdlib Require Import String.
 From Stdlib Require Lists.List.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 Import List.ListNotations.
+From Stdlib Require Import Setoid.
+
 
 From Qoreo Require Import Base Expr Choreography.
 From Qoreo Require Import Network NetQasm.
@@ -105,6 +107,13 @@ Declare Scope example_scope.
     do _ ← add_insn (Choreography.Insn.LetPair A x1 x2 e);;
     ret (x1, x2).
 
+
+  (** Bind the expression [e] to !x , and return x *)
+  Definition localBang A e : Qoreo Var.t :=
+    do x ← fresh A ;;
+    do _ ← add_insn (Choreography.Insn.LetBang A x e);;
+    ret x.
+
   (** Measure qubit [q] owned by [A] in the computational basis. *)
   Definition meas (A : Actor.t) (q : Var.t) : Qoreo Var.t :=
     do x ← fresh A ;;
@@ -131,6 +140,65 @@ Declare Scope example_scope.
   Notation "A '[--' e '-]'" :=
     (localPair A e)
     (no associativity, at level 50) : example_scope.
+  Notation "A '[!-' e '-]'" :=
+    (localPair A e)
+    (no associativity, at level 50) : example_scope.
+
+
+(* Tactics for typechecking examples *)
+
+
+Import Actor.Map.
+Require Import Lia.
+
+
+Definition singleton {T} x (tau : T) := Var.Map.add x tau (Var.Map.empty T).
+Lemma wtqvar : forall x (τ : typ),
+  Expr.WellTyped (Var.Map.empty _) (Var.Map.add x τ (Var.Map.empty _)) (Var.Map.empty _) (Expr.Var x) τ.
+Proof.
+  intros. econstructor; eauto; Var.simplify.
+Qed.
+Lemma wtbit : forall Γ b,
+  Expr.WellTyped Γ (Var.Map.empty _) (Var.Map.empty _) (Bit b) BIT.
+Proof. intros. econstructor; eauto; Var.simplify. Qed.
+
+Lemma wtqref : forall Γ q (idx : nat),
+  Expr.WellTyped Γ (Var.Map.empty _) (Var.Map.add q idx (Var.Map.empty _)) (QRef q) QUBIT.
+Proof. intros. econstructor; eauto; Var.simplify. Qed.
+
+
+Ltac solve_wt :=
+  match goal with
+  | [ |- Expr.WellTyped _ _ _ (Expr.Var ?q) _ ] => apply wtqvar
+  | [ |- Expr.WellTyped _ _ _ (Bit _) _] => apply wtbit
+  | [ |- Expr.WellTyped _ _ _ (QRef _) _] => apply wtqref
+  | [ |- Expr.WellTyped _ _ _ _ _] => econstructor; auto; try reflexivity
+  | [ |- Choreography.WellTyped _ _ _ _] => econstructor; auto; try reflexivity
+
+  | [ |- Var.Map.Partition _ _ _ ] => Var.Map.Tactics.reflect_partition
+  | [ |- _ /\ _ ] => split; auto
+  | [ |- ~ (_ \/ _)] => intros [? | ?]; subst; try contradiction
+  end.
+
+
+Ltac fold_ChorEnv :=
+  match goal with
+  | [ |- context[Actor.Map.add ?A (Var.Map.add ?x ?tau ?D) ?T ]] =>
+    let Heq := fresh "Heq" in
+    assert (Heq : ChorEnv.Equal (Actor.Map.add A (Var.Map.add x tau D) T) (ChorEnv.add A x tau (Actor.Map.add A D T)))
+    by ChorEnv.solve;
+    rewrite Heq; clear Heq
+  end.
+
+Ltac right_associate A :=
+  try unfold ChorEnv.add;
+  match goal with
+  | [ H : A <> ?B |- context[Actor.Map.add A _ (Actor.Map.add ?B _ _)]] =>
+    rewrite (ChorEnv.ce_actor_add_neq_sym A B); auto
+  | [ H : ?B <> A |- context[Actor.Map.add A _ (Actor.Map.add ?B _ _)]] =>
+    rewrite (ChorEnv.ce_actor_add_neq_sym A B); auto
+  end.
+
 
   (** Send a qubit from Alice to Bob via teleportation. *)
   Definition teleport (Alice Bob : Actor.t) (q : Var.t) : Qoreo Var.t :=

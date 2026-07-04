@@ -2448,7 +2448,6 @@ Ltac EPP_cons_nin_inversion D :=
     by (apply (EPP_mapsto_uncons_nin _ _ _ _ _ H H'); simpl; Actor.simplify)
   end.
 
-Hint Rewrite @Choreography.find_add_env  : var_db.
 
 Ltac destruct_cases H :=
   match type of H with
@@ -3009,7 +3008,7 @@ Theorem safety : forall N Θ ρ N' Θ' ρ',
 
   forall C,
   Choreography.WellTyped (Actor.Map.empty _) (Actor.Map.empty _) Θ C ->
-  Choreography.WellScoped Θ ρ ->
+  ChorEnv.WellScoped Θ ρ ->
   EPP_N_complete C N ->
 
   Network.Empty N' \/ exists l N'' Θ'' ρ'', Network.step N' Θ' ρ' l N'' Θ'' ρ''.

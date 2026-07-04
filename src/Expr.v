@@ -42,9 +42,35 @@ Inductive Val : t -> Prop :=
 .
 #[global] Hint Constructors Val : var_db.
 
-(*************************)
-(* Operational Semantics *)
-(*************************)
+
+(* Return the set of variables that occur (anywhere, not necessarily free) in the expression *)
+Fixpoint vars (e : t) : Var.FSet.t :=
+  match e with
+  | Var x | QRef x => Var.FSet.singleton x 
+
+  | LetIn x e1 e2 | LetBang x e1 e2 =>
+    Var.FSet.add x (Var.FSet.union (vars e1) (vars e2))
+
+  | Bit _ => Var.FSet.empty
+  | Bang e | Meas e | New e | Unitary _ e =>
+    vars e
+  | Pair e1 e2 | App e1 e2 =>
+    Var.FSet.union (vars e1) (vars e2)
+  | If e0 e1 e2 =>
+    Var.FSet.union (vars e0) (Var.FSet.union (vars e1) (vars e2))
+  
+  | LetPair x1 x2 e1 e2 =>
+    Var.FSet.add x1 (Var.FSet.add x2 (Var.FSet.union (vars e1) (vars e2)))
+  
+  | Lambda x e' => Var.FSet.add x (vars e')
+  | Fix f x e' => Var.FSet.add f (Var.FSet.add x (vars e'))
+  
+  end.
+
+
+(**************************)
+(** Operational Semantics *)
+(**************************)
 
 Inductive Fresh x : Expr.t -> Prop :=
 | FVar : forall y, ~ Var.V.eq x y -> Fresh x (Var y)
@@ -329,32 +355,24 @@ Proof.
     symmetry; auto.
 Qed.
 
-(*
-Fixpoint qrefs (e : Expr.t) : Var.FSet.t :=
-  match e with
-  | Var _ => Var.FSet.empty
-  | LetIn _ e1 e2 => Var.FSet.union (qrefs e1) (qrefs e2)
-  | Bang e => qrefs e
-  | LetBang _ e1 e2 => Var.FSet.union (qrefs e1) (qrefs e2)
-  | Bit _ => Var.FSet.empty
-  | If e e1 e2 => Var.FSet.union (Var.FSet.union (qrefs e) (qrefs e1)) (qrefs e2)
-  | Pair e1 e2 => Var.FSet.union (qrefs e1) (qrefs e2)
-  | LetPair _ _ e1 e2 => Var.FSet.union (qrefs e1) (qrefs e2)
-  | Meas e => qrefs e
-  | QRef x => Var.FSet.singleton x
-  | New e => qrefs e
-  | Unitary _ e => qrefs e
-  | Lambda _ e => qrefs e
-  | Fix _ _ e => qrefs e
-  | App e1 e2 => Var.FSet.union (qrefs e1) (qrefs e2)
-  end.
-*)
+Close Scope R_scope.
+(* This is implementation dependent *)
+Lemma step_dim_monotonic : forall e Θ ρ e' Θ' ρ',
+  step e Θ ρ e' Θ' ρ' ->
+  Config.dim ρ <= Config.dim ρ'.
+Proof.
+  intros.
+  induction H; auto.
+  * inversion H; subst; simpl; auto.
+  * inversion H0; subst; simpl; auto.
+  * subst; simpl; auto.
+  * subst; simpl; auto.
+Qed.
 
 
-
-(*********)
-(* Types *)
-(*********)
+(**********)
+(** Types *)
+(**********)
 
 Inductive typ :=
 | BIT | QUBIT
@@ -508,7 +526,7 @@ Definition WellTypedConfig (refs : Var.Map.t nat) e tau : Prop :=
   WellTyped (Var.Map.empty _) (Var.Map.empty _) refs e tau.
 
 
-(* TODO: The stronger statement would be 
+(* The stronger statement would be 
 to define alpha equivalence for Expr.tessions
 and then to prove this with respect to
     Var.Map.Equiv alpha_equiv
@@ -551,32 +569,9 @@ Proof.
     try (symmetry; auto).
 Qed.
 
-Fixpoint vars (e : t) : Var.FSet.t :=
-  match e with
-  | Var x | QRef x => Var.FSet.singleton x 
-
-  | LetIn x e1 e2 | LetBang x e1 e2 =>
-    Var.FSet.add x (Var.FSet.union (vars e1) (vars e2))
-
-  | Bit _ => Var.FSet.empty
-  | Bang e | Meas e | New e | Unitary _ e =>
-    vars e
-  | Pair e1 e2 | App e1 e2 =>
-    Var.FSet.union (vars e1) (vars e2)
-  | If e0 e1 e2 =>
-    Var.FSet.union (vars e0) (Var.FSet.union (vars e1) (vars e2))
-  
-  | LetPair x1 x2 e1 e2 =>
-    Var.FSet.add x1 (Var.FSet.add x2 (Var.FSet.union (vars e1) (vars e2)))
-  
-  | Lambda x e' => Var.FSet.add x (vars e')
-  | Fix f x e' => Var.FSet.add f (Var.FSet.add x (vars e'))
-  
-  end.
-
-(***************)
-(* Type safety *)
-(***************)
+(******************)
+(** * Type safety *)
+(******************)
 
 Lemma wt_disjoint' : forall Γ Δ Θ e τ,
   WellTyped Γ Δ Θ e τ ->
@@ -629,6 +624,7 @@ Proof.
   eapply wt_disjoint'; eauto.
 Qed.
 
+(** Weakening of a single non-linear varialbe *)
 Lemma weakening1 : forall e Γ Δ Θ τ,
   WellTyped Γ Δ Θ e τ ->
   forall z τ0,
@@ -707,7 +703,7 @@ Proof.
       reflect_partition; Var.simplify.
 Qed.
   
-
+(** Weakening of possibly multiple non-linear variables *)
 Lemma weakening_gen : forall Γ0,
   forall Γ Δ Θ e τ,
   WellTyped Γ Δ Θ e τ ->
@@ -743,6 +739,10 @@ Proof.
 Qed.
 #[global] Hint Resolve weakening : var_db.
 
+
+(** ** Substitution lemma *)
+
+(* Substitution for x is the identity if x does not occur free in e *)
 Lemma subst_not_in : forall e x v Γ Δ Θ τ,
   WellTyped Γ Δ Θ e τ ->
   ~ Var.Map.In x Γ ->
@@ -793,6 +793,7 @@ Proof.
     erewrite IHe2; eauto; Var.simplify.
 Qed.
 
+(** Substitution for non-linear variables *)
 Lemma wt_subst_bang : forall e τ Γ Δ Θ x v τ',
   WellTyped (Var.Map.empty _) (Var.Map.empty _) (Var.Map.empty _) v τ ->
   WellTyped (Var.Map.add x τ Γ) Δ Θ e τ' ->
@@ -925,6 +926,7 @@ Ltac partition_add_inversion :=
         try destruct H as [[? [? ?]] | [? [? ?]]]
     end.
 
+(* Substitution for linear variables *)
 Lemma wt_subst : forall e Θ1 Θ2 τ Γ Δ Θ x v τ',
   WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ1 v τ ->
   WellTyped Γ (Var.Map.add x τ Δ) Θ2 e τ' ->
@@ -1245,6 +1247,7 @@ Proof.
     
 Qed.
 
+(* Substitution for two linear variables at a time *)
 Lemma wt_subst2 : forall Θ1 Θ2 Θ0 Θ τ1 τ2 Γ Δ Θ' x1 v1 x2 v2 e τ',
   WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ1 v1 τ1 ->
   WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ2 v2 τ2 ->
@@ -1280,6 +1283,9 @@ Proof.
   }
 Qed.
 
+(** ** Proofs of preservation *)
+
+(** Step weakening: If e can take a step with qrefs Θ1, and Θ is strictly bigger than Θ1, then e can take a step with Θ as well. *)
 Lemma step_weakening_1 : forall Θ1 Θ1' Θ2 e Θ cfg e' Θ' cfg',
   step e Θ1 cfg e' Θ1' cfg' ->
   Var.Map.Partition Θ Θ1 Θ2 ->
@@ -1348,6 +1354,7 @@ Proof.
   apply Var.Map.Properties.Partition_sym; eauto.
 Qed.
 
+(** Step inversion: If e can take a step with refs, but its free qrefs (refs1) are only a subset of those, then it can can a step with using only refs1 *)
 Lemma step_inversion : forall e refs ρ e' refs' ρ',
 
   step e refs ρ e' refs' ρ' ->
@@ -1646,6 +1653,7 @@ Ltac simplify_val :=
     end
   end.
 
+(** Typing preservation *)
 Lemma WellTyped_preservation : forall Γ Δ Θ e τ,
   WellTyped Γ Δ Θ e τ ->
 
@@ -1862,6 +1870,7 @@ Proof.
       eapply wt_subst_bang; eauto with var_db.
 Qed.
 
+(** Scoping preservation *)
 Lemma WellScoped_preservation : forall e Θ ρ e' Θ' ρ',
   step e Θ ρ e' Θ' ρ' ->
   Config.WellScoped Θ ρ ->
@@ -1903,6 +1912,7 @@ Proof.
     destruct g; simpl; auto with wf_db.
 Qed.
 
+(** Combined preservation lemma *)
 Theorem preservation :  forall Θ e τ ρ e' Θ' ρ',
   WellTyped (Var.Map.empty _) (Var.Map.empty _) Θ e τ ->
   Config.WellScoped Θ ρ ->
@@ -1915,6 +1925,8 @@ Proof.
   * eapply WellScoped_preservation; eauto.
 Qed.
 
+
+(** ** Progress *)
 
 Lemma step_WellScoped_disjoint : forall Θ2 e Θ1 cfg e' Θ1' cfg',
   step e Θ1 cfg e' Θ1' cfg' ->
@@ -1965,7 +1977,7 @@ Ltac ws_step_tac :=
           eapply step_WellScoped_disjoint; eauto)
   end.
 
-
+(* Type progress: well-typed expressions are either values or they can take a step *)
 Theorem progress : forall e τ Γ Δ Θ,
   WellTyped Γ Δ Θ e τ ->
   forall cfg,
@@ -2161,7 +2173,7 @@ Proof.
 Unshelve. exact true.
 Qed.
 
-(** General type safety *)
+(** ** Type safety *)
 
 Inductive multi_step : t -> Var.Map.t nat -> Config.t -> t -> Var.Map.t nat -> Config.t -> Prop :=
 | Step0 : forall e Θ cfg, multi_step e Θ cfg e Θ cfg
