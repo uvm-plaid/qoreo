@@ -31,3 +31,12 @@ generate-measure-send-py: examples/MeasureSend.vo ocaml/write_apps.ml ocaml/gene
 	ocamlc -I extracted -I ocaml -c ocaml/generate_measure_send.ml
 	ocamlc -I extracted -I ocaml -o extracted/generate_measure_send unix.cma extracted/measure_send_netqasm.cmo ocaml/write_apps.cmo ocaml/generate_measure_send.cmo
 	./extracted/generate_measure_send generated/measure_send
+
+generate-b92-py: examples/b92.vo ocaml/write_apps.ml ocaml/generate_b92.ml python/qoreo_netqasm_runtime.py
+	mkdir -p extracted generated
+	ocamlc -I extracted -c extracted/b92_netqasm.mli
+	ocamlc -I extracted -c extracted/b92_netqasm.ml
+	ocamlc -I extracted -I ocaml -c ocaml/write_apps.ml
+	ocamlc -I extracted -I ocaml -c ocaml/generate_b92.ml
+	ocamlc -I extracted -I ocaml -o extracted/generate_b92 unix.cma extracted/b92_netqasm.cmo ocaml/write_apps.cmo ocaml/generate_b92.cmo
+	./extracted/generate_b92 generated/b92

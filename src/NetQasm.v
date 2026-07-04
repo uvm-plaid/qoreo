@@ -134,6 +134,21 @@ Fixpoint render_process_body (P : Network.Process.t) : string :=
   | insn :: P' => render_insn insn +:+ render_process_body P'
   end.
 
+Fixpoint last_bound_var (P : Network.Process.t) : option Var.t :=
+  match P with
+  | [] => None
+  | [insn] =>
+      match insn with
+      | Network.Insn.Let x _ => Some x
+      | Network.Insn.LetBang x _ => Some x
+      | Network.Insn.LetPair x _ _ => Some x
+      | Network.Insn.Receive x _ => Some x
+      | Network.Insn.EPR x _ => Some x
+      | Network.Insn.Send _ _ => None
+      end
+  | _ :: P' => last_bound_var P'
+  end.
+
 Definition render_app (self : Actor.t) (P : Network.Process.t) : string :=
   let classicals := classical_peers P in
   let eprs := epr_peers P in
@@ -144,4 +159,8 @@ Definition render_app (self : Actor.t) (P : Network.Process.t) : string :=
             render_peer_list classicals +:+ ", " +:+
             render_peer_list eprs +:+ ")") +:+
   line 1 "with rt.connection():" +:+
-  render_process_body P.
+  render_process_body P +:+
+  match last_bound_var P with
+  | Some x => line 2 ("return " +:+ var_name x)
+  | None => EmptyString
+  end.

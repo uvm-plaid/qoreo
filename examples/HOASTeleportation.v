@@ -6,26 +6,6 @@ Open Scope string_scope.
 Open Scope example_scope.
 
 
-Definition teleport (Alice Bob : Actor.t) (q : Var.t) : Qoreo Var.t :=
-      (* Alice and Bob establish an entangled pair of qubits. *)
-      do ( a , b ) ← get_entangled_pair Alice Bob ;;
-      
-      (* Alice performs some local operations
-         and obtains classical bits x and z. *)
-      do (q,a) ← Alice [-- Unitary CNOT (Pair q a) -] ;;
-      do q     ← Alice [- Unitary H q -] ;;
-      do x ← Alice [- Meas q -];;
-      do z ← Alice [- Meas a -];;
-
-      (* Alice sends x and z to Bob. *)
-      do x ← send Alice x Bob ;;
-      do z ← send Alice z Bob ;;
-
-      (* Bob uses x and z to update his qubit. *)
-      do b ← Bob [- If z (Unitary Z b) b -];;
-      do b ← Bob [- If x (Unitary X b) b -];;
-      ret b.
-
 Definition fresh_in_teleport q := q = 10.
 
 (* TODO: improve tactics for typechecking! *)

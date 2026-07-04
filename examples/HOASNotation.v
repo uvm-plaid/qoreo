@@ -200,6 +200,19 @@ Ltac right_associate A :=
   end.
 
 
+  (** Send a qubit from Alice to Bob via teleportation. *)
+  Definition teleport (Alice Bob : Actor.t) (q : Var.t) : Qoreo Var.t :=
+    do (a, b) ← get_entangled_pair Alice Bob ;;
+    do (q, a) ← Alice [-- Unitary CNOT (Pair q a) -] ;;
+    do q      ← Alice [- Unitary H q -] ;;
+    do z      ← Alice [- Meas q -] ;;
+    do x      ← Alice [- Meas a -] ;;
+    do z      ← send Alice z Bob ;;
+    do x      ← send Alice x Bob ;;
+    do b      ← Bob [- If z (Unitary Z b) b -] ;;
+    do b      ← Bob [- If x (Unitary X b) b -] ;;
+    ret b.
+
 
 Module ExampleExtraction.
   Definition render_party (choreo : Choreography.t) (p : Actor.t)
