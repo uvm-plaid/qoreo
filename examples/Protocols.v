@@ -31,6 +31,82 @@ Definition DCNOT (Alice Bob : Actor.t) (qA : var Alice) (qB : var Bob) : Qoreo (
       ret (qA, qB).
 
 
+(* Distributed controlled unitary *)
+Definition distrubuted_ctrl_U Alice Bob q tgt (ctrl_U_circ : Var.t -> Var.t -> Expr.t) : Qoreo (Var.t * Var.t) :=
+    do (a,b) ← get_entangled_pair Alice Bob ;;
+    do (q,a) ← Alice [-- Unitary CNOT (Pair q a) -] ;;
+    do z     ← Alice [- Meas a -] ;;
+    do z     ← send Alice z Bob ;;
+
+    do tgt   ← Bob [- If z (Unitary Z tgt) tgt -] ;;
+
+    (* controlled unitary *)
+    do (b, tgt) ← Bob [-- ctrl_U_circ b tgt -];;
+
+    do x     ← Bob [- Meas (Unitary H b) -] ;;
+    do x     ← send Bob x Alice ;;
+    do q     ← Alice [- If x (Unitary X q) q -];;
+    ret (q, tgt).
+
+Fixpoint fold {X} (As : list Actor.t) (qs : list Var.t) (C : Actor.t -> Var.t -> Qoreo X) (default : X) : Qoreo X :=
+    match As, qs with
+    | [], _ | _, [] => ret default 
+    | A::As', q::qs' =>
+        do default ← C A q ;;
+        fold As' qs' C default
+    end.
+Fixpoint fmap {X} (As : list Actor.t) (qs : list Var.t) (C : Actor.t -> Var.t -> Qoreo X) : Qoreo (list X) :=
+    match As, qs with
+    | [], _ | _, [] => ret []
+    | A::As', q::qs' =>
+        do v ← C A q ;;
+        do vs ← fmap As' qs' C ;;
+        ret (v::vs)
+    end.
+Fixpoint fmap2 {X} (As : list Actor.t) (qs1 qs2 : list Var.t) (C : Actor.t -> Var.t -> Var.t -> Qoreo X) : Qoreo (list X) :=
+    match As, qs1, qs2 with
+    | [], _, _ | _, [], _ | _, _, [] => ret []
+    | A::As', q1::qs1', q2 :: qs2' =>
+        do v ← C A q1 q2 ;;
+        do vs ← fmap2 As' qs1' qs2' C ;;
+        ret (v::vs)
+    end.
+
+(* n-ary distributed controlled unitary on n actors. See ``A general protocol for distributed quantum gates'' by Sarvaghad-Moghaddam, Zomorodi-Moghadam, and Farouk. https://arxiv.org/pdf/1812.07798 *)
+Definition distributed_n_ctrl_U (CU : list Var.t -> Var.t -> Qoreo (list Var.t * Var.t)) 
+                                (As : list Actor.t) (qs : list Var.t)
+                                (B : Actor.t) (tgt : Var.t)
+                              : Qoreo (list Var.t * Var.t) :=
+
+    let stage1 := fun (A : Actor.t) (q : Var.t) => (* : Qoreo (Var.t * Var.t)  *)
+        do (a,b) ← get_entangled_pair A B ;;
+        do (q,a) ← A [-- Unitary CNOT (Pair q a) -] ;;
+        do x     ← send A (Meas a) B ;;
+        do b ← B [- If x (Unitary X b) b -];;
+        ret (q, b) : Qoreo (Var.t * Var.t) in
+
+    let stage3 := fun A q b => (* : Qoreo Var.t *)
+        do z ← send B (Meas (Unitary H b)) A ;;
+        do q ← B [- If z (Unitary Z q) q -];;
+        ret q in
+
+    (* Stage 1:As performs local operations  *)
+    do qs_bs_list ← fmap As qs stage1 ;;
+    (* split up qs_bs_list : list (Var.t * Var.t) into a pair of lists *)
+    let (qs, bs) := List.split qs_bs_list in
+
+    (* Stage 2: B applies ctrl-U gate locally using bs to control tgt*)
+    do (qs, tgt) ← CU bs tgt ;;
+
+    (* Stage 3: B sends corrections back to As *)
+    do qs ← fmap2 As qs bs stage3 ;;
+    
+    ret (qs, tgt).
+    
+
+
+
+
 (* Implement an n-qubit GHZ state using distributed unitaries *)
 (* We assume that A performs distributed CNOT gates with its qubit q and all the actors in Bs *)
 Definition DCNOTs (A : Actor.t) (q : var A) (Bs : list Actor.t) : Qoreo (var A * list Var.t).
