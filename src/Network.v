@@ -1,3 +1,19 @@
+(**
+Definition of process language and endpoint projection
+
+Data structures
+
+  - `Insn.t`, `Process.t`, `Network.t`: Definiton of choreographic instructions, processes, and networks respectively
+  - `Process.step`, `Network.step` - small-step operational semantics
+  - `epp` - Definition of endpoint projection as a function from choreographies and an actor name to a process.
+  - `EPP` - Relational definition of endpoint projection
+  - `EPP_N` - Relational definition of when a choreography is projected onto an entire network
+  - `soundness` - Soundness of EPP; if a choreography can take a step, then so can the projected choreography
+  - `completeness` - Completeness of EPP; if a projected choreography can take a step, then so can the unprojected choreography
+  - `safety` - Well-typed choreographies project to safe and deadlock-free networks
+
+*)
+
 From Qoreo Require Import Base.
 From Qoreo Require Expr Choreography.
 From Stdlib Require Import Morphisms (* for Proper *).

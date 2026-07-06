@@ -1,3 +1,23 @@
+(** 
+Definition of choreographic language
+
+Data structures:
+
+  - `Insn.t`, `Expr.t` - Choreographic instructions and choreographies, respectively
+  - `step` - small-step operational semantics
+  - `WellTyped` - typing relation
+
+Theorems:
+  - `wt_subst_lin`, `wt_subst_bang`: substitution lemmas for linear and non-linear variables respectively
+  - `WellTyped_preservation`: preservation of the typing relation with respect to the step relation
+  - `WellScoped_preservation`: preservation of the configuration well-scopedness relation with respect to the step relation
+  - `preservation`: conjunction of the previous two lemmas
+  - 'progress': well-typed choreographies are either values or can take a step
+  - `safety`: top-level type safety theorem
+
+
+*)
+
 From Qoreo Require Import Base.
 From Qoreo Require Expr.
 

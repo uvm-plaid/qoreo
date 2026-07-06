@@ -1,3 +1,14 @@
+(**
+  This file defines some common structures used in the formaliztion
+        - `FMap_fun`/`FMap` - finite maps
+        - `Var` - variables represented as natural numbers
+        - `unitary` - data structure of unitary gates
+        - `Config` - quantum states represented as QuantumLib density matrices
+        - `Actor` - actors in a network, represented as strings
+        - `ChorEnv` - specialized finite maps from pairs of actors and variable names.
+*)
+
+
 From Stdlib Require FSets.FMapList FSets.FSetList 
                             FSets.FMapFacts
                             FSets.FMapInterface
@@ -2635,7 +2646,7 @@ Module Actor.
   Ltac solve := 
     repeat (reflect_find; first [tauto | discriminate | auto; fail | intuition]).
 
-(*  #[global] Existing Instance MapProofs.F.EqualSetoid.*)
+  (*  #[global] Existing Instance MapProofs.F.EqualSetoid.*)
   
   (* Global actor_db hints: instantiations of FMap_fun's local qoreo_db hints for Actor.Map *)
   #[global] Hint Rewrite Map.Properties.F.add_mapsto_iff : actor_db.

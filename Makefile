@@ -3,6 +3,9 @@
 all: CoqMakefile
 	$(MAKE) -f CoqMakefile
 
+proofs: CoqMakefile
+	$(MAKE) -f CoqMakefile
+
 CoqMakefile: _CoqProject
 	rocq makefile -f _CoqProject -o CoqMakefile
 
