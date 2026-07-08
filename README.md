@@ -88,25 +88,82 @@ Qoreo uses the OCaml/Rocq concept of modules to define data structures. The vari
 
 # Extracting to NetQASM
 
-The `examples` directory includes:
+Qoreo can project example choreographies to per-party processes and render those processes as Python applications that use the NetQASM SDK.
+
+## Dependencies
+
+First install the Rocq dependencies described in the `Install` section above and make sure `rocq`, `ocamlc`, `make`, and `python` are available on your `PATH`. We have tested using Python 3.10. The extraction targets use Rocq extraction to produce OCaml code, compile that OCaml code with `ocamlc`, and then write Python applications.
+
+The generated applications import the NetQASM SDK. Running the included simulation also requires SquidASM:
+
+```
+python -m pip install netqasm
+python -m pip install squidasm --extra-index-url=https://pypi.netsquid.org
+```
+
+SquidASM depends on NetSquid, which requires special credentials to install. You can register and obtain credentials at the [NetSquid website](https://netsquid.org/).
+
+## Extracting the examples
+
+The `examples` directory includes these extractable NetQASM examples:
 
 * `examples/MeasureSend.v` - Alice creates a qubit, applies `H`, measures it, and sends the resulting classical bit to Bob
-* `examples/Teleportation.v` - a more involved teleportation choreography
+* `examples/Teleportation.v` - a teleportation choreography
+* `examples/b92.v` - a B92 quantum key distribution choreography
 
-To run endpoint projection on the simple measurement example and compile the resulting processes to Python files using the NetQASM API, run:
+To run endpoint projection and generate Python applications for the simple
+measurement example:
 
 ```
 make generate-measure-send-py
 ```
 
-For the teleportation example, run:
+For teleportation:
 
 ```
 make generate-teleportation-py
 ```
 
-The results are stored in the `generated` directory. The compilation pipeline relies on:
+For B92:
+
+```
+make generate-b92-py
+```
+
+Each target builds the corresponding Rocq example, extracts rendered application data into `extracted/`, compiles the OCaml generator, and writes the final Python application directory under `generated/<example>/`. For example, `make generate-b92-py` writes files such as:
+
+```
+generated/b92/app_alice.py
+generated/b92/app_bob.py
+generated/b92/qoreo_netqasm_runtime.py
+```
+
+The generated `app_<party>.py` files are the NetQASM SDK applications for each party. `qoreo_netqasm_runtime.py` is copied into the generated directory so the applications can import the Qoreo runtime wrapper directly.
+
+The compilation pipeline relies on:
 
 * `src/NetQasm.v` - Renders a `Process` into a string in a NetQASM-like IR
 * `ocaml/write_apps.ml` - An OCaml driver to run the renderer and save the results to .py files
 * `python/qoreo_netqasm_runtime.py` - A Python runtime that wraps the NetQASM API to make it more similar to the Qoreo expression language
+
+## Running the simulation
+
+The repository includes a simulation harness for the B92 example. Generate the B92 applications first:
+
+```
+make generate-b92-py
+```
+
+Then run:
+
+```
+python test_examples/test_b92.py
+```
+
+The script starts a SquidASM runtime with Alice and Bob, imports the generated applications from `generated/b92`, runs the protocol several times, and checks that Alice's and Bob's conclusive key bits match. It prints the key extracted from each run.
+
+`MeasureSend` and `Teleportation` are generated as NetQASM SDK Python applications in the same way. You can run the simulation for these examples by changing to the directory containing the generated application and running:
+
+```
+netqasm simulate
+```
