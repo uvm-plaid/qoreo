@@ -7,7 +7,6 @@ From Stdlib Require Import Setoid.
 
 From Qoreo Require Import Base Expr Choreography.
 From Qoreo Require Import Network NetQasm.
-From QoreoExamples Require Import Notation.
 Require Extraction.
 
 (** 

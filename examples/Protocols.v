@@ -1,6 +1,6 @@
 From Stdlib Require Import String.
 From Qoreo Require Import Base Expr Choreography.
-From QoreoExamples Require Import HOASNotation.
+From QoreoExamples Require Import Notation.
 
 Open Scope string_scope.
 Open Scope example_scope.

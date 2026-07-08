@@ -5,9 +5,8 @@ src/Expr.v
 src/Choreography.v
 src/Network.v
 src/NetQasm.v
-
+examples/Notation.v
 examples/OldNotation.v
-examples/HOASNotation.v
 examples/Teleportation.v
 examples/MeasureSend.v
 examples/b92.v
