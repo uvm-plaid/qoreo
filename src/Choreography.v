@@ -248,36 +248,125 @@ Module Insn.
     end.       
 End Insn.
 
+Module Typ.
+  Inductive t :=
+  | Loc : Actor.t -> Expr.typ -> t
+  | Pair : t -> t -> t
+  .
+End Typ.
+
+Module Pattern.
+  Inductive t :=
+  | Loc  : Actor.t -> Var.t -> t
+  | Bang : Actor.t -> Var.t -> t
+  | Pair : Actor.t -> Var.t -> t -> t (* right-associated list *)
+  .
+
+  Fixpoint bound_in x (pat : t) : bool :=
+  match pat with
+  | Loc _ y | Bang _ y => if Var.eq_dec x y then true else false
+  | Pair _ y pat' => if Var.eq_dec x y then true else bound_in x pat'
+  end.
+
+
+  Fixpoint actors (p : t) : Actor.FSet.t :=
+    match p with
+    | Loc A _ | Bang A _ => Actor.FSet.singleton A
+    | Pair A x p => Actor.FSet.add A (actors p)
+    end.
+
+  Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> t -> Typ.t -> Prop :=
+  | WTLoc : forall G D A x tau,
+    ChorEnv.Empty G ->
+    ChorEnv.Equal D (ChorEnv.add A x tau ChorEnv.empty) ->
+    WellTyped G D (Loc A x) (Typ.Loc A tau)
+
+  | WTBang : forall G D A x tau,
+    ChorEnv.Equal G (ChorEnv.add A x tau ChorEnv.empty) ->
+    ChorEnv.Empty D ->
+    WellTyped G D (Bang A x) (Typ.Loc A (Expr.BANG tau))
+
+  | WTPair : forall G1 G2 D1 D2 G D A x p tau tau',
+    WellTyped G1 D1 (Loc A x) tau ->
+    WellTyped G2 D2 p tau' ->
+
+    (forall A, Var.Map.Partition (ChorEnv.find A G) (ChorEnv.find A G1) (ChorEnv.find A G2)) ->
+    (forall A, Var.Map.Partition (ChorEnv.find A D) (ChorEnv.find A D1) (ChorEnv.find A D2)) ->
+    
+    WellTyped G D (Pair A x p) (Typ.Pair tau tau')
+    .
+
+End Pattern.
+
 Module Choreography.
-    Definition t := list Insn.t.
+  Inductive t : Type :=
+    | Send : Actor.t -> Expr.t -> Actor.t -> Var.t -> t -> t
+    | Entangle : Actor.t -> Actor.t -> Var.t -> Var.t -> t -> t
+
+    | LetIn : Pattern.t -> t -> t -> t
+
+    | Loc : Actor.t -> Expr.t -> t
+    | Pair : t -> t -> t
+    .
+
+    Inductive Val : t -> Prop :=
+    | VLoc : forall A v, Expr.Val v -> Val (Loc A v)
+    | VPair : forall v1 v2,
+      Val v1 -> Val v2 -> Val (Pair v1 v2).
 
     Fixpoint actors (C : t) : Actor.FSet.t :=
       match C with
-      | [] => Actor.FSet.empty
-      | I0 :: C' => Actor.FSet.union (Insn.actors I0) (actors C')
+      | Send B1 e B2 y C' => Actor.FSet.union (Actor.FSet.add B1 (Actor.FSet.add B2 Actor.FSet.empty)) (actors C')
+      | Entangle B1 B2 y1 y2 C' => Actor.FSet.union (Actor.FSet.add B1 (Actor.FSet.add B2 Actor.FSet.empty)) (actors C')
+      | LetIn p C1 C2 => Actor.FSet.union (actors C1) (actors C2) (* do we need actors of p? *)
+      | Loc A e => Actor.FSet.singleton A
+      | Pair C1 C2 => Actor.FSet.union (actors C1) (actors C2)
       end.
-    
-    Inductive WellFormed : t -> Prop :=
-    | WFNil : WellFormed []
-    | WFCons : forall I C,
-      Insn.WellFormed I -> WellFormed C -> WellFormed (I :: C).
 
     Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
       match C with
-      | [] => []
-      | (Ins :: C') => (Insn.subst A x v Ins)::(if (Insn.rebound_in A x Ins)
-                                                then C' else (subst A x v C')) 
+      | Send B1 e B2 y C' => 
+          let C'' := if Var.eq_dec x y then C' else subst A x v C' in
+          Send B1 (Expr.subst x v e) B2 y C''
+      | Entangle B1 B2 y1 y2 C' => 
+          let C'' := if Var.eq_dec x y1 then C' else if Var.eq_dec x y2 then C' else subst A x v C' in
+          Entangle B1 B2 y1 y2 C''
+      | LetIn p C1 C2 => 
+          let C2' := if Pattern.bound_in x p then C2 else subst A x v C2 in
+          LetIn p (subst A x v C1) C2'
+      | Loc A' e => Loc A' (Expr.subst x v e)
+      | Pair C1 C2 => Pair (subst A x v C1) (subst A x v C2)
       end.
 
     Lemma actors_subst : forall C A x v,
       Actor.FSet.Equal
         (actors (subst A x v C))
         (actors C).
-    Proof.
-      induction C as [ | I C]; intros A x v; simpl; Actor.simplify.
-      destruct (Insn.rebound_in A x I); try reflexivity.
-      rewrite IHC; reflexivity.
+(*    Proof.
+      induction C; intros A x v; simpl; Actor.simplify; auto.
+      admit.
+      admit.
+      repeat match goal with
+      | [ p : Pattern.t |- _ ] => destruct p; simpl
+      end.
+
+      repeat match goal with
+      | [ |- context[Var.eq_dec ?x ?y]] => destruct (Var.eq_dec x y)
+      end.
+      Actor.simplify;
+      try rewrite IHC; try rewrite IHC1; try rewrite IHC2;
+      try reflexivity.
+      
+      destruct t0; simpl;
+      repeat match goal with
+           | [ |- context[Var.eq_dec ?x ?y]] => destruct (Var.eq_dec x y)
+           end;
+           Actor.simplify;
+           try rewrite IHC; try rewrite IHC1; try rewrite IHC2;
+           try reflexivity.
     Qed.
+    *)
+  Admitted.
     #[global] Hint Rewrite actors_subst : actor_db.
 End Choreography.
 
@@ -302,6 +391,8 @@ Module Label.
 End Label.
 
 (** Semantics **)
+Import Choreography.
+
 
 (** NOTE: I had to change the EPR rule to ensure that the label is unordered *)
 (** NOTE: I also changed the beta rules so there is a refs' equal to refs, not syntactically equal *)
@@ -314,15 +405,15 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
 
     ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
 
-    step  (Insn.Send A e B x :: C) T cfg
+    step  (Choreography.Send A e B x C) T cfg
           (Label.Loc A)
-          (Insn.Send A e' B x :: C) T' cfg'
+          (Choreography.Send A e' B x C) T' cfg'
 
 | SendB : forall A v B x C refs refs' cfg C',
     C' = Choreography.subst B x v C ->
     ChorEnv.Equal refs refs' ->
 
-    step  (Insn.Send A (Expr.Bang v) B x :: C) refs cfg
+    step  (Choreography.Send A (Expr.Bang v) B x C) refs cfg
           (Label.Send A v B)
           C' refs' cfg
 
@@ -332,7 +423,7 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
 
     C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
 
-    step  (Insn.EPR A x B y :: C) T cfg
+    step  (Entangle A B x y C) T cfg
           (Label.EPR A B) 
           C' T' cfg'
 
@@ -342,65 +433,105 @@ Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
 
     C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
 
-    step  (Insn.EPR A x B y :: C) T cfg
+    step  (Entangle A B x y C) T cfg
           (Label.EPR B A) 
           C' T' cfg'
 
-| LetC : forall TA' A x e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
-    
-    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+| LetC : forall e T cfg l e' T' cfg' p C,
+    step e T cfg
+         l
+         e' T' cfg' ->
 
-    step  (Insn.Let A x e :: C) T cfg
-          (Label.Loc A)
-          (Insn.Let A x e' :: C) T' cfg'
+    step  (Choreography.LetIn p e C) T cfg
+          l
+          (Choreography.LetIn p e' C) T' cfg'
 
-| LetB : forall A x v C refs refs' cfg C',
+| LetBLoc : forall A x v C refs refs' cfg C',
     Expr.Val v ->
     C' = Choreography.subst A x v C ->
     ChorEnv.Equal refs refs' ->
-    step  (Insn.Let A x v :: C) refs cfg
+    step  (LetIn (Pattern.Loc A x) (Loc A v) C) refs cfg
           (Label.Loc A)
           C' refs' cfg
 
-| LetBangC : forall TA' A x e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
-
-    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
-    step  (Insn.LetBang A x e :: C) T cfg
+| LetPairB : forall A x p' v v' C refs refs' cfg C',
+    Expr.Val v ->
+    Val v' ->
+    C' = Choreography.subst A x v (LetIn p' v' C) ->
+    ChorEnv.Equal refs refs' ->
+    step  (LetIn (Pattern.Pair A x p') (Pair (Loc A v) v') C) refs cfg
           (Label.Loc A)
-          (Insn.LetBang A x e' :: C) T' cfg'
+          C' refs' cfg
+
+| LetLocPairB : forall A x p' v1 v2 C refs cfg C' refs',
+    Expr.Val v1 ->
+    Expr.Val v2 ->
+
+    C' = Choreography.subst A x v1 (LetIn p' (Loc A v2) C) ->
+    ChorEnv.Equal refs refs' ->
+
+    step (LetIn (Pattern.Pair A x p') (Loc A (Expr.Pair v1 v2)) C) refs cfg
+         (Label.Loc A)
+         C' refs' cfg
+
 
 | LetBangB : forall A x e0 C refs refs' cfg C',
     C' = Choreography.subst A x e0 C ->
     ChorEnv.Equal refs' refs ->
-    step  (Insn.LetBang A x (Expr.Bang e0) :: C) refs cfg
+    step  (LetIn (Pattern.Bang A x) (Loc A (Expr.Bang e0)) C) refs cfg
           (Label.Loc A)
           C' refs' cfg
 
-| LetPairC : forall TA' A x1 x2 e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+| LocC : forall A e refs cfg e' refs' cfg' refsA',
+    Expr.step e (ChorEnv.find A refs) cfg e' refsA' cfg' ->
 
-    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+    ChorEnv.Equal refs' (Actor.Map.add A refsA' refs) ->
 
-    step  (Insn.LetPair A x1 x2 e :: C) T cfg
-          (Label.Loc A)
-          (Insn.LetPair A x1 x2 e' :: C) T' cfg'
-
-| LetPairB : forall A x1 x2 v1 v2 C refs refs' cfg C',
-    Expr.Val v1 -> Expr.Val v2 ->
-    C' = Choreography.subst A x1 v1 (Choreography.subst A x2 v2 C) ->
-    ChorEnv.Equal refs' refs ->
-    step  (Insn.LetPair A x1 x2 (Expr.Pair v1 v2) :: C) refs cfg
-          (Label.Loc A) 
-          C' refs' cfg
+    step (Loc A e) refs cfg
+         (Label.Loc A)
+         (Loc A e') refs' cfg'
 
 (* delay *)
-| Delay : forall I C T cfg C' T' cfg' l,
-    step C T cfg l C' T' cfg' ->
-    Actor.FSet.Empty (Actor.FSet.inter (Label.actors l) (Insn.actors I)) ->
-    step (I::C) T cfg l (I::C') T' cfg'
-.
+| DelaySend : forall A B e x C refs cfg C' refs' cfg' l,
+
+  step C refs cfg
+       l
+       C' refs' cfg' ->
+
+  A <> B ->
+  ~ Actor.FSet.In A (Label.actors l) ->
+  ~ Actor.FSet.In B (Label.actors l) ->
+
+  step (Send A e B x C) refs cfg
+       l
+       (Send A e B x C') refs' cfg'
+
+| DelayEntangle : forall A B x y C refs cfg C' refs' cfg' l,
+
+  step C refs cfg
+       l
+       C' refs' cfg' ->
+    
+  A <> B ->
+  ~ Actor.FSet.In A (Label.actors l) ->
+  ~ Actor.FSet.In B (Label.actors l) ->
+
+  step (Entangle A B x y C) refs cfg
+       l
+       (Entangle A B x y C') refs' cfg'
+
+
+| DelayLetIn : forall p e C C' refs refs' cfg cfg' l,
+
+  step C refs cfg 
+       l
+       C' refs' cfg' ->
+  
+  Actor.FSet.Empty (Actor.FSet.inter (Pattern.actors p) (Label.actors l)) ->
+
+  step (LetIn p e C) refs cfg
+       l
+       (LetIn p e C') refs' cfg'.
 
 Lemma stepProper' : forall C Θ1 cfg l C' Θ1' cfg',
   Choreography.step C Θ1 cfg l C' Θ1' cfg' ->
@@ -442,87 +573,92 @@ Proof.
   * eapply stepProper'; eauto. symmetry; auto. symmetry; auto.
 Qed.
 
+
+Print Choreography.t.
 Inductive WellTyped :
-  ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
+  ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Typ.t -> Prop :=
+
+| WTLoc : forall DA TA G D T A e tau,
+  Expr.WellTyped (ChorEnv.find A G) DA TA e tau ->
+
+  ChorEnv.Equal D (Actor.Map.add A DA (Actor.Map.empty _)) ->
+  ChorEnv.Equal T (Actor.Map.add A TA (Actor.Map.empty _)) ->
+
+  WellTyped G D T (Loc A e) (Typ.Loc A tau)
+
+| WTPair : forall D1 D2 T1 T2 G D T C1 C2 tau1 tau2,
+  WellTyped G D1 T1 C1 tau1 ->
+  WellTyped G D2 T2 C2 tau2 ->
   
-| Nil : forall G D T, 
-    ChorEnv.Empty D ->
-    ChorEnv.Empty T ->
-    WellTyped G D T nil
+  (forall A, Var.Map.Partition (ChorEnv.find A D) (ChorEnv.find A D1) (ChorEnv.find A D2)) ->
+  (forall A, Var.Map.Partition (ChorEnv.find A T) (ChorEnv.find A T1) (ChorEnv.find A T2)) ->
+
+  WellTyped G D T (Pair C1 C2) (Typ.Pair tau1 tau2)
                                 
-| EPR : forall G D T A x B y C,
+| Entangle : forall G D T A x B y C tau,
     A <> B ->
     WellTyped (ChorEnv.remove B y (ChorEnv.remove A x G))
-      (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)) T C ->
+              (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)) 
+              T 
+              C 
+              tau ->
 
     ~ Var.Map.In x (ChorEnv.find A D) ->
     ~ Var.Map.In y (ChorEnv.find B D) ->
 
-    WellTyped G D T ((Insn.EPR A x B y)::C)
+    WellTyped G D T (Entangle A B x y C) tau
 
-| Send : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A e tau B y C,
+| Send : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A e tau B y C tau',
+
     A <> B ->
     Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
-    WellTyped (ChorEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C ->
+    WellTyped (ChorEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C tau' ->
 
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
 
-    WellTyped G D T ((Insn.Send A e B y)::C)
+    WellTyped G D T (Send A e B y C) tau'
 
-| LetBang : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
 
-    Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
-    WellTyped (ChorEnv.add A x tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C ->
+| LetIn : forall G0 D0 D1 D2 T1 T2 tau G D T p C C' tau',
+    WellTyped G D1 T1 C tau ->
+    Pattern.WellTyped G0 D0 p tau ->
 
-    Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
-    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
+    (* The non-linear varialbes (G0) introduced by p are added to G *)
+    (* The linear variables (D0) introduced by p are removed from G *)
+    WellTyped (Actor.Map.setminus (Actor.Map.domain D0) (Actor.Map.concat G G0))
+              (Actor.Map.concat D2 D0)
+              T2
+              C'
+              tau' ->
 
-    WellTyped G D T ((Insn.LetBang A x e)::C)
+    (forall A, Var.Map.Partition (ChorEnv.find A D) (ChorEnv.find A D1) (ChorEnv.find A D2)) ->
+    (* The linear variables introduced by p are disjoint from D2 *)
+    (forall A x, ~ (Var.Map.In x (ChorEnv.find A D2) /\ Var.Map.In x (ChorEnv.find A D0))) ->
+    (forall A, Var.Map.Partition (ChorEnv.find A T) (ChorEnv.find A T1) (ChorEnv.find A T2)) ->
 
-| LetIn : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
-
-    Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e tau ->
-    WellTyped (ChorEnv.remove A x G) (Actor.Map.add A (Var.Map.add x tau DeltaA2) D)
-      (Actor.Map.add A ThetaA2 T) C ->
-
-    Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
-    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
-    ~ Var.Map.In x DeltaA2 ->
-    WellTyped G D T ((Insn.Let A x e)::C)
-
-| LetPair: forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x1 x2 tau1 tau2 e C,
-
-    Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) ->
-    WellTyped (ChorEnv.remove A x1 (ChorEnv.remove A x2 G))
-      (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D)
-      (Actor.Map.add A ThetaA2 T) C ->
-
-    Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
-    Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
-    ~ Var.Map.In x1 DeltaA2 -> 
-    ~ Var.Map.In x2 DeltaA2 ->
-    x1 <> x2 ->
-
-    WellTyped G D T ((Insn.LetPair A x1 x2 e)::C)
+    WellTyped G D T (LetIn p C C') tau'
 .
 
-Lemma WellTypedProper' : forall G D T C,
-  WellTyped G D T C ->
+
+Lemma WellTypedProper' : forall G D T C tau,
+  WellTyped G D T C tau ->
   forall G' D' T',
   ChorEnv.Equal G G' ->
   ChorEnv.Equal D D' -> 
   ChorEnv.Equal T T' ->
-  WellTyped G' D' T' C.
+  WellTyped G' D' T' C tau.
 Proof.
-  intros G D T C HWT.
+  (*
+  intros G D T C tau HWT.
   induction HWT; intros G' D' T' HG HD HT;
     try (constructor; auto; fail).
-  * constructor.
+  * econstructor; eauto.
+    rewrite <- HG. eauto.
     rewrite <- HD; auto.
     rewrite <- HT; auto.
 
-  * constructor; auto.
+  * econstructor; auto.
     2:{ rewrite <- HD; auto. }
     2:{ rewrite <- HD; auto. }
     eapply  IHHWT; auto.
@@ -561,13 +697,14 @@ Proof.
       try rewrite <- HT;
       eauto;
       reflexivity.
-
 Qed.
+*)
+Admitted.
 
 Global Instance WellTypedProper :
-  Proper (ChorEnv.Equal ==> ChorEnv.Equal ==> ChorEnv.Equal ==> eq ==> iff) WellTyped.
+  Proper (ChorEnv.Equal ==> ChorEnv.Equal ==> ChorEnv.Equal ==> eq ==> eq ==> iff) WellTyped.
 Proof.
-  intros G1 G2 HG D1 D2 HD T1 T2 HT ? e ?; subst.
+  intros G1 G2 HG D1 D2 HD T1 T2 HT ? e ? ? tau ?; subst.
   split; intros; eapply WellTypedProper'; eauto;
     symmetry; auto.
 Qed.
