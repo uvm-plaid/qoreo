@@ -249,7 +249,31 @@ Module Insn.
 End Insn.
 
 Module Choreography.
-    Definition t := list Insn.t.
+    (*Definition t := list Insn.t.*)
+
+    (* type t = Empty | Seq of t * t *)
+    Inductive t : Type :=
+    | Empty : t
+    | Seq : t -> t -> t
+
+    (* send A.e -> B.x in C *)
+    | Send : Actor.t -> Expr.t -> Actor.t -> Var.t -> t -> t
+    (* epr A.x <-> B.y in C *)
+    | EPR : Actor.t -> Var.t -> Actor.t -> Var.t -> t -> t
+
+    (* let A.x = e in C aka Let(A,x,e,C) *)
+    | Let : Actor.t -> Var.t -> Expr.t -> t -> t
+    | LetBang : Actor.t -> Var.t -> Expr.t -> t -> t
+    | LetPair : Actor.t -> Var.t -> Var.t -> Expr.t -> t -> t
+    
+    (* if A.e then C1 else C2 *)
+    (* 
+     ... | If of Actor.t * Expr.t * t * t 
+    *)
+    | If : Actor.t -> Expr.t -> t -> t -> t
+    (* No selection tags *)
+    .
+    (* TOOD: update processes, update EPP *)
 
     Fixpoint actors (C : t) : Actor.FSet.t :=
       match C with
