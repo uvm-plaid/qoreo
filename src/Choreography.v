@@ -31,6 +31,26 @@ From Stdlib Require Import Morphisms (* for Proper *).
 From Stdlib Require Import Lia.
 
 
+Module Label.
+    Inductive t :=
+    | Send : Actor.t -> Expr.t -> Actor.t -> t
+    | EPR  : Actor.t -> Actor.t -> t
+    | Loc  : Actor.t -> t
+    .
+
+    Inductive WellFormed : Label.t -> Prop :=
+    | WFLSend : forall A v B, A <> B -> WellFormed (Send A v B)
+    | WFLEPR : forall A B, A <> B -> WellFormed (EPR A B)
+    | WFLLoc : forall A, WellFormed (Loc A)
+    .
+
+    Definition actors (l : t) : Actor.FSet.t :=
+        match l with
+        | Send A _ B | EPR A B => Actor.FSet.add A (Actor.FSet.singleton B)
+        | Loc A => Actor.FSet.singleton A
+        end.
+End Label.
+
 Module Insn.
     Inductive t : Type :=
 
@@ -245,7 +265,37 @@ Module Insn.
       | Let B y e => bind_eqb (A,x) (B,y) 
       | LetBang B y e => bind_eqb (A,x) (B,y) 
       | LetPair B y1 y2 e => (bind_eqb (A,x) (B,y1)) || (bind_eqb (A,x) (B,y2)) 
-    end.       
+    end.
+
+    Inductive stepC : 
+              Insn.t -> ChorEnv.t nat -> Config.t ->
+              Label.t ->
+              Insn.t -> ChorEnv.t nat -> Config.t -> Prop :=
+    | SendC : forall TA' A e B x T cfg e' T' cfg',
+      Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+      ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+      stepC (Insn.Send A e B x) T cfg
+            (Label.Loc A)
+            (Insn.Send A e' B x) T' cfg'
+    | LetC : forall TA' A x e T cfg e' T' cfg',
+      Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+      ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+      stepC (Insn.Let A x e) T cfg
+            (Label.Loc A)
+            (Insn.Let A x e') T' cfg'
+    | LetBangC : forall TA' A x e T cfg e' T' cfg',
+      Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+      ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+      stepC (Insn.LetBang A x e) T cfg
+            (Label.Loc A)
+            (Insn.LetBang A x e') T' cfg'
+    | LetPairC : forall TA' A x1 x2 e T cfg e' T' cfg',
+      Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+      ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+      stepC (Insn.LetPair A x1 x2 e) T cfg
+            (Label.Loc A)
+            (Insn.LetPair A x1 x2 e') T' cfg'
+    .
 End Insn.
 
 Module Choreography.
@@ -254,43 +304,54 @@ Module Choreography.
     (* type t = Empty | Seq of t * t *)
     Inductive t : Type :=
     | Empty : t
-    | Seq : t -> t -> t
-
-    (* send A.e -> B.x in C *)
-    | Send : Actor.t -> Expr.t -> Actor.t -> Var.t -> t -> t
-    (* epr A.x <-> B.y in C *)
-    | EPR : Actor.t -> Var.t -> Actor.t -> Var.t -> t -> t
-
-    (* let A.x = e in C aka Let(A,x,e,C) *)
-    | Let : Actor.t -> Var.t -> Expr.t -> t -> t
-    | LetBang : Actor.t -> Var.t -> Expr.t -> t -> t
-    | LetPair : Actor.t -> Var.t -> Var.t -> Expr.t -> t -> t
-    
-    (* if A.e then C1 else C2 *)
-    (* 
-     ... | If of Actor.t * Expr.t * t * t 
-    *)
-    | If : Actor.t -> Expr.t -> t -> t -> t
+    | Do : Insn.t -> t -> t
+    (* If A e C1 C2 C
+        ==
+       If A.e then C1 else C2 ; C *)
+    | If : Actor.t -> Expr.t -> t -> t -> t -> t
     (* No selection tags *)
     .
     (* TOOD: update processes, update EPP *)
 
+    Fixpoint seq (C1 C2 : t) : t :=
+    match C1 with
+    | Empty => C2
+    | Do I0 C1' => Do I0 (seq C1' C2)
+    | If A e C11 C12 C1' =>
+      If A e C11 C12 (seq C1' C2)
+    end.
+
     Fixpoint actors (C : t) : Actor.FSet.t :=
       match C with
-      | [] => Actor.FSet.empty
-      | I0 :: C' => Actor.FSet.union (Insn.actors I0) (actors C')
+      | Empty => Actor.FSet.empty
+      | Do I0 C' => Actor.FSet.union (Insn.actors I0) (actors C')
+      | If A e C1 C2 C0 => Actor.FSet.add A (Actor.FSet.union (actors C1) (Actor.FSet.union (actors C2) (actors C0)))
       end.
     
     Inductive WellFormed : t -> Prop :=
-    | WFNil : WellFormed []
-    | WFCons : forall I C,
-      Insn.WellFormed I -> WellFormed C -> WellFormed (I :: C).
+    | WFEmpty : WellFormed Empty
+    | WFDo : forall I C,
+      Insn.WellFormed I -> WellFormed C -> WellFormed (Do I C)
+    | WFIf : forall A e C1 C2 C,
+      WellFormed C1 ->
+      WellFormed C2 ->
+      WellFormed C ->
+      WellFormed (If A e C1 C2 C)
+    .
 
     Fixpoint subst (A : Actor.t) (x : Var.t) (v : Expr.t) (C : t) : t :=
       match C with
-      | [] => []
-      | (Ins :: C') => (Insn.subst A x v Ins)::(if (Insn.rebound_in A x Ins)
-                                                then C' else (subst A x v C')) 
+      | Empty => Empty
+      | (Do Ins C') => 
+        Do (Insn.subst A x v Ins)
+           (if (Insn.rebound_in A x Ins)
+            then C'
+            else (subst A x v C'))
+      | If B e C1 C2 C =>
+        If B (if Actor.eq_dec A B then Expr.subst x v e else e)
+             (subst A x v C1)
+             (subst A x v C2)
+             (subst A x v C)
       end.
 
     Lemma actors_subst : forall C A x v,
@@ -298,140 +359,154 @@ Module Choreography.
         (actors (subst A x v C))
         (actors C).
     Proof.
-      induction C as [ | I C]; intros A x v; simpl; Actor.simplify.
-      destruct (Insn.rebound_in A x I); try reflexivity.
-      rewrite IHC; reflexivity.
+      induction C as [ | I C | ]; intros A x v; simpl; Actor.simplify.
+      * destruct (Insn.rebound_in A x I); try reflexivity.
+        rewrite IHC; reflexivity.
+      * rewrite IHC1, IHC2, IHC3. reflexivity.
     Qed.
     #[global] Hint Rewrite actors_subst : actor_db.
 End Choreography.
 
-Module Label.
-    Inductive t :=
-    | Send : Actor.t -> Expr.t -> Actor.t -> t
-    | EPR  : Actor.t -> Actor.t -> t
-    | Loc  : Actor.t -> t
-    .
-
-    Inductive WellFormed : Label.t -> Prop :=
-    | WFLSend : forall A v B, A <> B -> WellFormed (Send A v B)
-    | WFLEPR : forall A B, A <> B -> WellFormed (EPR A B)
-    | WFLLoc : forall A, WellFormed (Loc A)
-    .
-
-    Definition actors (l : t) : Actor.FSet.t :=
-        match l with
-        | Send A _ B | EPR A B => Actor.FSet.add A (Actor.FSet.singleton B)
-        | Loc A => Actor.FSet.singleton A
-        end.
-End Label.
 
 (** Semantics **)
 
+Inductive stepB : Choreography.t -> ChorEnv.t nat -> Config.t ->
+                 Label.t ->
+                 Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
+  | IfB : forall A (b : bool) C1 C2 C T cfg C' T' cfg',
+    C' = Choreography.seq (if b then C1 else C2) C ->
+    ChorEnv.Equal T' T ->
+    cfg' = cfg ->
+    stepB (Choreography.If A (Expr.Bit b) C1 C2 C) T cfg
+          (Label.Loc A) (*??? do we need a new label that covers all actors in the if? *)
+          C' T' cfg'
+
+  | SendB : forall A v B x C refs refs' cfg C',
+      C' = Choreography.subst B x v C ->
+      ChorEnv.Equal refs refs' ->
+
+      stepB (Choreography.Do (Insn.Send A (Expr.Bang v) B x) C) refs cfg
+            (Label.Send A v B)
+            C' refs' cfg
+
+  | EPRB : forall q1 q2 T0 A x B y C T cfg C' T' cfg',
+      ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
+      ChorEnv.Equal T' T0 ->
+
+      C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
+
+      stepB (Choreography.Do (Insn.EPR A x B y) C) T cfg
+            (Label.EPR A B) 
+            C' T' cfg'
+
+  | EPRB' : forall q1 q2 T0 A x B y C T cfg C' T' cfg',
+      ChorEnv.epr B A T cfg = (q2, q1, T0, cfg') ->
+      ChorEnv.Equal T' T0 ->
+
+      C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
+
+      stepB (Choreography.Do (Insn.EPR A x B y) C) T cfg
+            (Label.EPR B A) 
+            C' T' cfg'
+    
+  | LetB : forall A x v C refs refs' cfg C',
+      Expr.Val v ->
+      C' = Choreography.subst A x v C ->
+      ChorEnv.Equal refs refs' ->
+      stepB (Choreography.Do (Insn.Let A x v) C) refs cfg
+            (Label.Loc A)
+            C' refs' cfg
+
+  | LetBangB : forall A x e0 C refs refs' cfg C',
+      C' = Choreography.subst A x e0 C ->
+      ChorEnv.Equal refs' refs ->
+      stepB (Choreography.Do (Insn.LetBang A x (Expr.Bang e0)) C) refs cfg
+            (Label.Loc A)
+            C' refs' cfg
+
+  | LetPairB : forall A x1 x2 v1 v2 C refs refs' cfg C',
+      Expr.Val v1 -> Expr.Val v2 ->
+      C' = Choreography.subst A x1 v1 (Choreography.subst A x2 v2 C) ->
+      ChorEnv.Equal refs' refs ->
+      stepB  (Choreography.Do (Insn.LetPair A x1 x2 (Expr.Pair v1 v2)) C) refs cfg
+            (Label.Loc A) 
+            C' refs' cfg
+.
+
 (** NOTE: I had to change the EPR rule to ensure that the label is unordered *)
-(** NOTE: I also changed the beta rules so there is a refs' equal to refs, not syntactically equal *)
 Inductive step : Choreography.t -> ChorEnv.t nat -> Config.t ->
                  Label.t ->
                  Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
 
-| SendC : forall TA' A e B x C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+| StepC : forall I C T cfg l I' T' cfg',
+  Insn.stepC I T cfg
+             l
+             I' T' cfg' ->
+  step (Choreography.Do I C) T cfg
+       l
+       (Choreography.Do I' C) T' cfg'
 
-    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+| IfC : forall TA' A e C1 C2 C0 T cfg e' T' cfg',
+  Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
+  ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
+  step (Choreography.If A e C1 C2 C0) T cfg
+       (Label.Loc A)
+       (Choreography.If A e' C1 C2 C0) T' cfg'
 
-    step  (Insn.Send A e B x :: C) T cfg
-          (Label.Loc A)
-          (Insn.Send A e' B x :: C) T' cfg'
+| StepB : forall C T cfg l C' T' cfg',
+  stepB C T cfg
+        l
+        C' T' cfg' ->
+  step  C T cfg
+        l
+        C' T' cfg'
 
-| SendB : forall A v B x C refs refs' cfg C',
-    C' = Choreography.subst B x v C ->
-    ChorEnv.Equal refs refs' ->
-
-    step  (Insn.Send A (Expr.Bang v) B x :: C) refs cfg
-          (Label.Send A v B)
-          C' refs' cfg
-
-| EPRB : forall q1 q2 T0 A x B y C T cfg C' T' cfg',
-    ChorEnv.epr A B T cfg = (q1, q2, T0, cfg') ->
-    ChorEnv.Equal T' T0 ->
-
-    C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
-
-    step  (Insn.EPR A x B y :: C) T cfg
-          (Label.EPR A B) 
-          C' T' cfg'
-
-| EPRB' : forall q1 q2 T0 A x B y C T cfg C' T' cfg',
-    ChorEnv.epr B A T cfg = (q2, q1, T0, cfg') ->
-    ChorEnv.Equal T' T0 ->
-
-    C' = Choreography.subst A x (Expr.QRef q1) (Choreography.subst B y (Expr.QRef q2) C) ->
-
-    step  (Insn.EPR A x B y :: C) T cfg
-          (Label.EPR B A) 
-          C' T' cfg'
-
-| LetC : forall TA' A x e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
-    
-    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
-
-    step  (Insn.Let A x e :: C) T cfg
-          (Label.Loc A)
-          (Insn.Let A x e' :: C) T' cfg'
-
-| LetB : forall A x v C refs refs' cfg C',
-    Expr.Val v ->
-    C' = Choreography.subst A x v C ->
-    ChorEnv.Equal refs refs' ->
-    step  (Insn.Let A x v :: C) refs cfg
-          (Label.Loc A)
-          C' refs' cfg
-
-| LetBangC : forall TA' A x e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
-
-    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
-    step  (Insn.LetBang A x e :: C) T cfg
-          (Label.Loc A)
-          (Insn.LetBang A x e' :: C) T' cfg'
-
-| LetBangB : forall A x e0 C refs refs' cfg C',
-    C' = Choreography.subst A x e0 C ->
-    ChorEnv.Equal refs' refs ->
-    step  (Insn.LetBang A x (Expr.Bang e0) :: C) refs cfg
-          (Label.Loc A)
-          C' refs' cfg
-
-| LetPairC : forall TA' A x1 x2 e C T cfg e' T' cfg',
-    Expr.step e (ChorEnv.find A T) cfg e' TA' cfg' ->
-
-    ChorEnv.Equal T' (Actor.Map.add A TA' T) ->
-
-    step  (Insn.LetPair A x1 x2 e :: C) T cfg
-          (Label.Loc A)
-          (Insn.LetPair A x1 x2 e' :: C) T' cfg'
-
-| LetPairB : forall A x1 x2 v1 v2 C refs refs' cfg C',
-    Expr.Val v1 -> Expr.Val v2 ->
-    C' = Choreography.subst A x1 v1 (Choreography.subst A x2 v2 C) ->
-    ChorEnv.Equal refs' refs ->
-    step  (Insn.LetPair A x1 x2 (Expr.Pair v1 v2) :: C) refs cfg
-          (Label.Loc A) 
-          C' refs' cfg
 
 (* delay *)
 | Delay : forall I C T cfg C' T' cfg' l,
     step C T cfg l C' T' cfg' ->
     Actor.FSet.Empty (Actor.FSet.inter (Label.actors l) (Insn.actors I)) ->
-    step (I::C) T cfg l (I::C') T' cfg'
+    step (Choreography.Do I C) T cfg l (Choreography.Do I C') T' cfg'
+
+| IfDelay : forall A e C1 C2 C T cfg C' T' cfg' l,
+  step C T cfg
+       l
+       C' T' cfg' ->
+  Actor.FSet.Empty (Actor.FSet.inter
+      (Label.actors l)
+      (Actor.FSet.add A (Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2)))) ->
+  step (Choreography.If A e C1 C2 C) T cfg
+       l
+       (Choreography.If A e C1 C2 C') T' cfg'
 .
 
-Lemma stepProper' : forall C Θ1 cfg l C' Θ1' cfg',
-  Choreography.step C Θ1 cfg l C' Θ1' cfg' ->
+Lemma stepCProper' : forall I Θ1 cfg l I' Θ1' cfg',
+  Insn.stepC I Θ1 cfg l I' Θ1' cfg' ->
   forall Θ2 Θ2',
     ChorEnv.Equal Θ1 Θ2 ->
     ChorEnv.Equal Θ1' Θ2' ->
-    Choreography.step C Θ2 cfg l C' Θ2' cfg'.
+    Insn.stepC I Θ2 cfg l I' Θ2' cfg'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  destruct Hstep; intros ? ? Heq Heq';
+  econstructor; try rewrite <- Heq; try rewrite <- Heq'; eauto.
+Qed.
+
+Global Instance stepCProper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Insn.stepC).
+Proof.
+  intros ? C ? Θ1 Θ2 HΘ ? cfg ? ? l ? ? C' ? Θ1' Θ2' HΘ' ? cfg' ?; subst.
+  split; intros Hstep.
+  * eapply stepCProper'; eauto.
+  * eapply stepCProper'; eauto. symmetry; auto. symmetry; auto.
+Qed.
+
+
+Lemma stepBProper' : forall C Θ1 cfg l C' Θ1' cfg',
+  Choreography.stepB C Θ1 cfg l C' Θ1' cfg' ->
+  forall Θ2 Θ2',
+    ChorEnv.Equal Θ1 Θ2 ->
+    ChorEnv.Equal Θ1' Θ2' ->
+    Choreography.stepB C Θ2 cfg l C' Θ2' cfg'.
 Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros Θ2 Θ2' Heq Heq';
@@ -458,13 +533,38 @@ Proof.
 Qed.
 
 
+Global Instance stepBProper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.stepB).
+Proof.
+  intros ? C ? Θ1 Θ2 HΘ ? cfg ? ? l ? ? C' ? Θ1' Θ2' HΘ' ? cfg' ?; subst.
+  split; intros Hstep; eapply stepBProper'; eauto.
+  all: (symmetry; auto).
+Qed.
+
+
+Lemma stepProper' : forall C Θ1 cfg l C' Θ1' cfg',
+  Choreography.step C Θ1 cfg l C' Θ1' cfg' ->
+  forall Θ2 Θ2',
+    ChorEnv.Equal Θ1 Θ2 ->
+    ChorEnv.Equal Θ1' Θ2' ->
+    Choreography.step C Θ2 cfg l C' Θ2' cfg'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros Θ2 Θ2' Heq Heq';
+    try rewrite Heq in *;
+    try rewrite Heq' in *;
+    try (econstructor; eauto; fail).
+Qed.
+
+
 Global Instance stepProper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.step).
 Proof.
   intros ? C ? Θ1 Θ2 HΘ ? cfg ? ? l ? ? C' ? Θ1' Θ2' HΘ' ? cfg' ?; subst.
-  split; intros Hstep.
-  * eapply stepProper'; eauto.
-  * eapply stepProper'; eauto. symmetry; auto. symmetry; auto.
+  split; intros Hstep; eapply stepProper'; eauto.
+  all: (symmetry; auto).
 Qed.
+
+
+(** Typing Relation *)
 
 Inductive WellTyped :
   ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
@@ -472,7 +572,7 @@ Inductive WellTyped :
 | Nil : forall G D T, 
     ChorEnv.Empty D ->
     ChorEnv.Empty T ->
-    WellTyped G D T nil
+    WellTyped G D T Choreography.Empty
                                 
 | EPR : forall G D T A x B y C,
     A <> B ->
@@ -482,7 +582,7 @@ Inductive WellTyped :
     ~ Var.Map.In x (ChorEnv.find A D) ->
     ~ Var.Map.In y (ChorEnv.find B D) ->
 
-    WellTyped G D T ((Insn.EPR A x B y)::C)
+    WellTyped G D T (Choreography.Do (Insn.EPR A x B y) C)
 
 | Send : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A e tau B y C,
     A <> B ->
@@ -492,7 +592,7 @@ Inductive WellTyped :
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
 
-    WellTyped G D T ((Insn.Send A e B y)::C)
+    WellTyped G D T (Choreography.Do (Insn.Send A e B y) C)
 
 | LetBang : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
 
@@ -502,7 +602,7 @@ Inductive WellTyped :
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
 
-    WellTyped G D T ((Insn.LetBang A x e)::C)
+    WellTyped G D T (Choreography.Do (Insn.LetBang A x e) C)
 
 | LetIn : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
 
@@ -513,7 +613,7 @@ Inductive WellTyped :
     Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA2 ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
     ~ Var.Map.In x DeltaA2 ->
-    WellTyped G D T ((Insn.Let A x e)::C)
+    WellTyped G D T (Choreography.Do (Insn.Let A x e) C)
 
 | LetPair: forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x1 x2 tau1 tau2 e C,
 
@@ -528,7 +628,23 @@ Inductive WellTyped :
     ~ Var.Map.In x2 DeltaA2 ->
     x1 <> x2 ->
 
-    WellTyped G D T ((Insn.LetPair A x1 x2 e)::C)
+    WellTyped G D T (Choreography.Do (Insn.LetPair A x1 x2 e) C)
+
+| If : forall ΔA1 ΔA2 ΔA3 ΘA1 ΘA2 ΘA3 ΔA' ΘA' G D T A e C1 C2 C,
+  Expr.WellTyped (ChorEnv.find A G) ΔA1 ΘA1 e Expr.BIT ->
+  WellTyped G (Actor.Map.add A ΔA2 D) (Actor.Map.add A ΘA2 T) C1 ->
+  WellTyped G (Actor.Map.add A ΔA2 D) (Actor.Map.add A ΘA2 T) C2 ->
+  WellTyped G (Actor.Map.add A ΔA3 D) (Actor.Map.add A ΘA3 T) C ->
+
+  (* D[A] == ΔA1 ++ ΔA2 ++ ΔA3 *)
+  Var.Map.Partition (ChorEnv.find A D) ΔA1 ΔA' ->
+  Var.Map.Partition ΔA' ΔA2 ΔA3 ->
+  (* T[A] == ΘA1 ++ ΘA2 ++ ΘA3 *)
+  Var.Map.Partition (ChorEnv.find A T) ΘA1 ΘA' ->
+  Var.Map.Partition ΘA' ΘA2 ΘA3 ->
+
+
+  WellTyped G D T (Choreography.If A e C1 C2 C)
 .
 
 Lemma WellTypedProper' : forall G D T C,
@@ -580,6 +696,16 @@ Proof.
 
   * eapply (LetPair DeltaA1 DeltaA2 ThetaA1 ThetaA2);
       try apply IHHWT;
+      try rewrite <- HG;
+      try rewrite <- HD;
+      try rewrite <- HT;
+      eauto;
+      reflexivity.
+
+  * eapply (If ΔA1 ΔA2 ΔA3 ΘA1 ΘA2 ΘA3 ΔA' ΘA');
+      try apply IHHWT1;
+      try apply IHHWT2;
+      try apply IHHWT3;
       try rewrite <- HG;
       try rewrite <- HD;
       try rewrite <- HT;
