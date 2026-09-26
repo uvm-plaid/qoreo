@@ -49,6 +49,7 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   Definition setminus {T} (S : FSet.t) (N : M.t T) : M.t T :=
     FSet.fold (fun x N' => M.remove x N') S N.
 
+
   Definition Partition {A} := @Properties.Partition A.
 
   (* Rewrite/auto databases *)
@@ -2094,6 +2095,348 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
 
 
   End FSetProofs.
+
+  Module Reflection.
+
+  Inductive SetData :=
+    | PrimSD : FSet.t -> SetData
+    | EmptySD : SetData
+    | AddSD : key -> SetData -> SetData
+    | RemoveSD : key -> SetData -> SetData
+    | UnionSD : SetData -> SetData -> SetData
+    | IntersectSD : SetData -> SetData -> SetData
+    .
+
+  Module NormalSetData.
+    (* 
+        X ::= {x1,...,xn} ∪ Y1 ∪ ... ∪ Yn
+        Y ::= Z1 ∩ ... ∩ Zm
+        Z ::= Prim | Remove x Z
+    *)
+    Inductive NSD_Z := PrimNSD : FSet.t -> NSD_Z | RemoveNSD : key -> NSD_Z -> NSD_Z.
+    Definition NSD_Y := list NSD_Z.
+    Definition NSD := (list key * list NSD_Y)%type.
+
+    (* From SetData to NSD *)
+    (*
+    PrimSD : FSet.t -> SetData
+    | EmptySD : SetData
+    | AddSD : key -> SetData -> SetData
+    | RemoveSD : key -> SetData -> SetData
+    | UnionSD : SetData -> SetData -> SetData
+    | IntersectSD : SetData -> SetData -> SetData
+    *)
+    Definition primSD (X : FSet.t) : NSD :=
+      ([],[[PrimNSD X]]).
+
+    Definition emptySD : NSD := ([],[]).
+
+    Fixpoint insertKey (k : key) (l : list key) : list key :=
+    match l with
+    | [] => [k]
+    | k'::l' =>
+      match E.compare k k' with
+      | OrderedType.LT _ => k::l
+      | OrderedType.EQ _ => l
+      | OrderedType.GT _ => k':: insertKey k l'
+      end
+    end.
+    Definition addSD (x : key) (X : NSD) : NSD :=
+      let (ks, Ys) := X in
+      (insertKey x ks, Ys).
+
+    
+  Fixpoint removeKey k (l : list key) : list key :=
+    match l with
+    | [] => []
+    | k'::l' => 
+      match E.compare k k' with
+      | OrderedType.LT _ => l
+      | OrderedType.EQ _ => l'
+      | OrderedType.GT _ => k':: removeKey k l'
+      end
+    end.
+    
+  Fixpoint remove_NSD_Z k (Z : NSD_Z) :=
+    match Z with
+    | PrimNSD _ => RemoveNSD k Z
+    | RemoveNSD k' Z' =>
+      match E.compare k k' with
+      | OrderedType.LT _ => RemoveNSD k Z
+      | OrderedType.EQ _ => Z
+      | OrderedType.GT _ => RemoveNSD k' (remove_NSD_Z k Z')
+      end
+    end.
+  Definition remove_NSD_Y k (Y : NSD_Y) : NSD_Y :=
+    List.map (remove_NSD_Z k) Y.
+  Definition remove_NSD k (X : NSD) : NSD :=
+    let (l,Ys) := X in
+    (removeKey k l, List.map (remove_NSD_Y k) Ys).
+
+  Fixpoint unionKeys (l1 l2 : list key) : list key :=
+    match l1 with
+    | [] => l2
+    | k :: l1' => unionKeys l1' (insertKey k l2)
+    end.
+
+  Definition union_NSD (X1 X2 : NSD) : NSD :=
+    let (keys1, Ys1) := X1 in
+    let (keys2, Ys2) := X2 in
+    (unionKeys keys1 keys2, List.app Ys1 Ys2).
+
+  (* Return the keys in l that are strictly greater than k.
+   * Return true iff k appears in l
+   *)
+  Fixpoint seekKey (k : key) (l : list key) : (bool * list key)%type :=
+    match l with
+    | [] => (false, [])
+    | k' :: keys' =>
+        match E.compare k k' with
+        | OrderedType.LT _ => (false, l)
+        | OrderedType.EQ _ => (true, keys')
+        | OrderedType.GT _ => seekKey k keys'
+        end
+    end.
+
+  Fixpoint intersectKeys (keys1 keys2 : list key) : list key :=
+    match keys1 with
+    | [] => []
+    | k :: keys1' =>
+        match seekKey k keys2 with
+        | (true, keys2') => (* k ∈ keys2 *)
+          k :: intersectKeys keys1' keys2'
+        | (false, keys2') => (* k ∉ keys2 *)
+          intersectKeys keys1' keys2'
+        end
+    end.
+
+  Definition intersectKeyY (k : key) (Y : NSD_Y) : NSD_Y :=
+    PrimNSD (FSet.singleton k) :: Y.
+
+  Definition intersectKeysYs (keys : list key) (Ys : list NSD_Y)
+      : list NSD_Y :=
+    List.concat
+      (List.map (fun k => List.map (intersectKeyY k) Ys) keys).
+
+  Definition intersectYs (Ys1 Ys2 : list NSD_Y) : list NSD_Y :=
+    List.concat
+      (List.map (fun Y1 => List.map (List.app Y1) Ys2) Ys1).
+
+  (* Intersect key atoms directly; distribute key/conjunction and conjunction/
+     conjunction pairs while keeping each result in NSD_Y form. *)
+  Definition intersect_NSD (X1 X2 : NSD) : NSD :=
+    let (keys1, Ys1) := X1 in
+    let (keys2, Ys2) := X2 in
+    (intersectKeys keys1 keys2,
+     List.app (intersectKeysYs keys1 Ys2)
+       (List.app (intersectKeysYs keys2 Ys1) (intersectYs Ys1 Ys2))).
+
+
+
+
+    (* From SetData to NSD *)
+    (*
+    PrimSD : FSet.t -> SetData
+    | EmptySD : SetData
+    | AddSD : key -> SetData -> SetData
+    | RemoveSD : key -> SetData -> SetData
+    | UnionSD : SetData -> SetData -> SetData
+    | IntersectSD : SetData -> SetData -> SetData
+    *)
+  
+    Fixpoint to_NSD (X : SetData) : NSD :=
+      match X with
+      | PrimSD Z => primSD Z
+      | EmptySD  => emptySD
+      | AddSD x X' => addSD x (to_NSD X')
+      | RemoveSD x X' => remove_NSD x (to_NSD X')
+      | UnionSD X1 X2 => union_NSD (to_NSD X1) (to_NSD X2)
+      | IntersectSD X1 X2 => intersect_NSD (to_NSD X1) (to_NSD X2)
+      end.
+
+    (* From NSD to SetData *)
+
+    Fixpoint from_NSD_Z (Z : NSD_Z) : SetData :=
+      match Z with
+      | PrimNSD X => PrimSD X
+      | RemoveNSD k Z' => RemoveSD k (from_NSD_Z Z')
+      end.
+    Fixpoint from_NSD_Y (Y : NSD_Y) : SetData :=
+      match Y with
+      | [] => EmptySD
+      | Z::Y' => IntersectSD (from_NSD_Z Z) (from_NSD_Y Y')
+      end.
+    Fixpoint from_NSD_X (X : list NSD_Y) :=
+      match X with
+      | [] => EmptySD
+      | Y::X' => UnionSD (from_NSD_Y Y) (from_NSD_X X')
+      end.
+    Fixpoint from_NSD' (l : list key) (X : SetData) :=
+      match l with
+      | [] => X
+      | k::l' => from_NSD' l' (AddSD k X)
+      end.
+    Definition from_NSD (X : NSD) : SetData :=
+      let (l,X') := X in
+      from_NSD' l (from_NSD_X X').
+
+  End NormalSetData.
+
+  Fixpoint fromSetData (S : SetData) : FSet.t :=
+    match S with
+    | PrimSD X => X
+    | EmptySD => FSet.empty
+    | AddSD x S' => FSet.add x (fromSetData S')
+    | RemoveSD x S' => FSet.remove x (fromSetData S')
+    | UnionSD S1 S2 => FSet.union (fromSetData S1) (fromSetData S2)
+    | IntersectSD S1 S2 => FSet.inter (fromSetData S1) (fromSetData S2)
+    end.
+
+  Lemma to_from_NSD : forall D,
+    FSet.Equal (fromSetData (NormalSetData.from_NSD (NormalSetData.to_NSD D)))
+               (fromSetData D).
+  Proof.
+  Admitted.
+
+
+    Ltac reify_set e :=
+    lazymatch e with
+    | FSet.empty => constr:(EmptySD)
+    | FSet.add ?x ?S =>
+      let S' := reify_set S in
+      constr:(AddSD x S')
+    | FSet.remove ?x ?S =>
+      let S' := reify_set S in
+      constr:(RemoveSD x S')
+    | FSet.union ?S1 ?S2 =>
+      let S1' := reify_set S1 in
+      let S2' := reify_set S2 in
+      constr:(UnionSD S1' S2')
+    | FSet.inter ?S1 ?S2 =>
+      let S1' := reify_set S1 in
+      let S2' := reify_set S2 in
+      constr:(IntersectSD S1' S2')
+    | _ => constr:(PrimSD e)
+    end.
+
+  Lemma compare_refl : forall x,
+    E.compare x x = OrderedType.EQ (E.eq_refl x).
+  Admitted.
+
+  Ltac reflect_set' :=
+    match goal with
+    | [ |- FSet.Equal ?X1 ?X2 ] =>
+      let Y1 := reify_set X1 in
+      let Y2 := reify_set X2 in
+      try replace X1 with (fromSetData Y1) by reflexivity;
+      try replace X2 with (fromSetData Y2) by reflexivity;
+      try rewrite <- (to_from_NSD Y1);
+      try rewrite <- (to_from_NSD Y2);
+      simpl
+    end.
+  Ltac reflect_set :=
+    reflect_set';
+    try reflexivity;
+    match goal with
+    | [ |- context[E.compare ?x ?x]] =>
+      rewrite (compare_refl x);
+      simpl;
+      try reflexivity
+    end.
+
+  Example reflect_set_union_empty (x : key) :
+    FSet.Equal
+      (FSet.union (FSet.add x FSet.empty) FSet.empty)
+      (FSet.add x FSet.empty).
+  Proof.
+    reflect_set.
+  Qed.
+
+  Example reflect_set_intersect_empty (x : key) :
+    FSet.Equal
+      (FSet.inter (FSet.add x FSet.empty) FSet.empty)
+      FSet.empty.
+  Proof.
+    reflect_set.
+  Qed.
+  
+
+
+  Example reflect_set_intersect_shared_key (x : key) :
+    FSet.Equal
+      (FSet.inter (FSet.add x FSet.empty) (FSet.add x FSet.empty))
+      (FSet.add x FSet.empty).
+  Proof.
+    reflect_set.
+  Qed.
+
+  Example reflect_set_remove_added_key (x : key) :
+    FSet.Equal
+      (FSet.remove x (FSet.add x FSet.empty))
+      FSet.empty.
+  Proof.
+    reflect_set.
+  Qed.
+
+  Example reflect_set_opaque_union_empty (S : FSet.t) :
+    FSet.Equal (FSet.union S FSet.empty) S.
+  Proof.
+    reflect_set.
+  Qed.
+
+  Example reflect_set_intersect_distributes
+      (S1 S2 S3 : FSet.t) :
+    FSet.Equal
+      (FSet.inter (FSet.union S1 S2) S3)
+      (FSet.union (FSet.inter S1 S3) (FSet.inter S2 S3)).
+  Proof.
+    reflect_set.
+  Qed.
+
+  Inductive MapData {A} :=
+    | PrimD : M.t A -> MapData
+    | EmptyD : MapData
+    | AddD  : key -> A -> MapData -> MapData
+    | RemoveD : key -> MapData -> MapData
+    | SingletonD : key -> A -> MapData
+    | ConcatD : MapData -> MapData -> MapData
+    | SetMinusD : SetData -> MapData -> MapData.
+  Arguments MapData A : clear implicits.
+
+  Fixpoint fromMapData {A} (d : MapData A) : M.t A :=
+    match d with
+    | PrimD m => m
+    | EmptyD => M.empty _
+    | AddD x a M' => M.add x a (fromMapData M')
+    | RemoveD x M' => M.remove x (fromMapData M')
+    | SingletonD x a => M.add x a (M.empty _)
+    | ConcatD M1 M2 => concat (fromMapData M1) (fromMapData M2)
+    | SetMinusD X M' => setminus (fromSetData X) (fromMapData M')
+    end.
+
+
+    Ltac reify e :=
+    lazymatch e with
+    | M.empty _ => constr:(@EmptyD _)
+    | M.add ?x ?a (M.empty _) => constr:(@SingletonD _ x a)
+    | M.add ?x ?a ?m =>
+      let m' := reify m in
+      constr:(@AddD _ x a m')
+    | M.remove ?x ?m =>
+      let m' := reify m in
+      constr:(@RemoveD _ x m')
+    | concat ?m1 ?m2 =>
+      let m1' := reify m1 in
+      let m2' := reify m2 in
+      constr:(@ConcatD _ m1' m2')
+    | setminus ?S ?m =>
+      let S' := reify_set S in
+      let m' := reify m in
+      constr:(@SetMinusD _ S' m')
+    | _ => constr:(@PrimD _ e)
+    end.
+
+  End Reflection.
 
   Module Tactics.
   (**

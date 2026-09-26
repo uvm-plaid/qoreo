@@ -789,6 +789,78 @@ Proof.
 Qed.
 
 
+Lemma WellScoped_preservationC : forall I Θ ρ l I' Θ' ρ',
+  Insn.stepC I Θ ρ l I' Θ' ρ' ->
+  Insn.WellFormed I ->
+  ChorEnv.WellScoped Θ ρ ->
+  ChorEnv.WellScoped Θ' ρ'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep; intros HWT HWS;
+  try match goal with
+  | [ H : ChorEnv.Equal ?A ?B |- _ ] =>
+    rewrite H in *; clear A H
+  end; 
+  auto;
+  unfold ChorEnv.WellScoped in *.
+
+  * (* sendC *)
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
+    
+  * (* Let *) 
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
+
+  * (* LetBang *)
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
+
+  * (* LetPair *) 
+    assert (Config.WellScoped TA' cfg').
+    { eapply Expr.WellScoped_preservation; eauto. }
+    intros D. ChorEnv.simplify.
+    eapply Config.WellScoped_monotonic; eauto.
+    eapply Expr.step_dim_monotonic; eauto.
+Qed.
+
+
+Lemma WellScoped_preservationB : forall C Θ ρ l C' Θ' ρ',
+  Choreography.stepB C Θ ρ l C' Θ' ρ' ->
+  Choreography.WellFormed C ->
+  ChorEnv.WellScoped Θ ρ ->
+  ChorEnv.WellScoped Θ' ρ'.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  destruct Hstep; intros HWT HWS; subst;
+  try match goal with
+  | [ H : ChorEnv.Equal ?A ?B |- _ ] =>
+    rewrite H in *; clear A H
+  end; auto.
+  * eapply ChorEnv.WellScoped_epr; eauto.
+    inversion HWT; subst; clear HWT.
+    match goal with
+    | [ H : Insn.WellFormed (Insn.EPR _ _ _ _) |- _ ] =>
+      inversion H; subst; auto
+    end.
+  * eapply ChorEnv.WellScoped_epr; eauto.
+    inversion HWT; subst; clear HWT.
+    match goal with
+    | [ H : Insn.WellFormed (Insn.EPR _ _ _ _) |- _ ] =>
+      inversion H; subst; auto
+    end.
+Qed.
+
+
 Lemma WellScoped_preservation : forall C Θ ρ l C' Θ' ρ',
   Choreography.step C Θ ρ l C' Θ' ρ' ->
   Choreography.WellFormed C ->
@@ -802,46 +874,26 @@ Proof.
     rewrite H in *; clear A H
   end; auto.
 
-  * (* sendC *)
-    unfold ChorEnv.WellScoped in *.
+  * eapply WellScoped_preservationC; eauto.
+    inversion HWT; subst; auto.
+  * inversion HWT; subst; clear HWT.
     assert (Config.WellScoped TA' cfg').
     { eapply Expr.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
     eapply Expr.step_dim_monotonic; eauto.
-
-  * eapply ChorEnv.WellScoped_epr; eauto.
-    inversion HWT; subst; clear HWT.
-    inversion H3; subst; auto.
-  * eapply ChorEnv.WellScoped_epr; eauto.
-    inversion HWT; subst; clear HWT.
-    inversion H3; subst; auto.
-  * unfold ChorEnv.WellScoped in *.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
-  * unfold ChorEnv.WellScoped in *.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
-  * unfold ChorEnv.WellScoped in *.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
+    
+  * eapply WellScoped_preservationB; eauto.
+  * inversion HWT; subst; clear HWT.
+    apply IHHstep; auto.
   * inversion HWT; subst; clear HWT.
     apply IHHstep; auto.
 Qed.
 
 
-Lemma step_wf_label : forall C Θ ρ l C' Θ' ρ',
-  step C Θ ρ l C' Θ' ρ' ->
-  Choreography.WellFormed C ->
+Lemma stepC_wf_label : forall I Θ ρ l I' Θ' ρ',
+  Insn.stepC I Θ ρ l I' Θ' ρ' ->
+  Insn.WellFormed I ->
   Label.WellFormed l.
 Proof.
   intros ? ? ? ? ? ? ? Hstep.
@@ -850,6 +902,33 @@ Proof.
     match goal with
     | [ H : Insn.WellFormed _ |- _ ] => inversion H; subst; clear H; auto
     end.
+Qed.
+
+Lemma stepB_wf_label : forall C Θ ρ l C' Θ' ρ',
+  stepB C Θ ρ l C' Θ' ρ' ->
+  Choreography.WellFormed C ->
+  Label.WellFormed l.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep;
+  induction Hstep; inversion 1; subst;
+    try constructor;
+    match goal with
+    | [ H : Insn.WellFormed _ |- _ ] => inversion H; subst; clear H; auto
+    end.
+Qed.
+
+Lemma step_wf_label : forall C Θ ρ l C' Θ' ρ',
+  step C Θ ρ l C' Θ' ρ' ->
+  Choreography.WellFormed C ->
+  Label.WellFormed l.
+Proof.
+  intros ? ? ? ? ? ? ? Hstep.
+  induction Hstep;
+    try (eapply stepB_wf_label; eauto; fail);
+    inversion 1; subst;
+    try (eapply stepC_wf_label; eauto; fail);
+    try constructor;
+    try (apply IHHstep; auto; fail).
 Qed.
 
 (* A slew of Lemmas for manipulating environment mappings. *)
@@ -1782,11 +1861,44 @@ Module HelperLemmas.
 End HelperLemmas.
 Import HelperLemmas.
 
+
 (** * Proofs about well-typedness *)
 Lemma wt_disjoint : forall C A G D T,
     WellTyped G D T C ->
     Var.Map.Properties.Disjoint (ChorEnv.find A G) (ChorEnv.find A D).
 Proof.
+  intros ? ? ? ? ? HWT.
+  induction HWT; ChorEnv.simplify.
+  * unfold ChorEnv.Empty in *.
+    rewrite H.
+    Var.simplify.
+
+  * intros z [Hin1 Hin2].
+    Var.Map.Tactics.compare z y.
+    apply (H2 z).
+    split; auto.
+    Var.simplify.
+
+  * intros z [Hin1 Hin2].
+    Var.Map.Tactics.compare z x.
+    apply (H2 z).
+    split; auto.
+    Var.simplify.
+
+  * Var.Map.Tactics.reflect_partition.
+    rewrite Heq1.
+    Var.simplify.
+    split; auto.
+    eapply Expr.wt_disjoint; eauto.
+
+  * Var.Map.Tactics.reflect_partition.
+    rewrite Heq0.
+    Var.simplify.
+    split; auto.
+    eapply Expr.wt_disjoint; eauto.
+
+  * 
+
   intros C A.
 
   induction C as [| I C].

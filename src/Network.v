@@ -56,7 +56,13 @@ Module Insn.
 End Insn.
 
 Module Process.
-    Definition t := list Insn.t.
+    (*Definition t := list Insn.t.*)
+    Inductive t :=
+    | Empty
+    | Do : Insn.t -> t -> t
+    | If : Expr.t -> t -> t -> t -> t
+    (* TODO: BroadcastAndBranch, ReceiveAndBranch*)
+    .
 
     Fixpoint subst (x : Var.t) (v : Expr.t) (P : t) : t :=
     match P with
@@ -252,6 +258,17 @@ Fixpoint epp (p : Actor.t) (c : Choreography.t): option Process.t :=
       then conso (Insn.LetPair x1 x2 e) (epp p C)
       else epp p C
   (* | _ => None *)
+
+  | Choreography.If A e C1 C2 C =>
+    if p = A
+    then 
+      - send/broadcast e to all of the actos in C1/C2
+      - If e then epp A C1 else epp A C2 ; epp A C
+    else if p ∈ actors(C1) ∪ actors(C2)
+    then
+      - receive flag from A
+      - If flag then epp p C1 else epp p C2 ; epp p C
+    else epp p C
 end.
 
 (*
