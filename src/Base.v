@@ -2135,11 +2135,8 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
     match l with
     | [] => [k]
     | k'::l' =>
-      match E.compare k k' with
-      | OrderedType.LT _ => k::l
-      | OrderedType.EQ _ => l
-      | OrderedType.GT _ => k':: insertKey k l'
-      end
+      if E.eq_dec k k' then k'::l'
+      else k' :: insertKey k l'
     end.
     Definition addSD (x : key) (X : NSD) : NSD :=
       let (ks, Ys) := X in
@@ -2150,26 +2147,22 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
     match l with
     | [] => []
     | k'::l' => 
-      match E.compare k k' with
-      | OrderedType.LT _ => l
-      | OrderedType.EQ _ => l'
-      | OrderedType.GT _ => k':: removeKey k l'
-      end
+      if E.eq_dec k k'
+      then removeKey k l'
+      else k' :: removeKey k l'
     end.
     
   Fixpoint remove_NSD_Z k (Z : NSD_Z) :=
     match Z with
     | PrimNSD _ => RemoveNSD k Z
     | RemoveNSD k' Z' =>
-      match E.compare k k' with
-      | OrderedType.LT _ => RemoveNSD k Z
-      | OrderedType.EQ _ => Z
-      | OrderedType.GT _ => RemoveNSD k' (remove_NSD_Z k Z')
-      end
+      if E.eq_dec k k'
+      then Z
+      else RemoveNSD k' (remove_NSD_Z k Z')
     end.
   Definition remove_NSD_Y k (Y : NSD_Y) : NSD_Y :=
     List.map (remove_NSD_Z k) Y.
-  Definition remove_NSD k (X : NSD) : NSD :=
+  Definition removeSD k (X : NSD) : NSD :=
     let (l,Ys) := X in
     (removeKey k l, List.map (remove_NSD_Y k) Ys).
 
@@ -2179,35 +2172,25 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
     | k :: l1' => unionKeys l1' (insertKey k l2)
     end.
 
-  Definition union_NSD (X1 X2 : NSD) : NSD :=
+  Definition unionSD (X1 X2 : NSD) : NSD :=
     let (keys1, Ys1) := X1 in
     let (keys2, Ys2) := X2 in
     (unionKeys keys1 keys2, List.app Ys1 Ys2).
 
-  (* Return the keys in l that are strictly greater than k.
-   * Return true iff k appears in l
-   *)
-  Fixpoint seekKey (k : key) (l : list key) : (bool * list key)%type :=
-    match l with
-    | [] => (false, [])
-    | k' :: keys' =>
-        match E.compare k k' with
-        | OrderedType.LT _ => (false, l)
-        | OrderedType.EQ _ => (true, keys')
-        | OrderedType.GT _ => seekKey k keys'
-        end
-    end.
 
+  (* Intersection *)
+  Fixpoint key_in (k : key) (l : list key) : bool :=
+    match l with
+    | [] => false
+    | k' :: l' => if E.eq_dec k k' then true else key_in k l'
+    end.
   Fixpoint intersectKeys (keys1 keys2 : list key) : list key :=
     match keys1 with
     | [] => []
     | k :: keys1' =>
-        match seekKey k keys2 with
-        | (true, keys2') => (* k ∈ keys2 *)
-          k :: intersectKeys keys1' keys2'
-        | (false, keys2') => (* k ∉ keys2 *)
-          intersectKeys keys1' keys2'
-        end
+      if key_in k keys2
+      then k :: intersectKeys keys1' keys2
+      else intersectKeys keys1' keys2
     end.
 
   Definition intersectKeyY (k : key) (Y : NSD_Y) : NSD_Y :=
@@ -2224,7 +2207,7 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
 
   (* Intersect key atoms directly; distribute key/conjunction and conjunction/
      conjunction pairs while keeping each result in NSD_Y form. *)
-  Definition intersect_NSD (X1 X2 : NSD) : NSD :=
+  Definition intersectSD (X1 X2 : NSD) : NSD :=
     let (keys1, Ys1) := X1 in
     let (keys2, Ys2) := X2 in
     (intersectKeys keys1 keys2,
@@ -2249,9 +2232,9 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       | PrimSD Z => primSD Z
       | EmptySD  => emptySD
       | AddSD x X' => addSD x (to_NSD X')
-      | RemoveSD x X' => remove_NSD x (to_NSD X')
-      | UnionSD X1 X2 => union_NSD (to_NSD X1) (to_NSD X2)
-      | IntersectSD X1 X2 => intersect_NSD (to_NSD X1) (to_NSD X2)
+      | RemoveSD x X' => removeSD x (to_NSD X')
+      | UnionSD X1 X2 => unionSD (to_NSD X1) (to_NSD X2)
+      | IntersectSD X1 X2 => intersectSD (to_NSD X1) (to_NSD X2)
       end.
 
     (* From NSD to SetData *)
@@ -2261,10 +2244,15 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       | PrimNSD X => PrimSD X
       | RemoveNSD k Z' => RemoveSD k (from_NSD_Z Z')
       end.
-    Fixpoint from_NSD_Y (Y : NSD_Y) : SetData :=
+    Fixpoint from_NSD_Y_base Z (Y : NSD_Y) : SetData :=
+      match Y with
+      | [] => Z
+      | Z'::Y' => from_NSD_Y_base (IntersectSD (from_NSD_Z Z') Z) Y'
+      end.
+    Definition from_NSD_Y (Y : NSD_Y) :=
       match Y with
       | [] => EmptySD
-      | Z::Y' => IntersectSD (from_NSD_Z Z) (from_NSD_Y Y')
+      | Z :: Y' => from_NSD_Y_base (from_NSD_Z Z) Y'
       end.
     Fixpoint from_NSD_X (X : list NSD_Y) :=
       match X with
@@ -2292,11 +2280,279 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
     | IntersectSD S1 S2 => FSet.inter (fromSetData S1) (fromSetData S2)
     end.
 
-  Lemma to_from_NSD : forall D,
-    FSet.Equal (fromSetData (NormalSetData.from_NSD (NormalSetData.to_NSD D)))
-               (fromSetData D).
-  Proof.
-  Admitted.
+    Module Proof.
+
+      Lemma from_NSD_add : forall x X,
+        FSet.Equal
+          (fromSetData (NormalSetData.from_NSD (NormalSetData.addSD x X)))
+          (fromSetData (AddSD x (NormalSetData.from_NSD X))).
+      Proof.
+        intros x [keys Ys].
+        simpl.
+        assert (Hadd : forall ls k S,
+            FSet.Equal
+              (fromSetData
+                (NormalSetData.from_NSD' ls (AddSD k S)))
+              (fromSetData
+                (AddSD k (NormalSetData.from_NSD' ls S)))).
+        {
+          intros ls.
+          induction ls as [| y ls IH]; intros k S.
+          - simpl. reflexivity.
+          - simpl. rewrite IH. rewrite IH. 
+            simpl. rewrite IH.
+            simpl.
+            intros z. 
+            repeat rewrite FSetProperties.add_iff.
+            tauto.
+        }
+        assert (Hinsert : forall ls k S,
+            FSet.Equal
+              (fromSetData
+                (NormalSetData.from_NSD'
+                  (NormalSetData.insertKey k ls) S))
+              (fromSetData
+                (AddSD k (NormalSetData.from_NSD' ls S)))).
+        {
+          intros ls.
+          induction ls as [| y ls IH]; intros k S.
+          - simpl. reflexivity.
+          - simpl.
+            destruct (E.eq_dec k y) as [Heq | Hneq].
+            + rewrite Heq.
+              simpl.
+              rewrite (Hadd ls y S).
+              simpl.
+              intros z.
+              repeat rewrite FSetProperties.add_iff.
+              tauto.
+            + simpl.
+              rewrite (IH _ (AddSD y S)).
+              reflexivity.
+        }
+        apply Hinsert.
+      Qed.
+
+      Lemma from_remove_NSD_Z : forall x Z,
+            FSet.Equal
+              (fromSetData (NormalSetData.from_NSD_Z
+                (NormalSetData.remove_NSD_Z x Z)))
+              (fromSetData (RemoveSD x
+                (NormalSetData.from_NSD_Z Z))).
+      Proof.
+          intros x Z.
+          induction Z as [S | k Z IH].
+          - simpl. intros z.
+            repeat rewrite FSetProperties.remove_iff.
+            tauto.
+          - simpl.
+            destruct (E.eq_dec x k) as [Heq | Hneq].
+            + rewrite Heq. simpl. intros z.
+              repeat rewrite FSetProperties.remove_iff.
+              tauto.
+            + simpl. rewrite IH. simpl.
+              intros z. repeat rewrite FSetProperties.remove_iff.
+              tauto.
+      Qed.
+      Lemma from_remove_NSD_Y_base : forall x (A B : SetData) Y,
+              FSet.Equal (fromSetData A)
+                (fromSetData (RemoveSD x B)) ->
+              FSet.Equal
+                (fromSetData
+                  (NormalSetData.from_NSD_Y_base A
+                    (List.map (NormalSetData.remove_NSD_Z x) Y)))
+                (fromSetData
+                  (RemoveSD x
+                    (NormalSetData.from_NSD_Y_base B Y))).
+          {
+            intros x A0 B0 Y.
+            revert A0 B0.
+            induction Y as [| Z Y IH].
+            - intros A0 B0 HAB. simpl. exact HAB.
+            - intros A0 B0 HAB. simpl.
+              apply (IH
+                (IntersectSD
+                  (NormalSetData.from_NSD_Z
+                    (NormalSetData.remove_NSD_Z x Z)) A0)
+                (IntersectSD (NormalSetData.from_NSD_Z Z) B0)).
+              simpl.
+              rewrite from_remove_NSD_Z. simpl.
+              rewrite HAB. simpl.
+              intros z.
+              repeat rewrite FSetProperties.remove_iff.
+              repeat rewrite FSetProperties.inter_iff.
+              repeat rewrite FSetProperties.remove_iff.
+              tauto.
+          }
+      Qed.
+      Lemma from_remove_NSD_Y : forall x Y,
+            FSet.Equal
+              (fromSetData (NormalSetData.from_NSD_Y
+                (List.map (NormalSetData.remove_NSD_Z x) Y)))
+              (fromSetData (RemoveSD x
+                (NormalSetData.from_NSD_Y Y))).
+      Proof.
+        intros x [| Z Y].
+          - simpl. intros z.
+            rewrite FSetProperties.remove_iff.
+            rewrite FSetProperties.empty_iff.
+            tauto.
+          - simpl. apply from_remove_NSD_Y_base.
+            apply from_remove_NSD_Z.
+      Qed.
+
+      Lemma from_remove_NSD_X : forall x Ys,
+            FSet.Equal
+              (fromSetData (NormalSetData.from_NSD_X
+                (List.map (List.map (NormalSetData.remove_NSD_Z x)) Ys)))
+              (fromSetData (RemoveSD x
+                (NormalSetData.from_NSD_X Ys))).
+      Proof.
+          intros x Ys.
+          induction Ys as [| Y Ys IH].
+          - simpl. intros z.
+            repeat rewrite FSetProperties.remove_iff.
+            rewrite FSetProperties.empty_iff.
+            tauto.
+          - simpl. rewrite from_remove_NSD_Y.
+            rewrite IH. simpl.
+            intros z.
+            repeat rewrite FSetProperties.union_iff.
+            repeat rewrite FSetProperties.remove_iff.
+            repeat rewrite FSetProperties.union_iff.
+            tauto.
+      Qed.
+
+      Lemma from_NSD'_iff : forall ls z X,
+        FSet.In z (fromSetData (NormalSetData.from_NSD' ls X))
+        <->
+        SetoidList.InA E.eq z ls \/ FSet.In z (fromSetData X).
+      Proof.
+        induction ls as [ | k ls]; intros z X; simpl.
+        * rewrite SetoidList.InA_nil.
+          tauto.
+        * rewrite IHls.
+          simpl.
+          rewrite FSetProperties.add_iff.
+          rewrite SetoidList.InA_cons.
+          intuition.
+      Qed.
+
+      Lemma in_removeKey_iff : forall ls x z,
+        SetoidList.InA E.eq z (NormalSetData.removeKey x ls)
+        <->
+        SetoidList.InA E.eq z ls /\ ~ E.eq x z.
+      Proof.
+        induction ls as [ | k ls]; intros x z; simpl.
+        * rewrite SetoidList.InA_nil. tauto.
+        * rewrite SetoidList.InA_cons.
+          Proofs.compare x k.
+          + rewrite IHls. intuition.
+          + rewrite SetoidList.InA_cons.
+            rewrite IHls.
+            intuition.
+            rewrite <- H in H0.
+            auto.
+      Qed.
+
+      Lemma from_remove_NSD' : forall x ls X,
+        ~ FSet.In x (fromSetData X) ->
+        FSet.Equal
+          (fromSetData (NormalSetData.from_NSD' (NormalSetData.removeKey x ls) X))
+          (fromSetData (RemoveSD x (NormalSetData.from_NSD' ls X))).
+      Proof.
+        intros x ls.
+        induction ls as [ | k ls']; intros X Hin.
+        * simpl. intros z.
+          repeat rewrite FSetProperties.remove_iff.
+          Proofs.compare x z.
+          + tauto.
+          + tauto.
+        * simpl. Proofs.compare x k.
+          + rewrite IHls'; auto.
+            simpl.
+            intros z.
+            repeat rewrite FSetProperties.remove_iff.
+            repeat rewrite from_NSD'_iff.
+            simpl.
+            repeat rewrite FSetProperties.add_iff.
+            rewrite Heq.
+            tauto.
+          + simpl.
+            intros z.
+            repeat rewrite FSetProperties.remove_iff.
+            repeat rewrite from_NSD'_iff.
+            simpl.
+            repeat rewrite FSetProperties.add_iff.
+            rewrite in_removeKey_iff.
+            intuition.
+            { apply Heq. rewrite H. auto. }
+            { rewrite <- H0 in H. contradiction. }
+      Qed. 
+
+      Lemma from_NSD_remove : forall x X,
+        FSet.Equal
+          (fromSetData (NormalSetData.from_NSD (NormalSetData.removeSD x X)))
+          (fromSetData (RemoveSD x (NormalSetData.from_NSD X))).
+      Proof.
+        intros x [keys Ys].
+        simpl.
+        unfold NormalSetData.remove_NSD_Y.
+        rewrite from_remove_NSD'.
+        2:{
+          rewrite from_remove_NSD_X.
+          simpl.
+          rewrite FSetProperties.remove_iff.
+          intros [? H].
+          apply H. reflexivity.
+        }
+        simpl.
+        intros z.
+        repeat rewrite FSetProperties.remove_iff.
+        repeat rewrite from_NSD'_iff.
+        rewrite from_remove_NSD_X.
+        simpl.
+        repeat rewrite FSetProperties.remove_iff.
+        tauto.
+      Qed.
+
+      
+      Lemma from_NSD_union : forall X1 X2,
+        FSet.Equal
+          (fromSetData (NormalSetData.from_NSD (NormalSetData.unionSD X1 X2)))
+          (fromSetData (UnionSD (NormalSetData.from_NSD X1) (NormalSetData.from_NSD X2))).
+      Admitted.
+      Lemma from_NSD_intersect : forall X1 X2,
+        FSet.Equal
+          (fromSetData (NormalSetData.from_NSD (NormalSetData.intersectSD X1 X2)))
+          (fromSetData (IntersectSD (NormalSetData.from_NSD X1) (NormalSetData.from_NSD X2))).
+      Admitted.
+
+      Lemma to_from_NSD : forall D,
+        FSet.Equal (fromSetData (NormalSetData.from_NSD (NormalSetData.to_NSD D)))
+                  (fromSetData D).
+      Proof.
+        induction D.
+        * simpl.
+          intros z.
+          rewrite FSetProperties.union_iff.
+          rewrite FSetProperties.empty_iff.
+          intuition.
+
+        * simpl. reflexivity.
+        * simpl. rewrite from_NSD_add.
+          simpl. rewrite IHD. reflexivity.
+        * simpl. rewrite from_NSD_remove.
+          simpl. rewrite IHD.
+          reflexivity.
+        * simpl. rewrite from_NSD_union.
+          simpl. rewrite IHD1, IHD2.
+          reflexivity. 
+        * simpl. rewrite from_NSD_intersect.
+          simpl. rewrite IHD1, IHD2.
+          reflexivity. 
+      Qed.
+    End Proof.
 
 
     Ltac reify_set e :=
@@ -2337,7 +2593,7 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   Ltac reflect_set :=
     reflect_set';
     try reflexivity;
-    match goal with
+    try match goal with
     | [ |- context[E.compare ?x ?x]] =>
       rewrite (compare_refl x);
       simpl;
@@ -2361,7 +2617,6 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   Qed.
   
 
-
   Example reflect_set_intersect_shared_key (x : key) :
     FSet.Equal
       (FSet.inter (FSet.add x FSet.empty) (FSet.add x FSet.empty))
@@ -2375,6 +2630,16 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
       (FSet.remove x (FSet.add x FSet.empty))
       FSet.empty.
   Proof.
+    reflect_set.
+  Qed.
+
+  Example reflect_set_remove_added_key' (x y : key) Z :
+    x <> y ->
+    FSet.Equal
+      (FSet.remove x (FSet.add y (FSet.add x Z)))
+      (FSet.add y (FSet.remove x Z)).
+  Proof.
+    intros.
     reflect_set.
   Qed.
 
