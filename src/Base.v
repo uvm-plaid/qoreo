@@ -3017,26 +3017,180 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
     end.
 
 
+  (** Normal form for maps, evaluated by [find]: a priority list of items;
+      the first item that yields [Some] wins. *)
+  Module NormalMapData.
+    Inductive Item {A} :=
+      | EntryI : key -> A -> Item
+      | PrimI : M.t A -> list key -> Item. (* map with masked keys *)
+    Arguments Item A : clear implicits.
+    Definition NMD A := list (Item A).
+
+    Definition evalItem {A} (it : Item A) (k : key) : option A :=
+      match it with
+      | EntryI x a => if E.eq_dec k x then Some a else None
+      | PrimI p ms => if NormalSetData.key_in k ms then None else M.find k p
+      end.
+
+    Fixpoint lookup {A} (l : NMD A) (k : key) : option A :=
+      match l with
+      | [] => None
+      | it :: l' =>
+        match evalItem it k with
+        | Some a => Some a
+        | None => lookup l' k
+        end
+      end.
+
+    Fixpoint removeN {A} (x : key) (l : NMD A) : NMD A :=
+      match l with
+      | [] => []
+      | EntryI k a :: l' =>
+        if E.eq_dec k x then removeN x l' else EntryI k a :: removeN x l'
+      | PrimI p ms :: l' => PrimI p (x :: ms) :: removeN x l'
+      end.
+
+    Definition addN {A} (x : key) (a : A) (l : NMD A) : NMD A :=
+      EntryI x a :: removeN x l.
+    Arguments addN : simpl never.
+
+    Definition concatN {A} (l1 l2 : NMD A) : NMD A := l1 ++ l2.
+
+    Fixpoint norm {A} (d : MapData A) : NMD A :=
+      match d with
+      | PrimD m => [PrimI m []]
+      | EmptyD => []
+      | AddD x a d' => addN x a (norm d')
+      | RemoveD x d' => removeN x (norm d')
+      | SingletonD x a => [EntryI x a]
+      | ConcatD d1 d2 => concatN (norm d1) (norm d2)
+      | SetMinusD X d' => [PrimI (setminus (fromSetData X) (fromMapData d')) []]
+      end.
+
+    Lemma lookup_removeN : forall A (l : NMD A) x k,
+      lookup (removeN x l) k = if E.eq_dec k x then None else lookup l k.
+    Proof.
+      induction l as [|[k' a|p ms] l IH]; intros x k; simpl.
+      - destruct (E.eq_dec k x); auto.
+      - destruct (E.eq_dec k' x) as [Hk'x|Hk'x].
+        + rewrite IH.
+          destruct (E.eq_dec k x) as [Hkx|Hkx]; auto.
+          destruct (E.eq_dec k k') as [Hkk'|Hkk']; auto.
+          exfalso. apply Hkx. eapply E.eq_trans; eauto.
+        + simpl. destruct (E.eq_dec k k') as [Hkk'|Hkk'].
+          * destruct (E.eq_dec k x) as [Hkx|Hkx]; auto.
+            exfalso. apply Hk'x. eapply E.eq_trans; [apply E.eq_sym|]; eauto.
+          * rewrite IH. reflexivity.
+      - simpl. rewrite IH. destruct (E.eq_dec k x); reflexivity.
+    Qed.
+
+    Lemma lookup_app : forall A (l1 l2 : NMD A) k,
+      lookup (l1 ++ l2) k = match lookup l1 k with Some a => Some a | None => lookup l2 k end.
+    Proof.
+      induction l1 as [|it l1 IH]; intros; simpl; auto.
+      destruct (evalItem it k); auto.
+    Qed.
+
+    Lemma lookup_addN : forall A x (a : A) l k,
+      lookup (addN x a l) k = if E.eq_dec k x then Some a else lookup l k.
+    Proof.
+      intros. unfold addN. simpl.
+      destruct (E.eq_dec k x); auto.
+      rewrite lookup_removeN. destruct (E.eq_dec k x); auto; contradiction.
+    Qed.
+
+    Lemma find_norm : forall A (d : MapData A) z,
+      M.find z (fromMapData d) = lookup (norm d) z.
+    Proof.
+      induction d as [m| |k a d IHd|k d IHd|k a|d1 IHd1 d2 IHd2|X d IHd]; intros z; simpl norm; simpl fromMapData.
+      - simpl lookup. destruct (M.find z m); reflexivity.
+      - apply F.empty_o.
+      - rewrite lookup_addN, F.add_o, <- IHd.
+        destruct (E.eq_dec z k), (F.eq_dec k z); try reflexivity;
+          exfalso; firstorder using E.eq_sym.
+      - rewrite lookup_removeN, F.remove_o, <- IHd.
+        destruct (E.eq_dec z k), (F.eq_dec k z); try reflexivity;
+          exfalso; firstorder using E.eq_sym.
+      - simpl lookup. rewrite F.add_o, F.empty_o.
+        destruct (E.eq_dec z k), (F.eq_dec k z); try reflexivity;
+          exfalso; firstorder using E.eq_sym.
+      - unfold concatN. rewrite Proofs.concat_find, lookup_app, IHd1, IHd2. reflexivity.
+      - simpl lookup. destruct (M.find z (setminus (fromSetData X) (fromMapData d)));
+          reflexivity.
+    Qed.
+
+    Lemma equal_of_lookup : forall A (d1 d2 : MapData A),
+      (forall k, lookup (norm d1) k = lookup (norm d2) k) ->
+      M.Equal (fromMapData d1) (fromMapData d2).
+    Proof.
+      intros A d1 d2 H k. rewrite !find_norm. apply H.
+    Qed.
+  End NormalMapData.
+
+
     Ltac reify e :=
-    lazymatch e with
-    | M.empty _ => constr:(@EmptyD _)
-    | M.add ?x ?a (M.empty _) => constr:(@SingletonD _ x a)
-    | M.add ?x ?a ?m =>
-      let m' := reify m in
-      constr:(@AddD _ x a m')
-    | M.remove ?x ?m =>
-      let m' := reify m in
-      constr:(@RemoveD _ x m')
-    | concat ?m1 ?m2 =>
-      let m1' := reify m1 in
-      let m2' := reify m2 in
-      constr:(@ConcatD _ m1' m2')
-    | setminus ?S ?m =>
-      let S' := reify_set S in
-      let m' := reify m in
-      constr:(@SetMinusD _ S' m')
-    | _ => constr:(@PrimD _ e)
+    lazymatch type of e with
+    | M.t ?A =>
+      lazymatch e with
+      | M.empty _ => constr:(@EmptyD A)
+      | M.add ?x ?a (M.empty _) => constr:(@SingletonD A x a)
+      | M.add ?x ?a ?m =>
+        let m' := reify m in
+        constr:(@AddD A x a m')
+      | M.remove ?x ?m =>
+        let m' := reify m in
+        constr:(@RemoveD A x m')
+      | concat ?m1 ?m2 =>
+        let m1' := reify m1 in
+        let m2' := reify m2 in
+        constr:(@ConcatD A m1' m2')
+      | setminus ?S ?m =>
+        let S' := reify_set S in
+        let m' := reify m in
+        constr:(@SetMinusD A S' m')
+      | _ => constr:(@PrimD A e)
+      end
     end.
+
+  Ltac reflect_map' :=
+    match goal with
+    | [ |- M.Equal ?m1 ?m2 ] =>
+      let d1 := reify m1 in
+      let d2 := reify m2 in
+      change (M.Equal (fromMapData d1) (fromMapData d2));
+      apply NormalMapData.equal_of_lookup; intro z;
+      simpl NormalMapData.norm; unfold NormalMapData.addN;
+      simpl NormalMapData.removeN; simpl NormalMapData.lookup
+    end.
+
+  Ltac reflect_map :=
+    reflect_map';
+    repeat (Proofs.reduce_eq_dec; simpl);
+    try reflexivity;
+    try (exfalso; eauto using E.eq_sym, E.eq_trans).
+
+  Example reflect_map_add_remove {A} (x : key) (a : A) (m : M.t A) :
+    M.Equal (M.remove x (M.add x a m)) (M.remove x m).
+  Proof. reflect_map. Qed.
+
+  Example reflect_map_add_add {A} (x : key) (a b : A) (m : M.t A) :
+    M.Equal (M.add x a (M.add x b m)) (M.add x a m).
+  Proof. reflect_map. Qed.
+
+  Example reflect_map_concat_empty {A} (m : M.t A) :
+    M.Equal (concat m (M.empty A)) m.
+  Proof. reflect_map. Qed.
+
+  Example reflect_map_add_comm {A} (x y : key) (a b : A) (m : M.t A) :
+    ~ E.eq x y ->
+    M.Equal (M.add x a (M.add y b m)) (M.add y b (M.add x a m)).
+  Proof.
+    intros. reflect_map.
+  Qed.
+
+  Example reflect_map_concat_add {A} (x : key) (a : A) (m1 m2 : M.t A) :
+    M.Equal (concat (M.add x a m1) m2) (M.add x a (concat m1 m2)).
+  Proof. reflect_map. Qed.
 
   End Reflection.
 
