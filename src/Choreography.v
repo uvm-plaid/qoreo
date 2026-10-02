@@ -19,7 +19,8 @@ Theorems:
 *)
 
 From Qoreo Require Import Base.
-From Qoreo Require Expr.
+From Qoreo Require Expr.Expr Expr.Proofs.
+
 
 From Stdlib Require Import Structures.Equalities.
 From Stdlib Require Import Program.Equality.
@@ -806,31 +807,31 @@ Proof.
 
   * (* sendC *)
     assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
+    { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
+    eapply Expr.BaseProofs.step_dim_monotonic; eauto.
     
   * (* Let *) 
     assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
+    { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
+    eapply Expr.BaseProofs.step_dim_monotonic; eauto.
 
   * (* LetBang *)
     assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
+    { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
+    eapply Expr.BaseProofs.step_dim_monotonic; eauto.
 
   * (* LetPair *) 
     assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
+    { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
+    eapply Expr.BaseProofs.step_dim_monotonic; eauto.
 Qed.
 
 
@@ -878,10 +879,10 @@ Proof.
     inversion HWT; subst; auto.
   * inversion HWT; subst; clear HWT.
     assert (Config.WellScoped TA' cfg').
-    { eapply Expr.WellScoped_preservation; eauto. }
+    { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.step_dim_monotonic; eauto.
+    eapply Expr.BaseProofs.step_dim_monotonic; eauto.
     
   * eapply WellScoped_preservationB; eauto.
   * inversion HWT; subst; clear HWT.
@@ -1889,19 +1890,19 @@ Proof.
     rewrite Heq1.
     Var.simplify.
     split; auto.
-    eapply Expr.wt_disjoint; eauto.
+    eapply Expr.BaseProofs.wt_disjoint; eauto.
 
   * Var.Map.Tactics.reflect_partition.
     rewrite Heq0.
     Var.simplify.
     split; auto.
-    eapply Expr.wt_disjoint; eauto.
+    eapply Expr.BaseProofs.wt_disjoint; eauto.
 
   * Var.Map.Tactics.reflect_partition.
     rewrite Heq0.
     Var.simplify.
     split.
-    { eapply Expr.wt_disjoint; eauto. }
+    { eapply Expr.BaseProofs.wt_disjoint; eauto. }
     { 
       intros z [Hin1 Hin2].
       Var.Map.Tactics.compare x z.
@@ -1914,7 +1915,7 @@ Proof.
     rewrite Heq0.
     Var.simplify.
     split; auto.
-    { eapply Expr.wt_disjoint; eauto. }
+    { eapply Expr.BaseProofs.wt_disjoint; eauto. }
     { 
       intros z [Hin1 Hin2].
       Var.Map.Tactics.compare z x1.
@@ -1928,7 +1929,7 @@ Proof.
     rewrite Heq0.
     Var.simplify.
     repeat split; auto.
-    eapply Expr.wt_disjoint; eauto.
+    eapply Expr.BaseProofs.wt_disjoint; eauto.
 Qed.
 
 Lemma weakening_gen : forall C G D T G0,
@@ -1971,7 +1972,7 @@ Lemma weakening_gen : forall C G D T G0,
       pose proof (partition_dj
                     (ChorEnv.find A G0) (ChorEnv.find A D)
                     DeltaA1 DeltaA2 HEB H1) as HPDJ.
-      pose proof (Expr.weakening_gen
+      pose proof (Expr.Weakening.weakening_gen
                     (ChorEnv.find A G0) (ChorEnv.find A G)
                     DeltaA1 ThetaA1 e (Expr.BANG tau) H0
                     (ChorEnv.find A G') HEA HPDJ) as HEWG.
@@ -1999,7 +2000,7 @@ Lemma weakening_gen : forall C G D T G0,
       pose proof (partition_dj
                     (ChorEnv.find A G0) (ChorEnv.find A D)
                     DeltaA1 DeltaA2 HEB H0) as HPDJ.
-      pose proof (Expr.weakening_gen
+      pose proof (Expr.Weakening.weakening_gen
                     (ChorEnv.find A G0) (ChorEnv.find A G)
                     DeltaA1 ThetaA1 e (Expr.BANG tau) H
                     (ChorEnv.find A G') HEA HPDJ) as HEWG.
@@ -2030,7 +2031,7 @@ Lemma weakening_gen : forall C G D T G0,
                     (ChorEnv.find A G0) (ChorEnv.find A D)
                     DeltaA1 DeltaA2 HEAB H0) as Hpdj.
       eapply LetIn.
-      { eapply (Expr.weakening_gen
+      { eapply (Expr.Weakening.weakening_gen
                   (ChorEnv.find A G0)
                   (ChorEnv.find A G)
                   DeltaA1 ThetaA1 e tau H
@@ -2061,7 +2062,7 @@ Lemma weakening_gen : forall C G D T G0,
                     (ChorEnv.find A G0) (ChorEnv.find A D)
                     DeltaA1 DeltaA2 HEAB H0) as Hpdj.
       eapply LetPair.
-      { eapply (Expr.weakening_gen
+      { eapply (Expr.Weakening.weakening_gen
                   (ChorEnv.find A G0)
                   (ChorEnv.find A G)
                   DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) H
@@ -2104,7 +2105,7 @@ Lemma weakening_gen : forall C G D T G0,
       pose proof (partition_dj
                     (ChorEnv.find A G0) (ChorEnv.find A D)
                     DeltaA1 DeltaA' HEB H0) as HPDJ.
-      pose proof (Expr.weakening_gen
+      pose proof (Expr.Weakening.weakening_gen
                     (ChorEnv.find A G0) (ChorEnv.find A G)
                     DeltaA1 ThetaA1 e Expr.BIT H
                     (ChorEnv.find A G') HEA HPDJ) as HEWG.
@@ -4027,7 +4028,7 @@ Qed.
 
 
 (** Weakening *)
-Lemma step_weakening' : forall C T1 cfg l C' T1' cfg',
+Lemma cfg_weakening' : forall C T1 cfg l C' T1' cfg',
     step C T1 cfg l C' T1' cfg' ->
 
     Label.WellFormed l ->
@@ -4050,7 +4051,7 @@ Proof.
       apply SendC with (TA' := (Var.Map.concat Theta TA')).
       2:{ intros D. ChorEnv.simplify. }
 
-      eapply Expr.step_weakening_2; eauto.
+      eapply Expr.cfg_weakening_2; eauto.
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
 
@@ -4120,7 +4121,7 @@ Proof.
       econstructor; eauto.
       2:{ ChorEnv.simplify. }
 
-      eapply Expr.step_weakening_2; eauto.
+      eapply Expr.cfg_weakening_2; eauto.
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
 
@@ -4142,7 +4143,7 @@ Proof.
       econstructor; eauto.
       2:{ ChorEnv.simplify. }
 
-      eapply Expr.step_weakening_2; eauto.
+      eapply Expr.cfg_weakening_2; eauto.
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
 
@@ -4164,7 +4165,7 @@ Proof.
       econstructor; eauto.
       2:{ ChorEnv.simplify. }
 
-      eapply Expr.step_weakening_2; eauto.
+      eapply Expr.cfg_weakening_2; eauto.
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
       { Var.Map.Tactics.reflect_partition; eauto. ChorEnv.simplify. }
 
@@ -4184,8 +4185,8 @@ Proof.
     eapply IHHstep; eauto; reflexivity.
 Qed.
 
-(* This version of step_weakening is equivalent to the previous one, but appears to be easier to use in practice *)
-Lemma step_weakening : forall C T1 cfg l C' T1' cfg',
+(* This version of cfg_weakening is equivalent to the previous one, but appears to be easier to use in practice *)
+Lemma cfg_weakening : forall C T1 cfg l C' T1' cfg',
     step C T1 cfg l C' T1' cfg' ->
 
     Choreography.WellFormed C ->
@@ -4200,7 +4201,7 @@ Lemma step_weakening : forall C T1 cfg l C' T1' cfg',
 Proof.
   intros.
   Var.Map.Tactics.reflect_partition.
-  eapply step_weakening'; eauto.
+  eapply cfg_weakening'; eauto.
   { eapply step_wf_label; eauto. }
   { intros D. ChorEnv.simplify. }
   { intros D. ChorEnv.simplify. }
@@ -4881,13 +4882,13 @@ Proof.
           (* WTS exists T2'', C / T1' -l-> C' / ??? *)
           (* Because A ∉ l, we know exists ThetaA, T[A] == T1'[A]+ThetaA *)
 
-          (* step_weakening says that because
+          (* cfg_weakening says that because
              T1'[A] == ThetaA1 ++ ThetaA2 == ThetaA1 ++ (T1',A[ThetaA2])[A],
              and C / (T1',A[ThetaA2]) -l-> C' / T2',
              then whenever ???[A] = ThetaA1 ++ T2'[A],
              then we can conclude that C / T1' -l-> C' / ???
           *)
-          eapply step_weakening with (A0 := A)
+          eapply cfg_weakening with (A0 := A)
                                      (T1 := Actor.Map.add A ThetaA2 T1')
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
             eauto;
@@ -5100,7 +5101,7 @@ Proof.
         assert (HWF : Choreography.WellFormed C).
         { inversion HWT; subst. eapply WellTyped_WellFormed; eauto. }
 
-        pose proof (step_weakening
+        pose proof (cfg_weakening
                       C (Actor.Map.add A ThetaA2 T1') cfg l C' T2 cfg'
                       IHHstepA
                       HWF
@@ -5257,13 +5258,13 @@ Proof.
           (* WTS exists T2'', C / T1' -l-> C' / ??? *)
           (* Because A ∉ l, we know exists ThetaA, T[A] == T1'[A]+ThetaA *)
 
-          (* step_weakening says that because
+          (* cfg_weakening says that because
              T1'[A] == ThetaA1 ++ ThetaA2 == ThetaA1 ++ (T1',A[ThetaA2])[A],
              and C / (T1',A[ThetaA2]) -l-> C' / T2',
              then whenever ???[A] = ThetaA1 ++ T2'[A],
              then we can conclude that C / T1' -l-> C' / ???
           *)
-          eapply step_weakening with (A0 := A)
+          eapply cfg_weakening with (A0 := A)
                                      (T1 := Actor.Map.add A ThetaA2 T1')
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
             eauto;
@@ -5416,13 +5417,13 @@ Proof.
           (* WTS exists T2'', C / T1' -l-> C' / ??? *)
           (* Because A ∉ l, we know exists ThetaA, T[A] == T1'[A]+ThetaA *)
 
-          (* step_weakening says that because
+          (* cfg_weakening says that because
              T1'[A] == ThetaA1 ++ ThetaA2 == ThetaA1 ++ (T1',A[ThetaA2])[A],
              and C / (T1',A[ThetaA2]) -l-> C' / T2',
              then whenever ???[A] = ThetaA1 ++ T2'[A],
              then we can conclude that C / T1' -l-> C' / ???
           *)
-          eapply step_weakening with (A0 := A)
+          eapply cfg_weakening with (A0 := A)
                                      (T1 := Actor.Map.add A ThetaA2 T1')
                                      (T2' := Actor.Map.add A (Var.Map.concat ThetaA1 (ChorEnv.find A T2')) T2');
             eauto;
@@ -6674,7 +6675,7 @@ Proof.
                          ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
                          Hscoped H2 HeprogR)) as Hstepscope.
 
-        pose proof (Expr.step_weakening_1
+        pose proof (Expr.cfg_weakening_1
                       ThetaA1 ThetaA1' ThetaA2 e
                       (ChorEnv.find A T) cfg1 e'
                       (Var.Map.concat ThetaA1' ThetaA2)
@@ -6743,7 +6744,7 @@ Proof.
                          ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
                          Hscoped H1 HeprogR)) as Hstepscope.
 
-        pose proof (Expr.step_weakening_1
+        pose proof (Expr.cfg_weakening_1
                       ThetaA1 ThetaA1' ThetaA2 e
                       (ChorEnv.find A T) cfg1 e'
                       (Var.Map.concat ThetaA1' ThetaA2)
@@ -6808,7 +6809,7 @@ Proof.
                          ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
                          Hscoped H1 HeprogR)) as Hstepscope.
 
-        pose proof (Expr.step_weakening_1
+        pose proof (Expr.cfg_weakening_1
                       ThetaA1 ThetaA1' ThetaA2 e
                       (ChorEnv.find A T) cfg1 e'
                       (Var.Map.concat ThetaA1' ThetaA2)
@@ -6878,7 +6879,7 @@ Proof.
                          ThetaA2 e ThetaA1 cfg1 e' ThetaA1' cfg2
                          Hscoped H1 HeprogR)) as Hstepscope.
 
-        pose proof (Expr.step_weakening_1
+        pose proof (Expr.cfg_weakening_1
                       ThetaA1 ThetaA1' ThetaA2 e
                       (ChorEnv.find A T) cfg1 e'
                       (Var.Map.concat ThetaA1' ThetaA2)
