@@ -12,7 +12,8 @@
 
 From Stdlib Require Import FSets.FMapList FSets.FSetList FSets.FMapFacts OrderedType OrderedTypeEx.
 From QuantumLib Require Import Matrix Pad Quantum.
-From Qoreo Require Import Base.
+From Qoreo.Base Require Var Config.
+Import Config.Unitary.
 Import Var.Map.Tactics.
 
 

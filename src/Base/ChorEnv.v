@@ -4,7 +4,6 @@ From Stdlib Require Import String Morphisms (* for Proper *).
 Require Import Setoid. (* for setoid_replace with *)
 From Qoreo.Base Require Var Actor Config.
 
-Module ChorEnv.
     Definition t T := Actor.Map.t (Var.Map.t T).
     
     Definition find {T} (A : Actor.t) (G : t T) : Var.Map.t T :=
@@ -559,4 +558,3 @@ Module ChorEnv.
   Qed.
 
 
-End ChorEnv.

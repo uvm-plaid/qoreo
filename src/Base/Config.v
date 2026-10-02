@@ -3,9 +3,11 @@ From Stdlib Require Import String Morphisms (* for Proper *).
 Require Import Setoid. (* for setoid_replace with *)
 From Qoreo.Base Require Var.
 
+Module Unitary.
 Inductive unitary :=
 | H | X | Y | Z | CNOT | SGATE | Sdag | TGATE | Tdag.
-
+End Unitary.
+Import Unitary.
   
   Record t := {
     dim : nat;

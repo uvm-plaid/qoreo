@@ -1,7 +1,5 @@
 -Q src Qoreo
 -Q examples QoreoExamples
--Q src/Expr Qoreo.Expr
--Q src/Base Qoreo.Base
 
 src/Base/Map.v
 src/Base/Var.v
@@ -9,16 +7,24 @@ src/Base/Actor.v
 src/Base/Config.v
 src/Base/ChorEnv.v
 
-src/expr/Expr.v
-src/expr/BaseProofs.v
-src/expr/Weakening.v
-src/expr/Substitution.v
-src/expr/Preservation.v
-src/expr/Progress.v
-src/expr/Safety.v
-src/expr/Proofs.v
+src/Expr/Expr.v
+src/Expr/BaseProofs.v
+src/Expr/Weakening.v
+src/Expr/Substitution.v
+src/Expr/Preservation.v
+src/Expr/Progress.v
+src/Expr/Safety.v
+src/Expr/Proofs.v
 
-src/Choreography.v
+src/Choreography/Choreography.v
+src/Choreography/BaseProofs.v
+src/Choreography/Preservation.v
+src/Choreography/Lemmas.v
+src/Choreography/Progress.v
+src/Choreography/Proofs.v
+src/Choreography/Substitution.v
+src/Choreography/Weakening.v
+
 src/Network.v
 src/NetQasm.v
 examples/Notation.v

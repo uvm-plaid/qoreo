@@ -1,2 +1,2 @@
-From Qoreo Require Base.
-From Qoreo.Expr Require Export Expr BaseProofs Weakening Substitution Preservation Progress Safety.
+From Qoreo.Base Require Var Config.
+From Qoreo.Expr Require Expr BaseProofs Weakening Substitution Preservation Progress Safety.

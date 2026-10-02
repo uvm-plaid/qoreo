@@ -12,7 +12,7 @@
 
 From Stdlib Require Export FSets.FMapList FSets.FSetList FSets.FMapFacts OrderedType OrderedTypeEx.
 From QuantumLib Require Export Matrix Pad Quantum.
-From Qoreo Require Export Base Expr.Expr.
+From Qoreo Require Export Expr.Expr.
 Export Var.Map.Tactics.
 
 
