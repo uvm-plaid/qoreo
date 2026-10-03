@@ -555,6 +555,33 @@ Proof.
 Qed.
 
 
+
+Lemma concat_inversion_eq : forall {X} (m m1 m2 : Var.Map.t X),
+  Var.Map.Properties.Disjoint m m1 ->
+  Var.Map.Properties.Disjoint m m2 ->
+  Var.Map.Equal (Var.Map.concat m m1) (Var.Map.concat m m2) ->
+  Var.Map.Equal m1 m2.
+Proof.
+  intros X m m1 m2 H1 H2 Heq.
+  intros z.
+  specialize (Heq z).
+  Search Map.find Map.concat.
+  repeat rewrite Map.Proofs.concat_find in Heq.
+  destruct (Map.find z m) as [v | ] eqn:Hfind; auto.
+  { (* z ∈ m ==> z ∉ m1 /\ z ∉ m2 *)
+    destruct (Map.find z m1) as [v1 | ] eqn:Hfind1.
+    { (* contradiction *)
+      exfalso. apply (H1 z). Var.solve.
+    }
+    destruct (Map.find z m2) as [v2 | ] eqn:Hfind2.
+    { (* contradiction *)
+      exfalso. apply (H2 z). Var.solve.
+    }
+    auto.
+  }
+Qed.
+
+
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
     ChorEnv.WellScoped T1 cfg1 ->    
@@ -565,332 +592,6 @@ Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
         step C1 T1' cfg1 l C2 T2' cfg2 /\
           Step_partition_pairs T1 T1' T2 T2'.
 Proof.
-  (*
-  intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
-  induction Hstep.
-
-  (* Case SendC *)
-  - intros HWS G D T1' HPex HWT.
-
-    inversion HWT; subst.
-
-    unfold Partition_except in HPex.
-    destruct HPex as [HPexA HPexB].
-    
-    exists (Actor.Map.add A TA' T1').
-    split.
-    {
-      eapply SendC.
-      {
-        assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-        { unfold Label.actors; Actor.simplify. }          
-        specialize (HPexB A HAinl).
-        rewrite <- HPexB.
-        eauto.
-      }
-      {
-        assert (ChorEnv.Equal (Actor.Map.add A TA' T1') (Actor.Map.add A TA' T1')).
-        Var.simplify.
-        eauto.
-      }
-    }
-    {
-      unfold Step_partition_pairs.
-      intros.
-      rewrite H0.
-      
-      assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
-      tauto.
-      {
-        assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-        { unfold Label.actors; Actor.simplify. }          
-        specialize (HPexB A HAinl).   
-        rewrite <- HAeqA0 in *.
-        rewrite HPexB in H1.
-        pose proof (partition_lopsided  (ChorEnv.find A T1') Theta H1) as Hpl. 
-        rewrite find_add.
-        rewrite find_add.
-        rewrite Hpl.
-        apply Var.Map.Proofs.partition_empty_r; auto.
-      }
-      {
-        rewrite find_ab_neq2; auto.
-        rewrite find_ab_neq2; auto.
-      }
-    }
-
-  (* Case SendB *)
-  - intros HWS G D T1' Hpart HWT.
-
-    inversion HWT; subst.
-
-    exists T1'.
-    split.
-    {
-      apply SendB.
-      { Var.simplify. }
-      { Var.simplify. }
-    }
-    {
-      unfold Step_partition_pairs.
-      intros.
-      rewrite H0 in H.
-      auto.
-    }
-    
-    - (* EPR *)
-      intros HWS G D T1' Hpart HWT.
-      inversion HWT; subst; clear HWT.
-
-      (* T[A] = T1'[A] *)
-      (* T[B] = T1'[B] *)
-      (* for other D: T[D] = T1'[D],ThetaD *)
-
-      edestruct (epr_part' T1') as [T1'' [Hepr' Hpart']]; eauto.
-
-      exists T1''. split; auto.
-      {
-        econstructor; eauto.
-        reflexivity.
-      }
-      {
-        unfold Step_partition_pairs. intros.
-        rewrite H0.
-        apply Hpart'; auto.
-      }
-
-
-    - (* EPR' *)
-      intros HWS G D T1' Hpart HWT.
-      inversion HWT; subst; clear HWT.
-
-      (* T[A] = T1'[A] *)
-      (* T[B] = T1'[B] *)
-      (* for other D: T[D] = T1'[D],ThetaD *)
-
-      edestruct (epr_part' T1') as [T1'' [Hepr' Hpart']]; eauto.
-
-      exists T1''. split; auto.
-      {
-        econstructor; eauto.
-        reflexivity.
-      }
-      {
-        unfold Step_partition_pairs. intros.
-        rewrite H0.
-        apply Hpart'; auto.
-      }
-      
-    (* Case LetC *)
-    - intros HWS G D T1' HPex HWT.
-      
-      inversion HWT; subst.
-
-      unfold Partition_except in HPex.
-      destruct HPex as [HPexA HPexB].
-      
-      exists (Actor.Map.add A TA' T1').
-      split.
-      {
-        eapply LetC.
-        {
-          assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-          { unfold Label.actors; Actor.simplify. }          
-          specialize (HPexB A HAinl).
-          rewrite <- HPexB.
-          eauto.
-        }
-        {
-          assert (ChorEnv.Equal (Actor.Map.add A TA' T1') (Actor.Map.add A TA' T1')).
-          Var.simplify.
-          eauto.
-        }
-      }
-      {
-        unfold Step_partition_pairs.
-        intros.
-        rewrite H0.
-        
-        assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
-        tauto.
-        {
-          assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-          { unfold Label.actors; Actor.simplify. }          
-          specialize (HPexB A HAinl).   
-          rewrite <- HAeqA0 in *.
-          rewrite HPexB in H1.
-          pose proof (partition_lopsided  (ChorEnv.find A T1') Theta H1) as Hpl. 
-          rewrite find_add.
-          rewrite find_add.
-          rewrite Hpl.
-          apply Var.Map.Proofs.partition_empty_r; auto.
-        }
-        {
-          rewrite find_ab_neq2; auto.
-          rewrite find_ab_neq2; auto.
-        }
-      }
-      
-    (* Case LetB *)
-    - intros HWS G D T1' Hpart HWT.
-      
-      inversion HWT; subst.
-      
-      exists T1'.
-      split.
-      {
-        apply LetB.
-        { Var.simplify. }
-        { Var.simplify. }
-        { Var.simplify. }
-      }
-      {
-        unfold Step_partition_pairs.
-        intros.
-        rewrite H1 in H0.
-        auto.
-      }
-      
-    (* Case LetBangC *)
-    - intros HWS G D T1' HPex HWT.
-      
-      inversion HWT; subst.
-      
-      unfold Partition_except in HPex.
-      destruct HPex as [HPexA HPexB].
-      
-      exists (Actor.Map.add A TA' T1').
-      split.
-      {
-        eapply LetBangC.
-        {
-          assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-          { unfold Label.actors; Actor.simplify. }          
-          specialize (HPexB A HAinl).
-          rewrite <- HPexB.
-          eauto.
-        }
-        {
-          assert (ChorEnv.Equal (Actor.Map.add A TA' T1') (Actor.Map.add A TA' T1')).
-          Var.simplify.
-          eauto.
-        }
-      }
-      {
-        unfold Step_partition_pairs.
-        intros.
-        rewrite H0.
-        
-        assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
-        tauto.
-        {
-          assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-          { unfold Label.actors; Actor.simplify. }          
-          specialize (HPexB A HAinl).   
-          rewrite <- HAeqA0 in *.
-          rewrite HPexB in H1.
-          pose proof (partition_lopsided  (ChorEnv.find A T1') Theta H1) as Hpl. 
-          rewrite find_add.
-          rewrite find_add.
-          rewrite Hpl.
-          apply Var.Map.Proofs.partition_empty_r; auto.
-        }
-        {
-          rewrite find_ab_neq2; auto.
-          rewrite find_ab_neq2; auto.
-        }
-      }
-      
-    (* Case LetBangB *)
-    - intros HWS G D T1' Hpart HWT.
-      
-      inversion HWT; subst.
-      
-      exists T1'.
-      split.
-      {
-        apply LetBangB.
-        { Var.simplify. }
-        { Var.simplify. }
-      }
-      {
-        unfold Step_partition_pairs.
-        intros.
-        rewrite <- H0 in H.
-        auto.
-      }
-    (* Case LetPairC *)
-    - intros HWS G D T1' HPex HWT.
-      
-      inversion HWT; subst.
-      
-      unfold Partition_except in HPex.
-      destruct HPex as [HPexA HPexB].
-      
-      exists (Actor.Map.add A TA' T1').
-      split.
-      {
-        eapply LetPairC.
-        {
-          assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-          { unfold Label.actors; Actor.simplify. }          
-          specialize (HPexB A HAinl).
-          rewrite <- HPexB.
-          eauto.
-        }
-        {
-          assert (ChorEnv.Equal (Actor.Map.add A TA' T1') (Actor.Map.add A TA' T1')).
-          Var.simplify.
-          eauto.
-        }
-      }
-      {
-        unfold Step_partition_pairs.
-        intros.
-        rewrite H0.
-        
-        assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
-        tauto.
-        {
-          assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
-          { unfold Label.actors; Actor.simplify. }          
-          specialize (HPexB A HAinl).   
-          rewrite <- HAeqA0 in *.
-          rewrite HPexB in H1.
-          pose proof (partition_lopsided  (ChorEnv.find A T1') Theta H1) as Hpl. 
-          rewrite find_add.
-          rewrite find_add.
-          rewrite Hpl.
-          apply Var.Map.Proofs.partition_empty_r; auto.
-        }
-        {
-          rewrite find_ab_neq2; auto.
-          rewrite find_ab_neq2; auto.
-        }
-      }
-      
-    (* Case LetPairB *)
-    - intros HWS G D T1' Hpart HWT.
-      
-      inversion HWT; subst.
-      
-      exists T1'.
-      split.
-      {
-        apply LetPairB.
-        { Var.simplify. }
-        { Var.simplify. }
-        { Var.simplify. }
-        { Var.simplify. }
-      }
-      {
-        unfold Step_partition_pairs.
-        intros.
-        rewrite <- H2 in H1.
-        auto.
-      }
-      
-  *)
   intros C1 C2 T1 cfg1 l T2 cfg2 Hstep.
   induction Hstep.
   - intros HWS G D T1' HPex HWT.
@@ -1742,7 +1443,47 @@ Proof.
       split.
       2:{
         unfold Step_partition_pairs in *.
-        admit.
+        intros A0 Theta HpartA0.
+        Actor.Map.Tactics.compare A0 A.
+        + (* A = A0 *)
+          rewrite find_add.
+          (* Heq3 : T[A0] == ThetaA1 ++ ThetaA2 ++ ThetaA3 ++ ThetaA1' *)
+          (* Heq0 : T'[A0] == T2'[A0] ++ ThetaA1 ++ ThetaA2 ++ ThetaA1' *)
+          (* Heq : T[A0] == ThetaA1 ++ ThetaA2 ++ ThetaA3 ++ Theta *)
+          assert (HTheta : Var.Map.Equal Theta ThetaA1').
+          { (* concat_inversion_eq *)
+            Var.Map.Tactics.reflect_partition.
+            rewrite Heq3 in *.
+            apply concat_inversion_eq with (m := ChorEnv.find A0 T1'); auto.
+            symmetry; auto.
+          }
+          rewrite HTheta in *; clear Theta HTheta.
+          
+          Var.Map.Tactics.reflect_partition.
+          { match goal with
+            | [ H : Var.Map.Equal ?A ?B, H' : Var.Map.Properties.Disjoint ?A _ |- _ ] => rewrite H in *
+            | [ H : Var.Map.Equal ?A ?B, H' : Var.Map.Properties.Disjoint _ ?A |- _ ] => rewrite H in *
+            end.
+            Var.simplify.
+          }
+          {
+            repeat match goal with
+            | [ H : Var.Map.Equal ?A ?B, H' : Var.Map.Properties.Disjoint ?A _ |- _ ] => rewrite H in *; clear H
+            | [ H : Var.Map.Equal ?A ?B, H' : Var.Map.Properties.Disjoint _ ?A |- _ ] => rewrite H in *; clear H
+            | [ H : Var.Map.Equal ?A ?B |- Var.Map.Equal ?A _ ] => rewrite H in *; clear H
+            end.
+            repeat rewrite Var.Map.Proofs.concat_assoc.
+            apply Var.Map.Proofs.concatProper;
+              [ | reflexivity].
+            rewrite (Var.Map.Proofs.concat_sym _ (ChorEnv.find A0 T2')); [ | Var.simplify].
+            repeat rewrite Var.Map.Proofs.concat_assoc.
+            reflexivity.
+          }
+
+        + (* A <> A0 *)
+          ChorEnv.simplify.
+          apply IHpart.
+          ChorEnv.simplify.
       }
       apply IfDelay; eauto.
 
