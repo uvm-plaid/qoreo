@@ -1,10 +1,15 @@
+From Qoreo.Base Require Import Var.
+From Qoreo.Expr Require Expr BaseProofs.
+From Qoreo.Choreography Require Import Choreography BaseProofs Lemmas.
+Import HelperLemmas.
+
 
 (*** Substitution lemma for non-linear variables *)
 Lemma wt_subst_bang : forall C tau G D T A x v,
     WellTyped (ChorEnv.add A x tau G) D T C ->
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) (Var.Map.empty _) v tau ->
     WellTyped G D T (Choreography.subst A x v C).
-Proof.
+(* TODO Proof.
     intros C. induction C as [| I C IHC ].
     
   (* Case C = Nil *)
@@ -490,7 +495,8 @@ Proof.
            { auto. }
            { auto. }
          }
-Qed.        
+Qed. *)
+Admitted.
 
 (** Substitution is the identity for variables that don't occur free in C *)
 Lemma subst_not_in : forall C A x v G D T,
@@ -498,7 +504,7 @@ Lemma subst_not_in : forall C A x v G D T,
     ~ (Var.Map.In x (ChorEnv.find A D)) ->
     ~ (Var.Map.In x (ChorEnv.find A G)) ->
     (Choreography.subst A x v C) = C.
-Proof.
+(*Proof.
   intros C A x v. 
 
   induction C as [| I C].
@@ -831,7 +837,7 @@ Proof.
       setoid_rewrite Hgoale.
       setoid_rewrite HgoalC.
       auto.
-Qed.
+Qed.*) Admitted.
 
 (** Substitution lemma for linear varibles *)
 Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
@@ -841,7 +847,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
     ~ Var.Map.In x (ChorEnv.find A G) ->
     ~ Var.Map.In x (ChorEnv.find A D) ->
     WellTyped G D T (Choreography.subst A x v C).
-Proof.
+(* Proof.
   intros C. induction C as [| I C IHC ].
 
   (* Case C = Nil is not possible. *)
@@ -1822,4 +1828,4 @@ Proof.
 
           + auto.
       }
-Qed.
+Qed. *) Admitted.

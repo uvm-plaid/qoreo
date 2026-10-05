@@ -67,11 +67,16 @@ Proof.
       Var.simplify.
     }
 
-  * Var.Map.Tactics.reflect_partition.
-    rewrite Heq0.
-    Var.simplify.
-    repeat split; auto.
-    eapply Expr.BaseProofs.wt_disjoint; eauto.
+  * Actor.Map.Tactics.compare A A0.
+    + Var.Map.Tactics.reflect_partition.
+      rewrite Heq0.
+      Var.simplify.
+      repeat split; auto.
+      eapply Expr.BaseProofs.wt_disjoint; eauto.
+    + specialize (H2 A Heq); specialize (H5 A Heq).
+      Var.Map.Tactics.reflect_partition.
+      rewrite Heq2.
+      Var.simplify.
 Qed.
 
 Lemma weakening_gen : forall C G D T G0,
@@ -244,6 +249,7 @@ Lemma weakening_gen : forall C G D T G0,
 
     (* If *)
     - destruct (HE A) as [HEA HEB].
+    (*
       pose proof (partition_dj
                     (ChorEnv.find A G0) (ChorEnv.find A D)
                     DeltaA1 DeltaA' HEB H0) as HPDJ.
@@ -267,56 +273,75 @@ Lemma weakening_gen : forall C G D T G0,
           reflexivity.
         }
           
-      }
+      }*)
       eapply If.
-      { exact HEWG. }
-      { apply (IHHWT1 G0 G').
-        intros A0.
-        destruct (HE A0) as [HEpart HEdisj].
-        split.
-        { exact HEpart. }
-        { eapply partition_dj_env; eauto. }
-      }
-      { apply (IHHWT2 G0 G').
-        intros A0.
-        destruct (HE A0) as [HEpart HEdisj].
-        split.
-        { exact HEpart. }
-        { apply (partition_dj_env A0 A G0 D
-                   (Var.Map.concat DeltaA1 DeltaA3) DeltaA2
-                   HEdisj HpartD2'). }
-      }
-      { apply (IHHWT3 G0 G').
-        intros A0.
-        destruct (HE A0) as [HEpart HEdisj].
-        split.
-        { exact HEpart. }
-        { apply (partition_dj_env A0 A G0 D
-                   (Var.Map.concat DeltaA1 DeltaA2) DeltaA3
-                   HEdisj HpartD3). }
-      }
-      { Var.Map.Tactics.reflect_partition.
-        2:{
-          rewrite Heq.
-          rewrite <- Var.Map.Proofs.concat_assoc.
-          reflexivity.
-        }
-        Var.simplify.
-      }
-      { Var.Map.Tactics.reflect_partition.
-        2:{
-          Var.simplify.
-          rewrite Var.Map.Proofs.concat_sym; auto.
-          reflexivity.
-        }
-        Var.simplify.
-      }
-      2:{
+      + eapply Expr.Weakening.weakening_gen; eauto.
+        destruct (HE A) as [HEpart HEdisj].
         Var.Map.Tactics.reflect_partition.
-        2:{ reflexivity. }
+        rewrite Heq2 in *.
         Var.simplify.
-      }
-      { Var.Map.Tactics.reflect_partition; Var.simplify. }
+      + eapply IHHWT1; eauto.
+        intros A0.
+        destruct (HE A0) as [HEpart HEdisj].
+        split; eauto.
+        Actor.Map.Tactics.compare A0 A.
+        {
+          Var.Map.Tactics.reflect_partition.
+          rewrite Heq2 in *.
+          Var.simplify.
+        }
+        {
+          specialize (H2 A0 Heq);
+          specialize (H5 A0 Heq).
+          Var.Map.Tactics.reflect_partition.
+          rewrite Heq4 in *. Var.simplify.
+        }
+      + eapply IHHWT2; eauto.
+        intros A0.
+        destruct (HE A0) as [HEpart HEdisj].
+        split; eauto.
+        Actor.Map.Tactics.compare A0 A.
+        {
+          Var.Map.Tactics.reflect_partition.
+          rewrite Heq2 in *.
+          Var.simplify.
+        }
+        {
+          specialize (H2 A0 Heq);
+          specialize (H5 A0 Heq).
+          Var.Map.Tactics.reflect_partition.
+          rewrite Heq4 in *. Var.simplify.
+        }
+
+      + eapply IHHWT3; eauto.
+        intros A0.
+        destruct (HE A0) as [HEpart HEdisj].
+        split; eauto.
+        Actor.Map.Tactics.compare A0 A.
+        {
+          Var.Map.Tactics.reflect_partition.
+          rewrite Heq2 in *.
+          Var.simplify.
+        }
+        {
+          specialize (H2 A0 Heq);
+          specialize (H5 A0 Heq).
+          Var.Map.Tactics.reflect_partition.
+          rewrite Heq4 in *. Var.simplify.
+        }
+
+      + Var.Map.Tactics.reflect_partition.
+        2:{ rewrite Heq1. reflexivity. }
+        Var.simplify.
+      + Var.Map.Tactics.reflect_partition; eauto.
+        reflexivity.
+      + auto.
+      + Var.Map.Tactics.reflect_partition.
+        2:{ rewrite Heq0. reflexivity. }
+        Var.simplify.
+      + Var.Map.Tactics.reflect_partition; eauto.
+        reflexivity.
+      + auto.
   Qed.
 
 

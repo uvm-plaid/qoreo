@@ -563,7 +563,6 @@ Proof.
   all: (symmetry; auto).
 Qed.
 
-
 (** Typing Relation *)
 
 Inductive WellTyped :
@@ -630,21 +629,47 @@ Inductive WellTyped :
 
     WellTyped G D T (Choreography.Do (Insn.LetPair A x1 x2 e) C)
 
-| If : forall DeltaA1 DeltaA2 DeltaA3 ThetaA1 ThetaA2 ThetaA3 DeltaA' ThetaA' G D T A e C1 C2 C,
-  Expr.WellTyped (ChorEnv.find A G) DeltaA1 ThetaA1 e Expr.BIT ->
-  WellTyped G (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C1 ->
-  WellTyped G (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C2 ->
-  WellTyped G (Actor.Map.add A DeltaA3 D) (Actor.Map.add A ThetaA3 T) C ->
+| If : forall DeltaA ThetaA D' T' D'' T'' DeltaA' ThetaA'
+              G D T e C1 C2 C' A,
 
-  (* D[A] == DeltaA1 ++ DeltaA2 ++ DeltaA3 *)
-  Var.Map.Partition (ChorEnv.find A D) DeltaA1 DeltaA' ->
-  Var.Map.Partition DeltaA' DeltaA2 DeltaA3 ->
-  (* T[A] == ThetaA1 ++ ThetaA2 ++ ThetaA3 *)
-  Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA' ->
-  Var.Map.Partition ThetaA' ThetaA2 ThetaA3 ->
+  (* Γ[A]; ΔA; ΘA ⊢ e : BIT *)
+  Expr.WellTyped (ChorEnv.find A G) DeltaA ThetaA e Expr.BIT ->
 
+  (* Γ; D'; T' ⊢ C1 *)
+  (* Γ; D'; T' ⊢ C2 *)
 
-  WellTyped G D T (Choreography.If A e C1 C2 C)
+  WellTyped G D' T C1 ->
+  WellTyped G D' T C2 ->
+
+  (* Γ; D'' ; T'' ⊢ C' *)
+  WellTyped G D'' T'' C' ->
+
+  (* D[A] == DeltaA ++ D'[A] ++ D''[A0] *)
+  Var.Map.Partition (ChorEnv.find A D)
+                    DeltaA
+                    DeltaA' ->
+  Var.Map.Partition DeltaA' (ChorEnv.find A D') (ChorEnv.find A D'') ->
+
+  (* A0 <> A -> D[A0] == D'[A0] ++ D''[A0] *)
+  (forall A0, A0 <> A ->
+    Var.Map.Partition (ChorEnv.find A0 D)
+                      (ChorEnv.find A0 D')
+                      (ChorEnv.find A0 D'')) ->
+
+  (* T[A] == Theta ++ T'[A] ++ T''[A0] *)
+  Var.Map.Partition (ChorEnv.find A T)
+                    ThetaA
+                    ThetaA' ->
+  Var.Map.Partition ThetaA' (ChorEnv.find A T') (ChorEnv.find A T'') ->
+
+  (* A0 <> A -> T[A0] == T'[A0] ++ T''[A0] *)
+  (forall A0, A0 <> A ->
+    Var.Map.Partition (ChorEnv.find A0 T)
+                      (ChorEnv.find A0 T')
+                      (ChorEnv.find A0 T'')) ->
+ 
+
+  WellTyped G D T (Choreography.If A e C1 C2 C')
 .
 
 Lemma WellTypedProper' : forall G D T C,
@@ -656,7 +681,7 @@ Lemma WellTypedProper' : forall G D T C,
   WellTyped G' D' T' C.
 Proof.
   intros G D T C HWT.
-  induction HWT; intros G' D' T' HG HD HT;
+  induction HWT; intros G0' D0' T0' HG HD HT;
     try (constructor; auto; fail).
   * constructor.
     rewrite <- HD; auto.
@@ -702,7 +727,8 @@ Proof.
       eauto;
       reflexivity.
 
-  * eapply (If DeltaA1 DeltaA2 DeltaA3 ThetaA1 ThetaA2 ThetaA3 DeltaA' ThetaA');
+  * eapply If;
+      intros;
       try apply IHHWT1;
       try apply IHHWT2;
       try apply IHHWT3;
@@ -721,10 +747,6 @@ Proof.
   split; intros; eapply WellTypedProper'; eauto;
     symmetry; auto.
 Qed.
-
-
-(*HERE**)
-
 
 
 

@@ -14,8 +14,9 @@ Data structures
 
 *)
 
-From Qoreo Require Import Base.
-From Qoreo Require Expr Choreography.
+From Qoreo.Base Require Var Config ChorEnv.
+From Qoreo.Expr Require Expr.
+From Qoreo.Choreography Require Choreography.
 From Stdlib Require Import Morphisms (* for Proper *).
 
 Module Label := Choreography.Label.

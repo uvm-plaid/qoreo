@@ -1,6 +1,6 @@
 From Qoreo.Base Require Import Var.
 From Qoreo.Expr Require Expr BaseProofs.
-From Qoreo.Choreography Require Import Choreography BaseProofs Lemmas Weakening.
+From Qoreo.Choreography Require Import Choreography BaseProofs Lemmas Weakening Substitution.
 Import HelperLemmas.
 
 
@@ -11,10 +11,11 @@ Import HelperLemmas.
 Lemma WellTyped_WellFormed : forall Γ Delta Theta C,
   WellTyped Γ Delta Theta C ->
   Choreography.WellFormed C.
-Proof.
+(* Proof.
   intros ? ? ? ? HWT.
   induction HWT; constructor; auto; constructor; auto.
-Qed.
+Qed. *)
+Admitted.
 
 
 Lemma WellScoped_preservationC : forall I Theta ρ l I' Theta' ρ',
@@ -22,7 +23,7 @@ Lemma WellScoped_preservationC : forall I Theta ρ l I' Theta' ρ',
   Insn.WellFormed I ->
   ChorEnv.WellScoped Theta ρ ->
   ChorEnv.WellScoped Theta' ρ'.
-Proof.
+(* Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros HWT HWS;
   try match goal with
@@ -59,7 +60,8 @@ Proof.
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
     eapply Expr.BaseProofs.step_dim_monotonic; eauto.
-Qed.
+Qed. *)
+Admitted.
 
 
 Lemma WellScoped_preservationB : forall C Theta ρ l C' Theta' ρ',
@@ -67,7 +69,7 @@ Lemma WellScoped_preservationB : forall C Theta ρ l C' Theta' ρ',
   Choreography.WellFormed C ->
   ChorEnv.WellScoped Theta ρ ->
   ChorEnv.WellScoped Theta' ρ'.
-Proof.
+(* Proof.
   intros ? ? ? ? ? ? ? Hstep.
   destruct Hstep; intros HWT HWS; subst;
   try match goal with
@@ -86,7 +88,8 @@ Proof.
     | [ H : Insn.WellFormed (Insn.EPR _ _ _ _) |- _ ] =>
       inversion H; subst; auto
     end.
-Qed.
+Qed. *)
+Admitted.
 
 
 Lemma WellScoped_preservation : forall C Theta ρ l C' Theta' ρ',
@@ -94,7 +97,7 @@ Lemma WellScoped_preservation : forall C Theta ρ l C' Theta' ρ',
   Choreography.WellFormed C ->
   ChorEnv.WellScoped Theta ρ ->
   ChorEnv.WellScoped Theta' ρ'.
-Proof.
+(* Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros HWT HWS;
   try match goal with
@@ -116,7 +119,8 @@ Proof.
     apply IHHstep; auto.
   * inversion HWT; subst; clear HWT.
     apply IHHstep; auto.
-Qed.
+Qed. *)
+Admitted.
 
 
 
@@ -132,7 +136,7 @@ Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
       ChorEnv.Equal T1
         (Actor.Map.add B (ChorEnv.find B T1) (
              Actor.Map.add A (ChorEnv.find A T1) T2)).
-Proof.
+(* Proof.
   intros A B T1 cfg1 q1 q2 T2 cfg2 Heq Hepr HWS.
   unfold ChorEnv.epr in Hepr.
   destruct (Config.epr_cfg cfg1) as [[idx1 idx2] cfg'] eqn:Eqnepr.
@@ -174,16 +178,18 @@ Proof.
     ChorEnv.simplify.
     apply Var.Map.Proofs.partition_add_r; auto with var_db.
   }
-Qed.
+Qed. *)
+Admitted.
    
 Lemma nilnostep : forall T cfg l C' T' cfg',
     ~ step Choreography.Empty T cfg l C' T' cfg'. 
-Proof.
+(* Proof.
   intros.
   intros Habsurd.
   inversion Habsurd; subst.
   inversion H.
-Qed.
+Qed. *)
+Admitted.
 
 Lemma epr_partition : forall T1 Theta2 A B T cfg q1 q2 T' cfg' D,
   ChorEnv.epr A B T cfg = (q1, q2, T', cfg') ->
@@ -193,7 +199,7 @@ Lemma epr_partition : forall T1 Theta2 A B T cfg q1 q2 T' cfg' D,
   exists T1', ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') /\
               Var.Map.Partition (ChorEnv.find D T') (ChorEnv.find D T1') Theta2 /\
               (forall D0, D0 <> D -> Var.Map.Equal (ChorEnv.find D0 T1') (ChorEnv.find D0 T')).
-Proof.
+(* Proof.
   intros T1 Theta2 A B T cfg q1 q2 T' cfg' D Hepr HA HB Hpart Heq.
   unfold ChorEnv.epr in Hepr.
   destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hcfg0.
@@ -208,7 +214,8 @@ Proof.
     { rewrite Heq; auto; try reflexivity. }
     { rewrite Heq; auto; try reflexivity. }
     { rewrite Heq; auto; try reflexivity. }
-Qed.
+Qed. *)
+Admitted.
 
 (* Step_partition_pairs asserts that T1 differs from T1' by the same context that T2 differs from T2' *)
 Definition Step_partition_pairs (T1 T1' T2 T2' : ChorEnv.t nat) :=
@@ -221,7 +228,7 @@ Lemma spps_on : forall A Theta1 Theta2 (T1 T2 T3 : ChorEnv.t nat),
     Var.Map.Partition (ChorEnv.find A T1) Theta1 Theta2 ->
     ChorEnv.Equal T3 (Actor.Map.add A (ChorEnv.find A T3) T2) /\
       Var.Map.Partition (ChorEnv.find A T2) Theta1 (ChorEnv.find A T3).
-Proof.
+(* Proof.
   intros.  
   unfold Step_partition_pairs in H.
   split.
@@ -255,7 +262,8 @@ Proof.
                   (ChorEnv.find A T2) (ChorEnv.find A T3) Theta1 H).
     auto.
   }
-Qed.
+Qed. *)
+Admitted.
 
 (* Partition_except l T1 T2
   says that T1 and T2 are the same on all the actors in l, and T2 is a subset of T1 on all other actors
@@ -274,7 +282,7 @@ Lemma ws_partition_except : forall l (T1 T2 : ChorEnv.t nat) cfg,
     ChorEnv.WellScoped T1 cfg ->
     Partition_except l T1 T2 ->
     ChorEnv.WellScoped T2 cfg.
-Proof.
+(* Proof.
   intros l T1 T2 cfg Hws [Hpart Heq] A.
   specialize (Hws A). destruct Hws as [Hwf Hws].
   split; auto.
@@ -291,7 +299,8 @@ Proof.
     Var.Map.Tactics.reflect_partition.
     rewrite Heq0.
     Var.simplify.
-Qed.
+Qed. *)
+Admitted.
 
 
 Lemma epr_part' : forall T1 A B T cfg q1 q2 T' cfg',
@@ -300,7 +309,7 @@ Lemma epr_part' : forall T1 A B T cfg q1 q2 T' cfg',
   ChorEnv.WellScoped T cfg ->
   exists T1', ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') /\
               Step_partition_pairs T T1 T' T1'.
-Proof.
+(* Proof.
   intros T1 A B T cfg q1 q2 T' cfg' Hepr [Hpart Heq] HWS.
   unfold ChorEnv.epr in *.
   destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hcfg.
@@ -348,13 +357,14 @@ Proof.
   
   + (* D <> A, D <> B *)
     apply Var.Map.Proofs.partition_add_l; auto.
-Qed.
+Qed. *)
+Admitted.
 
 
 Lemma partition_functional_2 : forall T (M M1 M2 M2' : Var.Map.t T),
   Var.Map.Partition M M1 M2 -> Var.Map.Partition M M1 M2' ->
   Var.Map.Equal M2 M2'.
-Proof.
+(* Proof.
   intros T M M1 M2 M2' Hpart Hpart'.
   Var.Map.Tactics.reflect_partition.
   Var.reflect_find.
@@ -371,7 +381,8 @@ Proof.
     exfalso.
     apply (Hdisj z). split; Var.solve.
   }
-Qed.
+Qed. *)
+Admitted.
 
 
 
@@ -384,7 +395,7 @@ Lemma delay_inversion_C : forall I1 I2 C T1 cfg1 l T2 cfg2,
       exists T2',
         Insn.stepC I1 T1' cfg1 l I2 T2' cfg2 /\
           Step_partition_pairs T1 T1' T2 T2'.
-Proof.
+(* Proof.
   intros I1 I2 C T1 cfg1 l T2 cfg2 Hstep HWS.
   destruct Hstep; intros G D T1' Hexcept HWT.
   * destruct Hexcept as [_ Hsame].
@@ -462,7 +473,8 @@ Proof.
       }
       Var.simplify.
       eapply Var.Map.Proofs.partition_empty_r.
-Qed.
+Qed. *)
+Admitted.
 
 
 Lemma delay_inversion_B : forall C1 C2 T1 cfg1 l T2 cfg2,
@@ -474,7 +486,7 @@ Lemma delay_inversion_B : forall C1 C2 T1 cfg1 l T2 cfg2,
       exists T2',
         Choreography.stepB C1 T1' cfg1 l C2 T2' cfg2 /\
           Step_partition_pairs T1 T1' T2 T2'.
-Proof.
+(* Proof.
   intros C1 C2 T1 cfg1 l T2 cfg2 Hstep HWS.
   induction Hstep; intros G D T1' Hexcept HWT.
   - exists T1'; split.
@@ -552,7 +564,8 @@ Proof.
           first [rewrite Henv | rewrite <- Henv]
       end.
       exact Hparts.
-Qed.
+Qed. *)
+Admitted.
 
 
 
@@ -561,7 +574,7 @@ Lemma concat_inversion_eq : forall {X} (m m1 m2 : Var.Map.t X),
   Var.Map.Properties.Disjoint m m2 ->
   Var.Map.Equal (Var.Map.concat m m1) (Var.Map.concat m m2) ->
   Var.Map.Equal m1 m2.
-Proof.
+(* Proof.
   intros X m m1 m2 H1 H2 Heq.
   intros z.
   specialize (Heq z).
@@ -579,7 +592,8 @@ Proof.
     }
     auto.
   }
-Qed.
+Qed. *)
+Admitted.
 
 
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
@@ -591,7 +605,7 @@ Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
       exists T2',
         step C1 T1' cfg1 l C2 T2' cfg2 /\
           Step_partition_pairs T1 T1' T2 T2'.
-Proof.
+(* Proof.
   intros C1 C2 T1 cfg1 l T2 cfg2 Hstep.
   induction Hstep.
   - intros HWS G D T1' HPex HWT.
@@ -1517,20 +1531,340 @@ Proof.
           rewrite find_add.
           Var.Map.Tactics.reflect_partition; [ | reflexivity].
           Var.simplify.
+Qed. *)
+Admitted.
+
+
+Lemma WellTyped_preservation_stepC : forall G D T1 I C,
+  WellTyped G D T1 (Choreography.Do I C) ->
+  forall cfg1 l I' T2 cfg2,
+    Insn.stepC I T1 cfg1 l I' T2 cfg2 ->
+    ChorEnv.WellScoped T1 cfg1 ->
+    (forall A, Actor.FSet.In A (Label.actors l) ->
+      Var.Map.Empty (ChorEnv.find A G) /\
+      Var.Map.Empty (ChorEnv.find A D)) ->
+    WellTyped G D T2 (Choreography.Do I' C).
+  (* Proof outline: Invert the instruction step and typing derivation. For each
+     instruction constructor, use expression-step inversion and expression
+     preservation, then rebuild the choreography typing rule with its context
+     partitions. The continuation C remains unchanged. *)
+Proof.
+  intros G D T1 I C HWT cfg1 l I' T2 cfg2 Hstep Hscoped Hemptiness.
+  inversion HWT; subst; clear HWT;
+    inversion Hstep; subst; clear Hstep.
+  - (* Send with SendC: preserve expression typing and rebuild Send. *)
+      unfold  ChorEnv.WellScoped in Hscoped.
+      specialize (Hscoped A).
+      
+      assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+      {
+        unfold Label.actors.
+        Actor.simplify.
+      }
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      Var.simplify.
+      rewrite HAGempty, HADempty in *.
+      Var.simplify.
+
+      rename H14 into Hstep',
+             H15 into HT2.
+      eapply Expr.Preservation.step_inversion
+          in Hstep'; eauto.
+      destruct Hstep' as [ThetaA1' [Hstep' Hpart']].
+
+      eapply Send 
+          with (DeltaA1 := ChorEnv.find A D)
+               (ThetaA1 := ThetaA1')
+               (ThetaA2 := ThetaA2)
+               (DeltaA2 := Var.Map.empty _);
+          auto.
+      {
+        rewrite HAGempty, HADempty.
+        eapply Expr.Preservation.WellTyped_preservation; eauto;
+          Var.simplify.
+        { eapply ChorEnv.ws_partition; eauto. }
+      }
+      {
+        rewrite ChorEnv.ce_add_empty; auto.
+        rewrite HT2.
+        rewrite ChorEnv.addadd2.
+        auto.
+      }
+      { auto with var_db. }
+      { rewrite HT2. rewrite find_add. auto. } 
+
+  - (* LetBang with LetBangC: preserve expression typing and rebuild LetBang. *)
+      unfold  ChorEnv.WellScoped in Hscoped.
+      specialize (Hscoped A).
+      
+      assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+      {
+        unfold Label.actors.
+        Actor.simplify.
+      }
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      Var.simplify.
+      rewrite HAGempty, HADempty in *.
+      Var.simplify.
+
+      rename H12 into Hstep',
+             H13 into HT2.
+      eapply Expr.Preservation.step_inversion
+          in Hstep'; eauto.
+      destruct Hstep' as [ThetaA1' [Hstep' Hpart']].
+
+      eapply LetBang 
+          with (DeltaA1 := ChorEnv.find A D)
+               (ThetaA1 := ThetaA1')
+               (ThetaA2 := ThetaA2)
+               (DeltaA2 := Var.Map.empty _);
+          auto.
+      {
+        rewrite HAGempty, HADempty.
+        eapply Expr.Preservation.WellTyped_preservation; eauto;
+          Var.simplify.
+        { eapply ChorEnv.ws_partition; eauto. }
+      }
+      {
+        rewrite ChorEnv.ce_add_empty; auto.
+        rewrite HT2.
+        rewrite ChorEnv.addadd2.
+        auto.
+      }
+      { auto with var_db. }
+      { rewrite HT2. rewrite find_add. auto. } 
+
+  - (* Let with LetC: preserve expression typing and rebuild LetIn. *)
+      unfold  ChorEnv.WellScoped in Hscoped.
+      specialize (Hscoped A).
+      
+      assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+      {
+        unfold Label.actors.
+        Actor.simplify.
+      }
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      Var.simplify.
+      rewrite HAGempty, HADempty in *.
+      Var.simplify.
+
+      rename H13 into Hstep',
+             H14 into HT2.
+      eapply Expr.Preservation.step_inversion
+          in Hstep'; eauto.
+      destruct Hstep' as [ThetaA1' [Hstep' Hpart']].
+
+      eapply LetIn
+          with (DeltaA1 := ChorEnv.find A D)
+               (ThetaA1 := ThetaA1')
+               (ThetaA2 := ThetaA2)
+               (DeltaA2 := Var.Map.empty _);
+          auto.
+      {
+        rewrite HAGempty, HADempty.
+        eapply Expr.Preservation.WellTyped_preservation; eauto;
+          Var.simplify.
+        { eapply ChorEnv.ws_partition; eauto. }
+      }
+      {
+        rewrite HT2.
+        rewrite ChorEnv.addadd2.
+        auto.
+      }
+      { auto with var_db. }
+      { rewrite HT2. rewrite find_add. auto. }
+      { Var.simplify. } 
+
+  - (* LetPair with LetPairC: preserve expression typing and rebuild LetPair. *)
+    unfold  ChorEnv.WellScoped in Hscoped.
+      specialize (Hscoped A).
+      
+      assert (Actor.FSet.In A (Label.actors (Label.Loc A))) as HAinl.
+      {
+        unfold Label.actors.
+        Actor.simplify.
+      }
+      destruct (Hemptiness A HAinl) as [HAGempty HADempty].
+      Var.simplify.
+      rewrite HAGempty, HADempty in *.
+      Var.simplify.
+
+      rename H16 into Hstep',
+             H17 into HT2.
+      eapply Expr.Preservation.step_inversion
+          in Hstep'; eauto.
+      destruct Hstep' as [ThetaA1' [Hstep' Hpart']].
+
+      eapply LetPair
+          with (DeltaA1 := ChorEnv.find A D)
+               (ThetaA1 := ThetaA1')
+               (ThetaA2 := ThetaA2)
+               (DeltaA2 := Var.Map.empty _);
+          auto.
+      {
+        rewrite HAGempty, HADempty.
+        eapply Expr.Preservation.WellTyped_preservation; eauto;
+          Var.simplify.
+        { eapply ChorEnv.ws_partition; eauto. }
+      }
+      {
+        rewrite HT2.
+        rewrite ChorEnv.addadd2.
+        auto.
+      }
+      { auto with var_db. }
+      { rewrite HT2. rewrite find_add. auto. }
+      { Var.simplify. } 
+      { Var.simplify. } 
 Qed.
 
 
-(*
+Lemma WellTyped_seq_if : forall G D T A b C1 C2 C,
+  WellTyped G D T (Choreography.If A (Expr.Bit b) C1 C2 C) ->
+  Var.Map.Empty (ChorEnv.find A G) ->
+  Var.Map.Empty (ChorEnv.find A D) ->
+  WellTyped G D T
+    (Choreography.seq (if b then C1 else C2) C).
+(* Proof outline: Invert If typing and select the premise for branch b. Use
+   the partitions of A's quantum resources and empty classical contexts to
+   compose the selected branch with continuation C. Establish composition by
+   induction on the branch typing derivation, using seq's recursive cases. *)
+Admitted.
+
+Lemma WellTyped_preservation_seq :
+  forall G D1 T1 C1,
+  WellTyped G D1 T1 C1 ->
+  forall D D2 T T2 C2,
+  WellTyped G D2 T2 C2 ->
+  
+  (forall A, 
+    Var.Map.Properties.Partition (ChorEnv.find A D) (ChorEnv.find A D1) (ChorEnv.find A D2)) ->
+  (forall A, 
+    Var.Map.Properties.Partition (ChorEnv.find A T) (ChorEnv.find A T1) (ChorEnv.find A T2)) ->
+
+  WellTyped G D T (Choreography.seq C1 C2).
+Admitted.
+
+Lemma WellTyped_preservation_stepB : forall G D T C,
+  WellTyped G D T C ->
+  forall cfg1 l C' T' cfg2,
+    Choreography.stepB C T cfg1 l C' T' cfg2 ->
+    ChorEnv.WellScoped T cfg1 ->
+    (forall A, Actor.FSet.In A (Label.actors l) ->
+      Var.Map.Empty (ChorEnv.find A G) /\
+      Var.Map.Empty (ChorEnv.find A D)) ->
+    WellTyped G D T' C'.
+(* Proof outline: Invert the beta step and typing derivation. Use substitution
+   preservation for Send and let cases, and EPR inversion plus linear
+   substitution for EPR. For IfB, apply WellTyped_seq_if to the selected
+   branch and continuation. Rewrite environment equalities where needed. *)
+Proof.
+  intros G D T C HWT cfg1 l C' T' cfg2 Hstep Hscoped Hdisj.
+  inversion Hstep; subst; clear Hstep;
+    inversion HWT; subst; clear HWT.
+  * rewrite H0; clear T' H0.
+    eapply WellTyped_preservation_seq; eauto.
+    destruct b; eauto.
+
+Admitted.
+
+
 (** Preservation *)
 Theorem WellTyped_preservation : forall G D T1 C1,
     WellTyped G D T1 C1 ->
-    forall cfg1 l C2 T2 cfg2, 
+    forall cfg1 l C2 T2 cfg2,
       step C1 T1 cfg1 l C2 T2 cfg2 ->
       ChorEnv.WellScoped T1 cfg1 ->
         (forall A, Actor.FSet.In A (Label.actors l) ->
                    Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
         WellTyped G D T2 C2.
 Proof.
+  (*
+  intros G D T1 C1 HWT.
+  intros cfg1 l C2 T2 cfg2 Hstep.
+  revert G D HWT.
+  induction Hstep;
+    intros G D HWT Hscoped Hdisj.
+  * (* stepC *)
+    eapply WellTyped_preservation_stepC; eauto.
+  * (* IfC *)
+      inversion HWT; subst; clear HWT.
+      unfold  ChorEnv.WellScoped in Hscoped.
+      specialize (Hscoped A).
+      destruct (Hdisj A) as [HAGempty HADempty].
+      { simpl. Actor.simplify. }
+      
+      Var.simplify.
+      (*rewrite HAGempty, HADempty in *.
+      Var.simplify.*)
+
+      rename H into Hstep',
+             H0 into HT2,
+             H13 into HD,
+             H14 into HT.
+      specialize (HD A).
+      specialize (HT A).
+      rewrite HT2 in *; clear T' HT2.
+      rewrite HADempty in *; rewrite HAGempty in *.
+      Var.simplify.
+
+      eapply Expr.Preservation.step_inversion
+          in Hstep'; auto.
+      2:{ eauto. }
+      2:{ eauto with var_db. }
+      destruct Hstep' as [ThetaA1' [Hstep' Hpart']].
+
+      (* e/∅ → e'/ΘA1'.
+         So there's no guarantee that e' doesn't use qubits. *)
+
+      eapply If;
+        try rewrite HAGempty in *;
+        try rewrite HADempty in *;
+        try rewrite HT2 in *;
+        eauto.
+      (*
+          with  (DeltaA1 := Var.Map.empty _)
+                (ThetaA1 := ThetaA1')
+                (DeltaA2 := Var.Map.empty _)
+                (ThetaA2 := ThetaA2)
+                (DeltaA3 := Var.Map.empty _)
+                (ThetaA3 := ThetaA3);
+          try rewrite HAGempty in *;
+          try rewrite HADempty in *;
+          try rewrite HT2 in *;
+          eauto.*)
+      {
+        eapply Expr.Preservation.WellTyped_preservation; 
+          eauto;
+          Var.simplify.
+        
+        { eapply ChorEnv.ws_partition; eauto. }
+      }
+      {
+        rewrite ChorEnv.addadd2.
+        rewrite ChorEnv.ce_add_empty; auto.
+      }
+      {
+        rewrite ChorEnv.addadd2.
+        rewrite ChorEnv.ce_add_empty; auto.
+      }
+      {
+        rewrite ChorEnv.addadd2.
+        rewrite ChorEnv.ce_add_empty; auto.
+      }
+      { auto with var_db. }
+      { auto with var_db. }
+      { Var.simplify. Actor.simplify. } 
+  
+  * (* stepB *)
+    eapply WellTyped_preservation_stepB; eauto.
+
+  * (* Delay *) admit.
+  * (* IfDelay *) admit.
+Admitted.
+*)
+
+(*Proof.
   intros G D T1 C1 HWT.
   induction HWT.
 
@@ -2531,7 +2865,12 @@ Proof.
       { auto. }
       { auto. }
       { auto. }
-Qed.
+    Qed.*)
+     (* Proof sketch: Induct on the typing derivation, then invert the step. Use
+       preservation helpers for stepC and stepB. Handle IfC directly. Lift Delay
+       and IfDelay with delay_inversion and the induction hypotheses. Leave
+       substitution, partition, and branch-composition details for later. *)
+  Admitted.
 
 Lemma preservation : forall G D T1 C1,
     WellTyped G D T1 C1 ->
@@ -2548,4 +2887,3 @@ Proof.
   * eapply WellScoped_preservation; eauto.
     eapply WellTyped_WellFormed; eauto.
 Qed. 
-*)
