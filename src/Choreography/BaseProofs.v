@@ -77,9 +77,10 @@ Proof.
   intros ? ? ? ? ? ? ? Hstep;
   induction Hstep; inversion 1; subst;
     try constructor;
-    match goal with
+    try match goal with
     | [ H : Insn.WellFormed _ |- _ ] => inversion H; subst; clear H; auto
     end.
+    Actor.simplify.
 Qed.
 
 Lemma step_wf_label : forall C Theta ρ l C' Theta' ρ',

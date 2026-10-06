@@ -1,5 +1,5 @@
 From Qoreo.Base Require Import Var.
-From Qoreo.Expr Require Expr BaseProofs.
+From Qoreo.Expr Require Expr BaseProofs Weakening.
 From Qoreo.Choreography Require Import Choreography BaseProofs Lemmas.
 Import HelperLemmas.
 

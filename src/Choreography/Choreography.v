@@ -19,7 +19,7 @@ Theorems:
 *)
 
 From Qoreo.Base Require Var Actor Config ChorEnv.
-From Qoreo.Expr Require Expr Proofs.
+From Qoreo.Expr Require Expr BaseProofs.
 
 
 From Stdlib Require Import Structures.Equalities.
@@ -36,18 +36,22 @@ Module Label.
     | Send : Actor.t -> Expr.t -> Actor.t -> t
     | EPR  : Actor.t -> Actor.t -> t
     | Loc  : Actor.t -> t
+    | If   : Actor.t -> bool -> Actor.FSet.t -> t
     .
 
     Inductive WellFormed : Label.t -> Prop :=
     | WFLSend : forall A v B, A <> B -> WellFormed (Send A v B)
     | WFLEPR : forall A B, A <> B -> WellFormed (EPR A B)
     | WFLLoc : forall A, WellFormed (Loc A)
+    | WFLIf  : forall A v Bs, ~ Actor.FSet.In A Bs ->
+               WellFormed (If A v Bs)
     .
 
     Definition actors (l : t) : Actor.FSet.t :=
         match l with
         | Send A _ B | EPR A B => Actor.FSet.add A (Actor.FSet.singleton B)
         | Loc A => Actor.FSet.singleton A
+        | If A _ Bs => Actor.FSet.add A Bs
         end.
 End Label.
 
@@ -299,9 +303,7 @@ Module Insn.
 End Insn.
 
 Module Choreography.
-    (*Definition t := list Insn.t.*)
 
-    (* type t = Empty | Seq of t * t *)
     Inductive t : Type :=
     | Empty : t
     | Do : Insn.t -> t -> t
@@ -311,7 +313,6 @@ Module Choreography.
     | If : Actor.t -> Expr.t -> t -> t -> t -> t
     (* No selection tags *)
     .
-    (* TOOD: update processes, update EPP *)
 
     Fixpoint seq (C1 C2 : t) : t :=
     match C1 with
@@ -373,12 +374,13 @@ End Choreography.
 Inductive stepB : Choreography.t -> ChorEnv.t nat -> Config.t ->
                  Label.t ->
                  Choreography.t -> ChorEnv.t nat -> Config.t -> Prop :=
-  | IfB : forall A (b : bool) C1 C2 C T cfg C' T' cfg',
+  | IfB : forall A (b : bool) Bs C1 C2 C T cfg C' T' cfg',
     C' = Choreography.seq (if b then C1 else C2) C ->
     ChorEnv.Equal T' T ->
     cfg' = cfg ->
+    Bs = Actor.FSet.remove A (Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2)) ->
     stepB (Choreography.If A (Expr.Bit b) C1 C2 C) T cfg
-          (Label.Loc A) (*??? do we need a new label that covers all actors in the if? *)
+          (Label.If A b Bs) (*??? do we need a new label that covers all actors in the if? *)
           C' T' cfg'
 
   | SendB : forall A v B x C refs refs' cfg C',

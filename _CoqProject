@@ -25,7 +25,9 @@ src/Choreography/Proofs.v
 src/Choreography/Substitution.v
 src/Choreography/Weakening.v
 
-src/Network.v
+src/Network/Network.v
+src/Network/Proofs.v
+
 src/NetQasm.v
 examples/Notation.v
 examples/OldNotation.v

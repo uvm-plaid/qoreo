@@ -1,5 +1,5 @@
 From Qoreo.Base Require Import Var.
-From Qoreo.Expr Require Expr BaseProofs.
+From Qoreo.Expr Require Expr BaseProofs Progress.
 From Qoreo.Choreography Require Import Choreography BaseProofs Lemmas.
 Import HelperLemmas.
 From Stdlib Require Import Program.Equality. (* dependent induction *)
@@ -401,9 +401,9 @@ Proof.
     destruct H as [HvaleL | [e' [Θ' [cfg1' Hstep']]]].
     {
       right.
-      exists (Label.Loc A).
       inversion HvaleL; subst; clear HvaleL;
         inversion HWTe; subst; clear HWTe.
+      eexists.
       exists (Choreography.seq (if b then C1 else C2) C').
       eexists.
       eexists.
@@ -413,7 +413,7 @@ Proof.
     }
     {
       right.
-      exists (Label.Loc A).
+      eexists.
       eexists.
       eexists.
       eexists.
@@ -430,7 +430,7 @@ Proof.
         T[A] == ThetaA ++ ThetaA'
         ThetaA' == T'[A] ++ T''[A]
       *)
-      About step_scope.
+
       (* By step_scope:
         Since T[A] == ThetaA ++ ThetaA'
         and e / ThetaA -> e' / Θ',
