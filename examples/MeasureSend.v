@@ -3,7 +3,7 @@ From Stdlib Require Lists.List.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 Import List.ListNotations.
 
-From Qoreo Require Import Base Expr Choreography.
+From Qoreo Require Import Expr.Expr Choreography.Choreography.
 From Qoreo Require Import Network NetQasm.
 From QoreoExamples Require Import OldNotation.
 Require Extraction.
@@ -22,7 +22,7 @@ Module MeasureSend.
   Definition y : Var.t := var 2.
 
   Definition choreo : Choreography.t :=
-    [
+    Choreography.of_list [
       let{A, q := New[false]};
       let{A, q := H[q]};
       let!{A, x := Measure[q]};

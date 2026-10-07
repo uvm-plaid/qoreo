@@ -1,9 +1,14 @@
 From Stdlib Require Import String.
-From Qoreo Require Import Base Expr Choreography.
+From Qoreo Require Import Base.Config Expr.Expr Choreography.Choreography.
+Import Config.Unitary.
+Import Expr.
 From QoreoExamples Require Import Notation.
 Import ExampleExtraction.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
+
+Import List.ListNotations.
+Open Scope list_scope.
 
 Open Scope string_scope.
 Open Scope example_scope.
@@ -70,7 +75,6 @@ Module B92.
                                  (Pair (Var m2) (If (Var b2) (Bit false) (Bit true))))
                            (Pair (Var m3) (If (Var b3) (Bit false) (Bit true))) -]
   ).
-
 
   Definition parties : list Actor.t :=
     ["alice"; "bob"].

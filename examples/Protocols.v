@@ -1,9 +1,14 @@
 From Stdlib Require Import String.
-From Qoreo Require Import Base Expr Choreography.
+From Qoreo Require Import Base.Config Expr.Expr Choreography.Choreography.
+Import Config.Unitary.
+Import Expr.
 From QoreoExamples Require Import Notation.
+Import ExampleExtraction.
+From Stdlib Require Import extraction.ExtrOcamlNativeString.
+From Qoreo Require Import NetQasm.
 
-Open Scope string_scope.
-Open Scope example_scope.
+Import List.ListNotations.
+Open Scope list_scope.
 
 Notation var A := Var.t.
 
@@ -161,7 +166,7 @@ Definition DVQA (Alice Bob : Actor.t) (params : dvar_params) (success : Expr.t) 
     do (b,q3) ← Bob [-- Unitary CNOT (Pair b q3) -];;
     do z ← Bob [- Meas (Unitary H b) -];;
     do z ← send Bob z Alice ;;
-    do q1 ← Alice [- If z (Unitary Base.Z b) b -];;
+    do q1 ← Alice [- If z (Unitary Unitary.Z b) b -];;
 
     (* Layers 3 and 4 of rotations *)
     do q1 ← Alice [- Unitary (RZ (t8 params)) (Unitary (RY (t7 params)) q1) -];;

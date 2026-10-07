@@ -322,6 +322,12 @@ Module Choreography.
       If A e C11 C12 (seq C1' C2)
     end.
 
+    Fixpoint of_list (C : list Insn.t) : t :=
+    match C with
+    | nil => Empty
+    | cons i C' => Do i (of_list C')
+    end.
+
     Fixpoint actors (C : t) : Actor.FSet.t :=
       match C with
       | Empty => Actor.FSet.empty

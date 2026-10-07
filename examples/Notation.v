@@ -5,8 +5,10 @@ Import List.ListNotations.
 From Stdlib Require Import Setoid.
 
 
-From Qoreo Require Import Base Expr Choreography.
-From Qoreo Require Import Network NetQasm.
+From Qoreo.Base Require Config.
+Import Config.Unitary.
+From Qoreo Require Import Expr.Expr Choreography.Choreography.
+From Qoreo Require Import Network.Network NetQasm.
 Require Extraction.
 
 (** 
@@ -47,7 +49,7 @@ Declare Scope example_scope.
   Definition empty_state : state :=
   {|
     vars := Var.Map.empty _;
-    chor := []
+    chor := Choreography.Empty
   |}.
 
   (** Extract the underlying choreography from a monadic computation. *)
@@ -65,12 +67,16 @@ Declare Scope example_scope.
       |} in
       (s', x).
 
+  (* TODO: move to Choreography module *)
+  Definition snoc C I :=
+    Choreography.seq C (Choreography.Do I Choreography.Empty).
+
   (** Append instruction [I] to the choreography in the current state *)
   Definition add_insn (I : Choreography.Insn.t) : Qoreo unit :=
     fun s =>
       let s' := {|
         vars := vars s;
-        chor := (chor s ++ [I])%list
+        chor := snoc (chor s) I
       |} in
       (s', tt).
 
@@ -127,10 +133,10 @@ Declare Scope example_scope.
 
   (** Conditionally apply X gate based on classical bit [e]. *)
   Definition if_X A (e : Expr.t) (q : Var.t) : Qoreo unit :=
-    add_insn (Choreography.Insn.Let A q (If e (Unitary X q) q)).
+    add_insn (Choreography.Insn.Let A q (Expr.If e (Unitary X q) q)).
   (** Conditionally apply Z gate based on classical bit [e]. *)
   Definition if_Z A (e : Expr.t) (q : Var.t) : Qoreo unit :=
-    add_insn (Choreography.Insn.Let A q (If e (Unitary Z q) q)).
+    add_insn (Choreography.Insn.Let A q (Expr.If e (Unitary Z q) q)).
 
   (** Convenient notations for local quantum operations. *)
   Notation "A '[-' e '-]'" :=
@@ -208,8 +214,8 @@ Ltac right_associate A :=
     do x      ← Alice [- Meas a -] ;;
     do z      ← send Alice z Bob ;;
     do x      ← send Alice x Bob ;;
-    do b      ← Bob [- If z (Unitary Z b) b -] ;;
-    do b      ← Bob [- If x (Unitary X b) b -] ;;
+    do b      ← Bob [- Expr.If z (Unitary Z b) b -] ;;
+    do b      ← Bob [- Expr.If x (Unitary X b) b -] ;;
     ret b.
 
 

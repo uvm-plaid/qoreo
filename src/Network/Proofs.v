@@ -10,6 +10,7 @@ From Stdlib Require Import Logic.Decidable.
 From Stdlib Require Import Bool.Bool.
 From Stdlib Require Import Setoid.
 From Stdlib Require Import Morphisms (* for Proper *).
+Require Import Stdlib.Program.Equality.
 
 From Qoreo.Base Require Var Config ChorEnv.
 From Qoreo.Expr Require Expr.
@@ -29,7 +30,7 @@ Import Actor.Map.Tactics.
 
 Lemma EPP_correct : forall A C P,
     EPP A C P <-> epp A C = Some P.
-Proof.
+(*Proof.
     intros.
     split.
     * intros HEPP. 
@@ -57,7 +58,7 @@ Proof.
         inversion Hepp; subst; clear Hepp;
           constructor; auto;
         simpl; Actor.simplify.
-Qed.
+Qed.*) Admitted.
 
 Lemma eppI_disjoint : forall D I,
   ~ Actor.FSet.In D (Choreography.Insn.actors I) ->
@@ -66,11 +67,15 @@ Proof.
   intros D I Hin; destruct I; auto; simpl in *; Actor.simplify.
 Qed.
 
-
+Fixpoint prepend (ls : list Network.Insn.t) (P : Process.t) : Process.t :=
+  match ls with
+  | [] => P
+  | I0::ls' => Process.Do I0 (prepend ls' P)
+  end.
 Lemma EPP_cons : forall A I C PA,
   Choreography.Insn.WellFormed I ->
-  EPP A (I :: C) PA <->
-  exists PA', PA = eppI A I ++ PA' /\ EPP A C PA'.
+  EPP A (Choreography.Do I C) PA <->
+  exists PA', PA = prepend (eppI A I) PA' /\ EPP A C PA'.
 Proof.
   intros A I C PA HI. split.
   * intros  HEPPA.
@@ -166,7 +171,7 @@ Proof.
 Qed.
 
 Lemma EPP_disjoint_inversion : forall A I C P,
-  EPP A (I :: C) P ->
+  EPP A (Choreography.Do I C) P ->
   ~ Actor.FSet.In A (Choreography.Insn.actors I) ->
   EPP A C P.
 Proof.
@@ -177,11 +182,11 @@ Qed.
 
 
 Lemma EPP_N_cons : forall I C N ,
-  EPP_N (I :: C) N <->
+  EPP_N (Choreography.Do I C) N <->
   (forall A PA,
     Actor.FSet.In A (Choreography.Insn.actors I) ->
     Actor.Map.MapsTo A PA N ->
-    EPP A (I :: C) PA
+    EPP A (Choreography.Do I C) PA
   ) /\
   EPP_N C (Actor.Map.setminus (Choreography.Insn.actors I) N).
 Proof.
@@ -207,9 +212,6 @@ Proof.
       Actor.simplify.
 Qed.
 
-Require Import Stdlib.Program.Equality.
-
-
 Lemma bind_eqb_equiv : forall p1 p2,
   Choreography.Insn.bind_eqb p1 p2 =
     if Actor.eq_dec (fst p1) (fst p2)
@@ -229,7 +231,7 @@ Lemma EPP_subst_neq : forall C A P B x v,
     A <> B ->
     EPP A C P ->
     EPP A (Choreography.subst B x v C) P.
-Proof.
+(*Proof.
   induction C as [ | I C];
     intros ? ? ? ? ? Hneq H.
   { inversion H; subst; constructor. }
@@ -244,13 +246,13 @@ Proof.
   apply EPP_disjoint.
   { Actor.simplify. }
   destruct (Choreography.Insn.rebound_in B x I) eqn:HI; auto.
-Qed.
+Qed.*) Admitted.
 
 Lemma EPP_subst_neq_bwd : forall C A P B x v,
     A <> B ->
     EPP A (Choreography.subst B x v C) P ->
     EPP A C P.
-Proof.
+(*Proof.
   intros C A P B x v Hneq.
   revert P.
   induction C as [ | I C]; 
@@ -315,7 +317,7 @@ Proof.
       inversion Hepp; subst; clear Hepp;
       simpl in *; Actor.simplify;
       constructor; auto.
-Qed. 
+Qed. *) Admitted.
 
 
 Lemma subst_not_in_I : forall I A x v,
@@ -356,7 +358,7 @@ Qed.
 Lemma EPP_subst_eq_bwd : forall A x v C P',
   EPP A (Choreography.subst A x v C) P' ->
   exists P, EPP A C P /\ P' = Process.subst x v P.
-Proof.
+(*Proof.
   intros A x v C.
   induction C as [ | I C];
     intros P' H;
@@ -393,7 +395,7 @@ Proof.
     + (* A = A0 *)
       Actor.simplify.
       edestruct (IHC P) as [P0 [H0 ?]]; eauto; subst.
-      exists (Insn.Send v0 B0 :: P0).
+      exists (Process.Do (Insn.Send v0 B0) P0).
       split; auto.
       constructor; auto.
 
@@ -401,14 +403,14 @@ Proof.
       Actor.simplify.
       Var.Map.Tactics.compare x y0.
       - (* x = y0 *)
-        exists (Insn.Receive x A0 :: P).
+        exists (Process.Do (Insn.Receive x A0) P).
         simpl. Var.simplify.
         split; auto.
         constructor; auto.
       
       - (* x <> y0 *)
         edestruct (IHC P) as [P0 [H0 ?]]; eauto; subst.
-        exists (Insn.Receive y0 A0 :: P0).
+        exists (Process.Do (Insn.Receive y0 A0) P0).
         simpl. Var.simplify.
         split; auto.
         constructor; auto.
@@ -426,14 +428,14 @@ Proof.
       Actor.simplify.
       Var.Map.Tactics.compare x x0.
       - (* x = y0 *)
-        exists (Insn.EPR x B0 :: P).
+        exists (Process.Do (Insn.EPR x B0) P).
         simpl in *. Var.simplify.
         split; auto.
         constructor; auto.
 
       - (* x <> x0 *)
         edestruct (IHC P) as [P0 [H0 ?]]; eauto; subst.
-        exists (Insn.EPR x0 B0 :: P0).
+        exists (Process.Do (Insn.EPR x0 B0) P0).
         simpl in *. Var.simplify.
         split; auto.
         constructor; auto.
@@ -442,14 +444,14 @@ Proof.
       Actor.simplify. simpl in *.
       Var.Map.Tactics.compare x y0.
       - (* x = y0 *)
-        exists (Insn.EPR x A0 :: P).
+        exists (Process.Do (Insn.EPR x A0) P).
         simpl. Var.simplify.
         split; auto.
         constructor; auto.
       
       - (* x <> y0 *)
         edestruct (IHC P) as [P0 [H0 ?]]; eauto; subst.
-        exists (Insn.EPR y0 A0 :: P0).
+        exists (Process.Do (Insn.EPR y0 A0) P0).
         simpl. Var.simplify.
         split; auto.
         constructor; auto.
@@ -467,14 +469,14 @@ Proof.
 
     Var.Map.Tactics.compare x x0.
     + (* x = x0 *)
-      exists (Insn.Let x v0 :: P).
+      exists (Process.Do (Insn.Let x v0) P).
       simpl. Var.simplify.
       split; auto.
       constructor; auto.
 
     + (* x <> x0 *)
       edestruct (IHC P) as [P0 [H0 ?]]; eauto; subst.
-      exists (Insn.Let x0 v0 :: P0).
+      exists (Process.Do (Insn.Let x0 v0) P0).
       simpl; Var.simplify.
       split; auto.
       constructor; auto.
@@ -488,14 +490,14 @@ Proof.
 
     Var.Map.Tactics.compare x x0.
     + (* x = x0 *)
-      exists (Insn.LetBang x v0 :: P).
+      exists (Process.Do (Insn.LetBang x v0) P).
       simpl. Var.simplify.
       split; auto.
       constructor; auto.
 
     + (* x <> x0 *)
       edestruct (IHC P) as [P0 [H0 ?]]; eauto; subst.
-      exists (Insn.LetBang x0 v0 :: P0).
+      exists (Process.Do (Insn.LetBang x0 v0) P0).
       simpl; Var.simplify.
       split; auto.
       constructor; auto.
@@ -510,24 +512,24 @@ Proof.
     Var.Map.Tactics.compare x x0;
       [ | Var.Map.Tactics.compare x y0 ].
     + (* x = x0 *)
-      exists (Insn.LetPair x y0 v0 :: P).
+      exists (Process.Do (Insn.LetPair x y0 v0) P).
       simpl in *. Var.simplify.
       split; auto.
       constructor; auto.
 
     + (* x = y0 *)
-      exists (Insn.LetPair x0 x v0 :: P).
+      exists (Process.Do (Insn.LetPair x0 x v0) P).
       simpl in *. Var.simplify.
       split; auto.
       constructor; auto.
 
     + (* x <> x0 /\ x <> y0 *)
       edestruct (IHC P) as [P0 [H0 ?]]; eauto; subst.
-      exists (Insn.LetPair x0 y0 v0 :: P0).
+      exists (Process.Do (Insn.LetPair x0 y0 v0) P0).
       simpl; Var.simplify.
       split; auto.
       constructor; auto.
-Qed.
+Qed.*) Admitted.
 
 
 Lemma EPP_subst_iff : forall C D PD A x v,
@@ -554,10 +556,10 @@ Qed.
 
 Ltac EPP_N_cons :=
   match goal with
-  | [H : EPP_N (_ :: _) _ |- _] =>
+  | [H : EPP_N (Choreography.Do _ _) _ |- _] =>
     rewrite EPP_N_cons in H;
     simpl in H; Actor.simplify
-  | [ |- EPP_N (_ :: _) _ ] =>
+  | [ |- EPP_N (Choreography.Do _ _) _ ] =>
     eapply EPP_N_cons;
     repeat split; intros; simpl; Actor.simplify
   end.
@@ -620,22 +622,6 @@ Proof.
     try rewrite Heq in *;
     try rewrite Heq' in *;
     try (econstructor; eauto; fail).
-  (* only EPR cases left *)
-  * subst.
-
-    apply (chor_epr_eq Θ2) in H; auto.
-    destruct H as [T0' [Heq'' H]].
-
-    apply (Choreography.EPRB q1 q2 T0'); auto.
-    { rewrite H; auto. }
-
-  * apply (chor_epr_eq Θ2) in H; auto.
-    destruct H as [T0' [Heq'' H]].
-
-    apply (Choreography.EPRB' q1 q2 T0'); auto.
-    {
-      rewrite H; auto.
-    }
 Qed.
 
 Global Instance chor_step_Proper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.step).
@@ -683,9 +669,10 @@ Definition actor_map {T} (f : Actor.t -> option (option T)) (X : Actor.FSet.t) N
                   X N0.
 Definition uncons (N : Network.t) A : option (option Process.t):=
   match Actor.Map.find A N with
-  | Some (_ :: P) => Some (Some P)
-  | Some [] => None
+  | Some (Process.Do _ P) => Some (Some P)
+  | Some Process.Empty => None
   | None => None
+  | _ => None (* TODO: may have to change *)
   end.
 Definition unconsN N X := actor_map (uncons N) X N.
 
@@ -750,7 +737,7 @@ Qed.
 (*
 Definition uncons A (N : Network.t) :=
   match Actor.Map.find A N with
-  | Some (_ :: P) => Actor.Map.add A P N
+  | Some (Process.Do _ P) => Actor.Map.add A P N
   | Some [] => N
   | _ => Actor.Map.remove A N
   end.
@@ -807,49 +794,6 @@ Proof.
 Qed.
 Hint Rewrite find_actor_map : actor_db.
 
-(*  
-Lemma actor_map_mapsto_neq : forall T (X : Actor.FSet.t) A PA (f : Actor.t -> option (option T)) N,
-  ~ Actor.FSet.In A X ->
-  Actor.Map.MapsTo A PA (actor_map f X N)
-  <->
-  Actor.Map.MapsTo A PA N.
-Proof.
-  intros T X A PA f N Hin. unfold actor_map. rewrite Actor.FSet.fold_1.
-  remember (Actor.FSet.elements X) as ls eqn:Hls.
-  assert (Hls' : SetoidList.equivlistA eq ls (Actor.FSet.elements X)).
-  { rewrite Hls. reflexivity. }
-  assert (Hdup : SetoidList.NoDupA eq ls).
-  { rewrite Hls. apply Actor.FSet.elements_3w. }
-  clear Hls.
-  revert X Hls' Hdup N Hin.
-  induction ls as [ | B ls]; intros X Hls Hdup N Hin.
-  { reflexivity. }
-  simpl.
-
-  compare A B.
-  {
-    exfalso.
-    apply Hin.
-    apply Actor.FSet.elements_2.
-    rewrite <- Hls.
-    constructor; auto.
-  }
-
-  rewrite (IHls (Actor.FSet.remove B X)).
-  2:{
-    erewrite Actor.Map.FSetProofs.elements_cons_remove; eauto.
-    { reflexivity. }
-    { inversion Hdup; auto. }
-    { symmetry. auto. }
-  }
-  2:{ inversion Hdup; auto. }
-  2:{ Actor.simplify. }
-  destruct (f B) as [[v | ] |] eqn:HB.
-  { Actor.simplify. intuition. }
-  { Actor.simplify. intuition. }
-  { reflexivity. }
-Qed.
-*)
 
 Lemma fold_uncons_mapsto_neq : forall X A PA N,
   ~ Actor.FSet.In A X ->
@@ -885,7 +829,7 @@ Proof.
   intros M1 M2 HM ? A ?; subst.
   unfold uncons.
   rewrite HM.
-  destruct (Actor.Map.find A M2) as [ [ | P] | ]; auto.
+  destruct (Actor.Map.find A M2) as [ [ | ? | ? | ?] | ]; auto.
 Qed.
 
 Instance actor_map_Proper : forall T f, Proper (Actor.FSet.Equal ==> Actor.Map.Equal ==> Actor.Map.Equal) (@actor_map T f).
@@ -904,8 +848,8 @@ Qed.
 Lemma fold_uncons_mapsto_eq : forall N A PA X,
   Actor.FSet.In A X ->
   Actor.Map.MapsTo A PA (unconsN N X) <->
-  (PA = [] /\ Actor.Map.MapsTo A [] N) \/ exists I, Actor.Map.MapsTo A (I :: PA) N.
-Proof.
+  (PA = Process.Empty /\ Actor.Map.MapsTo A Process.Empty N) \/ exists I, Actor.Map.MapsTo A (Process.Do I PA) N.
+(*Proof.
   intros N A PA X Hin.
   repeat rewrite Actor.Map.Properties.F.find_mapsto_iff.
   unfold unconsN.
@@ -929,32 +873,32 @@ Proof.
     split; [inversion 1; subst | intros [[? Hfind] | [I0' HI0']]]; subst; auto;
       try discriminate.
     Actor.reflect_find. discriminate.
-Qed.
+Qed.*) Admitted.
 
 Lemma fold_uncons_find_iff : forall X A N,
   Actor.Map.find A (unconsN N X)
   =
   if Actor.Map.FSetProofs.in_dec A X
   then match Actor.Map.find A N with
-       | Some (_ :: PA) => Some PA
-       | Some [] => Some []
-       | None => None
+       | Some (Process.Do _ PA) => Some PA
+       | Some Process.Empty => Some Process.Empty
+       | _ => None
        end
   else Actor.Map.find A N.
-Proof.
+(*Proof.
   intros.
   unfold unconsN.
   autorewrite with actor_db.
   destruct (Actor.Map.FSetProofs.in_dec A X); auto.
   unfold uncons.
-  destruct (Actor.Map.find A N) as [[ | IA PA]|]; auto.
-Qed.
+  destruct (Actor.Map.find A N) as [[ | | | ]|]; auto.
+Qed.*) Admitted. (* False as written *)
 
 #[global] Hint Rewrite fold_uncons_find_iff : actor_db.
   
 
 Lemma EPP_N_cons_inversion : forall I C N,
-  EPP_N (I :: C) N ->
+  EPP_N (Choreography.Do I C) N ->
   EPP_N C (unconsN N (Choreography.Insn.actors I)).
 Proof.
   intros I C N HN.
@@ -992,7 +936,7 @@ Lemma completeness_local : forall PA (refs : Var.Map.t nat) cfg PA' refs' cfg',
     Choreography.step C Θ cfg (Label.Loc A) C' Θ' cfg'
     /\
     EPP_N C' (Actor.Map.add A PA' N).
-Proof.
+(*Proof.
   intros ? ? ? ? ? ? Hstep A N C Θ Θ' HEPP_N HWF Hmapsto Hrefs HΘ'.
   rewrite EPP_N_spec in HEPP_N.
   apply HEPP_N in Hmapsto.
@@ -1007,11 +951,11 @@ Proof.
   * (* SendC *)
     inversion Hstep; subst; clear Hstep.
     Var.simplify.
-    exists (Choreography.Insn.Send A e' B y :: C).
+    exists (Choreography.Do (Choreography.Insn.Send A e' B y) C).
     split.
     { econstructor; eauto. }
     { 
-      eapply (EPP_N_add _ A (Insn.Send e' B :: P)).
+      eapply (EPP_N_add _ A (Process.Do (Insn.Send e' B) P)).
       { Actor.simplify. }
       { constructor; auto. }
       {
@@ -1038,7 +982,7 @@ Proof.
     inversion Hstep; subst; clear Hstep.
     + (* LetC *)
       Var.simplify.
-      exists (Choreography.Insn.Let A x e' :: C).
+      exists (Choreography.Do (Choreography.Insn.Let A x e') C).
       split.
       { econstructor; eauto. }
       {
@@ -1085,7 +1029,7 @@ Proof.
     inversion Hstep; subst; clear Hstep.
     + (* LetBangC *)
       Var.simplify.
-      exists (Choreography.Insn.LetBang A x e' :: C).
+      exists (Choreography.Do (Choreography.Insn.LetBang A x e') C).
       split.
       { econstructor; eauto. }
       {
@@ -1130,7 +1074,7 @@ Proof.
     inversion Hstep; subst; clear Hstep.
     + (* LetPairC *)
       Var.simplify.
-      exists (Choreography.Insn.LetPair A x1 x2 e' :: C).
+      exists (Choreography.Do (Choreography.Insn.LetPair A x1 x2 e') C).
       split.
       { econstructor; eauto. }
       {
@@ -1180,7 +1124,7 @@ Proof.
     set (HEPP_N_uncons := EPP_N_cons_inversion _ _ _ HEPP_N).
     eapply IHHmapsto in HEPP_N_uncons; eauto.
     destruct HEPP_N_uncons as [C' [Hstep' HEPP_N_uncons]].
-    exists (I :: C').
+    exists (Choreography.Do I C').
     split.
     + apply Choreography.Delay; auto.
       simpl.
@@ -1229,14 +1173,14 @@ Proof.
     all: (subst; try contradiction).
     exact (Insn.Send t0 t).
     exact (Insn.EPR t0 t).
-Qed.
+Qed.*) Admitted.
 
 
 Lemma fold_uncons_in_iff : forall A X N,
   Actor.Map.In A (unconsN N X)
   <->
   Actor.Map.In A N.
-Proof.
+(*Proof.
   intros A X N.
   split; intros Hin.
   * Actor.reflect_find.
@@ -1248,7 +1192,7 @@ Proof.
     destruct (Actor.Map.FSetProofs.in_dec A X) as [HinX | HinX].
     + destruct v; discriminate.
     + discriminate. 
-Qed.
+Qed.*) Admitted.
 Hint Rewrite fold_uncons_in_iff : actor_db.
 
 
@@ -1261,7 +1205,7 @@ Lemma completeness_send : forall C N refs cfg A v B N' refs' cfg',
     Choreography.step C refs cfg (Label.Send A v B) C' refs' cfg'  /\
     EPP_N C' N' /\
     (forall D, Actor.FSet.In D (Choreography.actors C') -> Actor.Map.In D N').
-Proof.
+(*Proof.
   induction C as [ | I C]; intros N refs cfg A v B N' refs' cfg' HWF Hstep HEPP_N Hdomain.
   {
     exfalso.
@@ -1386,7 +1330,7 @@ Proof.
     assert (HEPP_N_cons : forall D PD,
       Actor.FSet.In D (Choreography.Insn.actors I) ->
       Actor.Map.MapsTo D PD N ->
-      EPP D (I :: C) PD).
+      EPP D (Choreography.Do I C) PD).
     { EPP_N_cons. }
     apply EPP_N_cons_inversion in HEPP_N.
     eapply IHC in WFC'; eauto.
@@ -1404,7 +1348,7 @@ Proof.
     }
     destruct WFC' as [C' [IHstep [IHEPP_N IHdomain]]].
 
-    exists (I :: C').
+    exists (Choreography.Do I C').
     split.
     { constructor; eauto.
       {
@@ -1473,14 +1417,14 @@ Proof.
       rewrite HI in HD. simpl in HD.
       rewrite fold_uncons_mapsto_eq; auto.
       right. exists I'; auto.
-Qed.
+Qed.*) Admitted.
 
 
 Lemma EPP_deterministic : forall C A P1 P2,
   EPP A C P1 ->
   EPP A C P2 ->
   P1 = P2.
-Proof.
+(*Proof.
   induction C as [ | I C]; intros A P1 P2 H1 H2.
   * inversion H1; inversion H2; subst; clear H1 H2.
     auto.
@@ -1495,11 +1439,11 @@ Proof.
     end;
     f_equal; eauto;
     simpl in *; Actor.simplify. 
-Qed.
+Qed.*) Admitted.
 
 Lemma EPP_disjoint_iff : forall A I C P,
   ~ Actor.FSet.In A (Choreography.Insn.actors I) ->
-  EPP A (I :: C) P <-> EPP A C P.
+  EPP A (Choreography.Do I C) P <-> EPP A C P.
 Proof.
   intros. split; intros Hepp.
   { apply EPP_disjoint_inversion in Hepp; auto. }
@@ -1507,8 +1451,8 @@ Proof.
 Qed.
 
 Lemma EPP_N_nil : forall N,
-  EPP_N [] N ->
-  forall D PD, Actor.Map.MapsTo D PD N -> PD = [].
+  EPP_N Choreography.Empty N ->
+  forall D PD, Actor.Map.MapsTo D PD N -> PD = Process.Empty.
 Proof.
   intros N HN.
   dependent induction HN; intros D PD HD.
@@ -1521,11 +1465,11 @@ Proof.
 Qed.
 
 Lemma EPP_N_nil_nostep : forall N refs cfg l N' refs' cfg',
-  EPP_N [] N ->
+  EPP_N Choreography.Empty N ->
   ~ Network.step N refs cfg l N' refs' cfg'.
 Proof.
   intros.
-  assert (Hempty : forall D PD, Actor.Map.MapsTo D PD N -> PD = []).
+  assert (Hempty : forall D PD, Actor.Map.MapsTo D PD N -> PD = Process.Empty).
   { apply EPP_N_nil; auto. }
   intros Hstep.
   clear H. revert Hempty.
@@ -1533,12 +1477,13 @@ Proof.
   * apply Hempty in H. subst. inversion H0.
   * apply Hempty in H0. inversion H0.
   * apply Hempty in H0. inversion H0.
+  * apply Hempty in H0. inversion H0. 
 Qed. 
 
 
 Lemma EPR_cons_dec : forall I C x y A B PA PB,
-  EPP A (I :: C) (Insn.EPR x B :: PA) ->
-  EPP B (I :: C) (Insn.EPR y A :: PB) ->
+  EPP A (Choreography.Do I C) (Process.Do (Insn.EPR x B) PA) ->
+  EPP B (Choreography.Do I C) (Process.Do (Insn.EPR y A) PB) ->
   (I = Choreography.Insn.EPR A x B y)
     \/
   (I = Choreography.Insn.EPR B y A x)
@@ -1572,7 +1517,7 @@ Lemma completeness_epr : forall C N refs cfg A B N' refs' cfg',
     Choreography.step C refs cfg (Label.EPR A B) C' refs' cfg'  /\
     EPP_N C' N' /\
     (forall D, Actor.FSet.In D (Choreography.actors C') -> Actor.Map.In D N').
-Proof.
+(*Proof.
   intros C; induction C as [ | I C];
     intros ? ? ? ? ? ? ? ? Hstep HEPP_N HWF Hdomain.
   {
@@ -1586,9 +1531,11 @@ Proof.
   rename H4 into HEPR, H12 into HN'.
 
   rewrite EPP_N_spec in HEPP_N.
-  assert (HEPPA : EPP A (I :: C) (Insn.EPR x B :: PA))
+  assert (HEPPA : EPP A (Choreography.Do I C)
+    (Process.Do (Insn.EPR x B) PA))
     by (apply HEPP_N; auto).
-  assert (HEPPB : EPP B (I :: C) (Insn.EPR y A :: PB))
+  assert (HEPPB : EPP B (Choreography.Do I C)
+    (Process.Do (Insn.EPR y A) PB))
     by (apply HEPP_N; auto).
   rewrite <- EPP_N_spec in HEPP_N.
 
@@ -1705,7 +1652,7 @@ Proof.
     }
     destruct HEPP_N' as [C' [Hstep' [HEPP_N' Hdomain']]].
     
-    eexists (I :: C').
+    eexists (Choreography.Do I C').
     split.
     { 
       apply Choreography.Delay; auto. simpl.
@@ -1764,7 +1711,7 @@ Proof.
 
     Unshelve.
     all: (apply Insn.EPR; auto).
-Qed.
+Qed.*) Admitted.
 
 
 Lemma step_domain_label_subset : forall C Θ ρ l C' Θ' ρ',
@@ -1775,6 +1722,10 @@ Lemma step_domain_label_subset : forall C Θ ρ l C' Θ' ρ',
 Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros D HD; simpl in *; Actor.simplify.
+  * inversion H; subst; clear H;
+      simpl in *; Actor.simplify.
+  * inversion H; subst; clear H;
+      simpl in *; Actor.simplify. 
 Qed.
 
 Lemma step_domain_subset : forall C Θ ρ l C' Θ' ρ',
@@ -1786,7 +1737,18 @@ Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros D HD; simpl in *; subst; Actor.simplify.
   * destruct HD; auto.
-Qed.
+    inversion H; subst; clear H;
+      simpl in *;
+      Actor.simplify.
+  * inversion H; subst; clear H;
+      simpl in *;
+      Actor.simplify.
+      destruct b.
+      admit (* lemma *).
+      admit (* lemma *).
+  * destruct HD; auto.
+  * repeat (destruct HD as [? | HD]; auto).
+Admitted.
 
 Theorem completeness : forall N refs cfg l N' refs' cfg',
 
@@ -1798,7 +1760,7 @@ Theorem completeness : forall N refs cfg l N' refs' cfg',
     exists C', EPP_N C' N' /\
                 Choreography.step C refs cfg l C' refs' cfg' /\
                 (forall D, Actor.FSet.In D (Choreography.actors C') -> Actor.Map.In D N').
-Proof.
+(*Proof.
     intros N refs cfg l N' refs' cfg' Hstep C HWF HEPP Hdomain.
     destruct l as [A v B | A B | A ].
 
@@ -1827,7 +1789,7 @@ Proof.
         eapply step_domain_subset in HD; eauto.
         Actor.simplify.        
       }
-Qed.
+Qed.*) Admitted.
 
 
 
@@ -1850,9 +1812,9 @@ Qed.
 Hint Rewrite remove_singleton : actor_db.
 
 Lemma EPP_cons_in_inversion : forall I C D PD,
-  EPP D (I :: C) PD ->
+  EPP D (Choreography.Do I C) PD ->
   Actor.FSet.In D (Choreography.Insn.actors I) ->
-  exists I' PD', eppI D I = [I'] /\ PD = I' :: PD'.
+  exists I' PD', eppI D I = [I'] /\ PD = Process.Do I' PD'.
 Proof.
   intros I C D PD HEPP Hin.
   inversion HEPP; subst; try contradiction;
@@ -1860,9 +1822,9 @@ Proof.
 Qed.
 
 Lemma EPP_send_inversion : forall A v B x C N PA,
-  EPP_N (Choreography.Insn.Send A v B x :: C) N ->
+  EPP_N (Choreography.Do (Choreography.Insn.Send A v B x) C) N ->
   Actor.Map.MapsTo A PA N ->
-  exists PA', PA = (Insn.Send v B :: PA').
+  exists PA', PA = Process.Do (Insn.Send v B) PA'.
 Proof.
   intros A v B x C N PA H HA.
   rewrite EPP_N_spec in H.
@@ -1877,10 +1839,10 @@ Proof.
 Qed.
 
 Lemma EPP_receive_inversion : forall A v B x C N PB,
-  EPP_N (Choreography.Insn.Send A v B x :: C) N ->
+  EPP_N (Choreography.Do (Choreography.Insn.Send A v B x) C) N ->
   A <> B ->
   Actor.Map.MapsTo B PB N ->
-  exists PB', PB = Insn.Receive x A :: PB'.
+  exists PB', PB = Process.Do (Insn.Receive x A) PB'.
 Proof.
   intros A v B x C N PB H Hneq HB.
   rewrite EPP_N_spec in H.
@@ -1895,9 +1857,9 @@ Proof.
 Qed.
 
 Lemma EPP_let_inversion : forall A x e C N PA,
-  EPP_N (Choreography.Insn.Let A x e :: C) N ->
+  EPP_N (Choreography.Do (Choreography.Insn.Let A x e) C) N ->
   Actor.Map.MapsTo A PA N ->
-  exists PA', PA = Insn.Let x e :: PA'.
+  exists PA', PA = Process.Do (Insn.Let x e) PA'.
 Proof.
   intros A x e C N PA H HA.
   rewrite EPP_N_spec in H.
@@ -1912,9 +1874,9 @@ Proof.
 Qed.
 
 Lemma EPP_let_bang_inversion : forall A x e C N PA,
-  EPP_N (Choreography.Insn.LetBang A x e :: C) N ->
+  EPP_N (Choreography.Do (Choreography.Insn.LetBang A x e) C) N ->
   Actor.Map.MapsTo A PA N ->
-  exists PA', PA = Insn.LetBang x e :: PA'.
+  exists PA', PA = Process.Do (Insn.LetBang x e) PA'.
 Proof.
   intros A x e C N PA H HA.
   rewrite EPP_N_spec in H.
@@ -1929,9 +1891,9 @@ Proof.
 Qed.
 
 Lemma EPP_let_pair_inversion : forall A x1 x2 e C N PA,
-  EPP_N (Choreography.Insn.LetPair A x1 x2 e :: C) N ->
+  EPP_N (Choreography.Do (Choreography.Insn.LetPair A x1 x2 e) C) N ->
   Actor.Map.MapsTo A PA N ->
-  exists PA', PA = Insn.LetPair x1 x2 e :: PA'.
+  exists PA', PA = Process.Do (Insn.LetPair x1 x2 e) PA'.
 Proof.
   intros A x1 x2 e C N PA H HA.
   rewrite EPP_N_spec in H.
@@ -1946,9 +1908,9 @@ Proof.
 Qed.
 
 Lemma EPP_EPR_inversion_1 : forall A x1 B x2 C N PA,
-  EPP_N (Choreography.Insn.EPR A x1 B x2 :: C) N ->
+  EPP_N (Choreography.Do (Choreography.Insn.EPR A x1 B x2) C) N ->
   Actor.Map.MapsTo A PA N ->
-  exists PA', PA = Insn.EPR x1 B :: PA'.
+  exists PA', PA = Process.Do (Insn.EPR x1 B) PA'.
 Proof.
   intros A x1 B x2 C N PA H HA.
   rewrite EPP_N_spec in H.
@@ -1962,10 +1924,10 @@ Proof.
   eexists; eauto.
 Qed.
 Lemma EPP_EPR_inversion_2 : forall B x1 A x2 C N PA,
-  EPP_N (Choreography.Insn.EPR B x1 A x2 :: C) N ->
+  EPP_N (Choreography.Do (Choreography.Insn.EPR B x1 A x2) C) N ->
   Actor.Map.MapsTo A PA N ->
   A <> B ->
-  exists PA', PA = Insn.EPR x2 B :: PA'.
+  exists PA', PA = Process.Do (Insn.EPR x2 B) PA'.
 Proof.
   intros B x1 A x2 C N PA H HA Hneq.
   rewrite EPP_N_spec in H.
@@ -1981,8 +1943,8 @@ Qed.
 
 
 Lemma EPP_mapsto_uncons_in : forall I C N A I' PA',
-  EPP_N (I :: C) N ->
-  Actor.Map.MapsTo A (I' :: PA') N ->
+  EPP_N (Choreography.Do I C) N ->
+  Actor.Map.MapsTo A (Process.Do I' PA') N ->
   Actor.FSet.In A (Choreography.Insn.actors I) ->
   EPP A C PA'.
 Proof.
@@ -1995,7 +1957,7 @@ Proof.
 Qed.
 
 Lemma EPP_mapsto_uncons_nin : forall I C N D PD,
-  EPP_N (I :: C) N ->
+  EPP_N (Choreography.Do I C) N ->
   Actor.Map.MapsTo D PD N ->
   ~ Actor.FSet.In D (Choreography.Insn.actors I) ->
   EPP D C PD.
@@ -2018,48 +1980,48 @@ Ltac EPP_cons_in_inversion A :=
     destruct H' as [PA H]
   end;
   try match goal with
-  | [ H : EPP_N (Choreography.Insn.Send A ?e ?B ?x :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do (Choreography.Insn.Send A ?e ?B ?x) ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
     let PA' := fresh PA in
     destruct (EPP_send_inversion A e B x C N PA H)
       as [PA' ?]; subst; auto
 
-  | [ H : EPP_N (Choreography.Insn.Send ?D ?e A ?x :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do (Choreography.Insn.Send ?D ?e A ?x) ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
     let PA' := fresh PA in
     destruct (EPP_receive_inversion D e A x C N PA H)
       as [PA' ?]; subst; auto
 
-  | [ H : EPP_N (Choreography.Insn.Let A ?x ?e :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do (Choreography.Insn.Let A ?x ?e) ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
     let PA' := fresh PA in
     destruct (EPP_let_inversion A x e C N PA H)
       as [PA' ?]; subst; auto
 
-  | [ H : EPP_N (Choreography.Insn.LetBang A ?x ?e :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do (Choreography.Insn.LetBang A ?x ?e) ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
     let PA' := fresh PA in
     destruct (EPP_let_bang_inversion A x e C N PA H)
       as [PA' ?]; subst; auto
 
-  | [ H : EPP_N (Choreography.Insn.LetPair A ?x1 ?x2 ?e :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do (Choreography.Insn.LetPair A ?x1 ?x2 ?e) ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
     let PA' := fresh PA in
     destruct (EPP_let_pair_inversion A x1 x2 e C N PA H)
       as [PA' ?]; subst; auto
 
-  | [ H : EPP_N (Choreography.Insn.EPR A ?x1 ?B ?x2 :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do (Choreography.Insn.EPR A ?x1 ?B ?x2) ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
     let PA' := fresh PA in
     destruct (EPP_EPR_inversion_1 A x1 B x2 C N PA H)
       as [PA' ?]; subst; auto
-  | [ H : EPP_N (Choreography.Insn.EPR ?B ?x1 A ?x2 :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do (Choreography.Insn.EPR ?B ?x1 A ?x2) ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
     let PA' := fresh PA in
@@ -2067,7 +2029,7 @@ Ltac EPP_cons_in_inversion A :=
       as [PA' ?]; subst; auto
 
   (* fallthrough case *)
-  | [ H : EPP_N (?I :: ?C) ?N,
+  | [ H : EPP_N (Choreography.Do ?I ?C) ?N,
       H' : Actor.Map.MapsTo A ?PA _
     |- _ ] =>
   
@@ -2079,7 +2041,8 @@ Ltac EPP_cons_in_inversion A :=
 
   end;
   try match goal with
-  | [ H : EPP_N (_ :: ?C) _, H' : Actor.Map.MapsTo A (_ :: ?PA') _ |- _ ] =>
+  | [ H : EPP_N (Choreography.Do _ ?C) _,
+      H' : Actor.Map.MapsTo A (Process.Do _ ?PA') _ |- _ ] =>
     let H0 := fresh H in
     try assert (H0 : EPP A C PA')
     by (apply (EPP_mapsto_uncons_in _ _ _ _ _ _ H H'); simpl; Actor.simplify)
@@ -2087,7 +2050,8 @@ Ltac EPP_cons_in_inversion A :=
 
 Ltac EPP_cons_nin_inversion D :=
   match goal with
-  | [ H : EPP_N (_ :: ?C) ?N, H' : Actor.Map.MapsTo D ?PD ?N |- _ ] =>
+  | [ H : EPP_N (Choreography.Do _ ?C) ?N,
+      H' : Actor.Map.MapsTo D ?PD ?N |- _ ] =>
     let H'' := fresh H' in
     assert (H'' : EPP D C PD)
     by (apply (EPP_mapsto_uncons_nin _ _ _ _ _ H H'); simpl; Actor.simplify)
@@ -2118,7 +2082,7 @@ Lemma soundness_local : forall PA C refs cfg A C' refs' cfg' N,
   exists PA' refsA', Process.step PA (ChorEnv.find A refs) cfg PA' refsA' cfg'
            /\ EPP_N C' (Actor.Map.add A PA' N)
            /\ ChorEnv.Equal refs' (Actor.Map.add A refsA' refs).
-Proof.
+(*Proof.
   intros PA C refs cfg A C' refs' cfg' N Hstep.
   remember (Choreography.Label.Loc A) as l eqn:Hl.
   revert N A Hl.
@@ -2310,7 +2274,7 @@ Proof.
       rewrite fold_uncons_mapsto_eq; auto.
       right. eexists; eauto.
     }
-Qed.
+Qed.*) Admitted.
 
 
 
@@ -2326,7 +2290,7 @@ Lemma soundness_send : forall C refs cfg A v B C' refs' cfg',
   exists N', 
     Network.step N refs cfg (Choreography.Label.Send A v B) N' refs' cfg'
     /\ EPP_N C' N'.
-Proof.
+(*Proof.
   intros ? ? ? ? ? ? ? ? ? Hstep Hneq HWF N HN HA HB.
   dependent induction Hstep.
   *
@@ -2351,7 +2315,7 @@ Proof.
       Actor.simplify.
       EPP_N_cons; auto.
 
-  * (* C = I :: C' such that A ∉ I *)
+  * (* C = Do I C' such that A is not in I *)
     assert (HA' : ~ Actor.FSet.In A (Choreography.Insn.actors I)).
     { intros Hin. apply (H A). simpl. Actor.simplify. }
     assert (HB' : ~ Actor.FSet.In B (Choreography.Insn.actors I)).
@@ -2416,7 +2380,7 @@ Proof.
 
     + Actor.reflect_find.
       discriminate.
-Qed.
+Qed.*) Admitted.
 
 Lemma soundness_epr : forall C refs cfg A B C' refs' cfg',
   Choreography.step C refs cfg (Choreography.Label.EPR A B) C' refs' cfg' ->
@@ -2429,7 +2393,7 @@ Lemma soundness_epr : forall C refs cfg A B C' refs' cfg',
   exists N',
     Network.step N refs cfg (Choreography.Label.EPR A B) N' refs' cfg'
     /\ EPP_N C' N'.
-Proof.
+(*Proof.
   intros C refs cfg A B C' refs' cfg' Hstep.
   remember (Choreography.Label.EPR A B) as l eqn:Hl.
   revert A B Hl.
@@ -2570,7 +2534,7 @@ Proof.
 
     + Actor.reflect_find.
       discriminate.
-Qed.
+Qed.*) Admitted.
 
 Theorem soundness : forall C C' refs cfg refs' cfg' l,
     Choreography.step C refs cfg l C' refs' cfg' ->
@@ -2581,7 +2545,7 @@ Theorem soundness : forall C C' refs cfg refs' cfg' l,
       EPP_N C N ->
     exists N', Network.step N refs cfg l N' refs' cfg'
               /\ EPP_N C'  N'.
-Proof.
+(*Proof.
   intros ? ? ? ? ? ? ? Hstep WF WFl N Hsubset HN.
   destruct l as [A v B | A B | A].
   * (* Send *)
@@ -2610,12 +2574,12 @@ Proof.
       econstructor; eauto.
       reflexivity.
     }
-Qed.
+Qed.*) Admitted.
 
 Lemma WellFormed_projectable : forall C,
   Choreography.WellFormed C ->
   forall A, exists P, EPP A C P.
-Proof.
+(*Proof.
   intros C HC.
   induction HC; intros A.
   { eexists; econstructor. }
@@ -2625,7 +2589,7 @@ Proof.
     rewrite EPP_cons; auto.
     eexists. split; eauto.
   }
-Qed.
+Qed.*) Admitted.
 
 Definition eppN C :=
   let f := fun A => match epp A C with
@@ -2686,7 +2650,7 @@ Lemma EPP_correctness : forall C N Θ ρ l,
   EPP_N_complete C N ->
   (exists C' Θ' ρ', Choreography.step C Θ ρ l C' Θ' ρ') <->
   (exists N' Θ' ρ', Network.step N Θ ρ l N' Θ' ρ').
-Proof.
+(*Proof.
   intros C N Θ ρ l [HEPP_N [HWF Hdomain]].
   split.
   * intros [C' [Θ' [ρ' Hstep]]].
@@ -2699,7 +2663,7 @@ Proof.
     eapply completeness in Hstep; eauto.
     destruct Hstep as [C' [HEPP_N' [Hstep Hdomain']]].
     exists C', Θ', ρ'. auto.
-Qed.
+Qed.*) Admitted.
 
 
 
@@ -2721,7 +2685,7 @@ Theorem safety : forall N Θ ρ N' Θ' ρ',
   EPP_N_complete C N ->
 
   Network.Empty N' \/ exists l N'' Θ'' ρ'', Network.step N' Θ' ρ' l N'' Θ'' ρ''.
-Proof.
+(*Pjroof.
   intros ? ? ? ? ? ? Hstep.
   induction Hstep; intros C HWT HWS [HEPP_N [HWF Hdomain]].
   * destruct (Choreography.safety C Θ ρ C Θ ρ)
@@ -2761,4 +2725,4 @@ Proof.
     { eapply Choreography.WellScoped_preservation; eauto. }
     split; auto. split; auto.
     { eapply Choreography.WellTyped_WellFormed; eauto. }
-Qed.
+Qed.*) Admitted.

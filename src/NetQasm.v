@@ -2,9 +2,12 @@ From Stdlib Require Import Ascii String.
 From Stdlib Require Import Numbers.DecimalString.
 From Stdlib Require Lists.List.
 Import List.ListNotations.
+Open Scope list_scope.
 Open Scope string_scope.
 
-From Qoreo Require Import Base Expr Network.
+From Qoreo Require Base.Var Base.Config Expr.Expr Network.Network.
+Import Config.Unitary.
+
 
 Module AppFile.
   Record t := {
@@ -85,6 +88,7 @@ Fixpoint render_expr (e : Expr.t) : string :=
   | _ => unsupported
   end.
 
+(*
 Fixpoint add_actor (a : Actor.t) (xs : list Actor.t) : list Actor.t :=
   match xs with
   | [] => [a]
@@ -93,24 +97,45 @@ Fixpoint add_actor (a : Actor.t) (xs : list Actor.t) : list Actor.t :=
       then x :: xs'
       else x :: add_actor a xs'
   end.
-
-Fixpoint classical_peers (P : Network.Process.t) : list Actor.t :=
+*)
+Module Process := Network.Process.
+Fixpoint classical_peers (P : Network.Process.t) : Actor.FSet.t :=
   match P with
-  | [] => []
-  | Network.Insn.Send _ peer :: P'
-  | Network.Insn.Receive _ peer :: P' => add_actor peer (classical_peers P')
-  | _ :: P' => classical_peers P'
+  | Process.Empty => Actor.FSet.empty
+  | Process.Do (Network.Insn.Send _ peer) P'
+  | Process.Do (Network.Insn.Receive _ peer) P' =>
+    Actor.FSet.add peer (classical_peers P')
+  | Process.Do _ P' => classical_peers P'
+
+  | Process.BroadcastIf _ peers P1 P2 P' =>
+    (Actor.FSet.union peers
+      (Actor.FSet.union (classical_peers P1)
+      (Actor.FSet.union (classical_peers P2) 
+                        (classical_peers P'))))
+  
+  | Process.ReceiveIf peer P1 P2 P' =>
+    Actor.FSet.add peer
+      (Actor.FSet.union (classical_peers P1)
+      (Actor.FSet.union (classical_peers P2) 
+                        (classical_peers P')))
   end.
 
-Fixpoint epr_peers (P : Network.Process.t) : list Actor.t :=
+Fixpoint epr_peers (P : Network.Process.t) : Actor.FSet.t :=
   match P with
-  | [] => []
-  | Network.Insn.EPR _ peer :: P' => add_actor peer (epr_peers P')
-  | _ :: P' => epr_peers P'
+  | Process.Empty => Actor.FSet.empty
+  | Process.Do (Network.Insn.EPR _ peer) P' =>
+    Actor.FSet.add peer (epr_peers P')
+  | Process.Do _ P' => epr_peers P'
+
+  | Process.BroadcastIf _ _ P1 P2 P'
+  | Process.ReceiveIf _ P1 P2 P' =>
+    (Actor.FSet.union (epr_peers P1)
+    (Actor.FSet.union (epr_peers P2) 
+                      (epr_peers P')))
   end.
 
-Definition render_peer_list (xs : list Actor.t) : string :=
-  "[" +:+ join ", " (List.map actor_literal xs) +:+ "]".
+Definition render_peer_list (xs : Actor.FSet.t) : string :=
+  "[" +:+ join ", " (List.map actor_literal (Actor.FSet.elements xs)) +:+ "]".
 
 Definition render_insn (insn : Network.Insn.t) : string :=
   match insn with
@@ -130,14 +155,16 @@ Definition render_insn (insn : Network.Insn.t) : string :=
 
 Fixpoint render_process_body (P : Network.Process.t) : string :=
   match P with
-  | [] => EmptyString
-  | insn :: P' => render_insn insn +:+ render_process_body P'
+  | Process.Empty => EmptyString
+  | Process.Do insn P' => render_insn insn +:+ render_process_body P'
+  | Process.BroadcastIf e targets P1 P2 P' => "TODO: BroadcastIf not yet implemented"
+  | Process.ReceiveIf source P1 P2 P' => "TODO: ReceiveIf not yet implemented"
   end.
 
 Fixpoint last_bound_var (P : Network.Process.t) : option Var.t :=
   match P with
-  | [] => None
-  | [insn] =>
+  | Process.Empty => None
+  | Process.Do insn Process.Empty =>
       match insn with
       | Network.Insn.Let x _ => Some x
       | Network.Insn.LetBang x _ => Some x
@@ -146,7 +173,9 @@ Fixpoint last_bound_var (P : Network.Process.t) : option Var.t :=
       | Network.Insn.EPR x _ => Some x
       | Network.Insn.Send _ _ => None
       end
-  | _ :: P' => last_bound_var P'
+  | Process.Do _ P'
+  | Process.BroadcastIf _ _ _ _ P'
+  | Process.ReceiveIf _ _ _ P' => last_bound_var P'
   end.
 
 Definition render_app (self : Actor.t) (P : Network.Process.t) : string :=

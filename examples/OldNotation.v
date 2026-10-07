@@ -2,7 +2,8 @@ From Stdlib Require Import String.
 From Stdlib Require Lists.List.
 Import List.ListNotations.
 
-From Qoreo Require Import Base Expr Choreography Network NetQasm.
+From Qoreo Require Import Base.Config Expr.Expr Choreography.Choreography Network.Network NetQasm.
+Import Config.Unitary.
 
 Open Scope string_scope.
 
