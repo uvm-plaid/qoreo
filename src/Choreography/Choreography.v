@@ -386,7 +386,7 @@ Inductive stepB : Choreography.t -> ChorEnv.t nat -> Config.t ->
     cfg' = cfg ->
     Bs = Actor.FSet.remove A (Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2)) ->
     stepB (Choreography.If A (Expr.Bit b) C1 C2 C) T cfg
-          (Label.If A b Bs) (*??? do we need a new label that covers all actors in the if? *)
+          (Label.If A b Bs)
           C' T' cfg'
 
   | SendB : forall A v B x C refs refs' cfg C',

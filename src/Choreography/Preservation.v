@@ -11,11 +11,10 @@ Import HelperLemmas.
 Lemma WellTyped_WellFormed : forall Γ Delta Theta C,
   WellTyped Γ Delta Theta C ->
   Choreography.WellFormed C.
-(* Proof.
+Proof.
   intros ? ? ? ? HWT.
   induction HWT; constructor; auto; constructor; auto.
-Qed. *)
-Admitted.
+Qed.
 
 
 Lemma WellScoped_preservationC : forall I Theta ρ l I' Theta' ρ',
@@ -23,7 +22,7 @@ Lemma WellScoped_preservationC : forall I Theta ρ l I' Theta' ρ',
   Insn.WellFormed I ->
   ChorEnv.WellScoped Theta ρ ->
   ChorEnv.WellScoped Theta' ρ'.
-(* Proof.
+Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros HWT HWS;
   try match goal with
@@ -33,35 +32,30 @@ Lemma WellScoped_preservationC : forall I Theta ρ l I' Theta' ρ',
   auto;
   unfold ChorEnv.WellScoped in *.
 
-  * (* sendC *)
-    assert (Config.WellScoped TA' cfg').
+  * assert (Config.WellScoped TA' cfg').
     { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
     eapply Expr.BaseProofs.step_dim_monotonic; eauto.
     
-  * (* Let *) 
-    assert (Config.WellScoped TA' cfg').
+  * assert (Config.WellScoped TA' cfg').
     { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
     eapply Expr.BaseProofs.step_dim_monotonic; eauto.
 
-  * (* LetBang *)
-    assert (Config.WellScoped TA' cfg').
+  * assert (Config.WellScoped TA' cfg').
     { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
     eapply Expr.BaseProofs.step_dim_monotonic; eauto.
 
-  * (* LetPair *) 
-    assert (Config.WellScoped TA' cfg').
+  * assert (Config.WellScoped TA' cfg').
     { eapply Expr.Preservation.WellScoped_preservation; eauto. }
     intros D. ChorEnv.simplify.
     eapply Config.WellScoped_monotonic; eauto.
     eapply Expr.BaseProofs.step_dim_monotonic; eauto.
-Qed. *)
-Admitted.
+Qed.
 
 
 Lemma WellScoped_preservationB : forall C Theta ρ l C' Theta' ρ',
@@ -69,27 +63,26 @@ Lemma WellScoped_preservationB : forall C Theta ρ l C' Theta' ρ',
   Choreography.WellFormed C ->
   ChorEnv.WellScoped Theta ρ ->
   ChorEnv.WellScoped Theta' ρ'.
-(* Proof.
+Proof.
   intros ? ? ? ? ? ? ? Hstep.
   destruct Hstep; intros HWT HWS; subst;
   try match goal with
   | [ H : ChorEnv.Equal ?A ?B |- _ ] =>
     rewrite H in *; clear A H
   end; auto.
-  * eapply ChorEnv.WellScoped_epr; eauto.
-    inversion HWT; subst; clear HWT.
-    match goal with
-    | [ H : Insn.WellFormed (Insn.EPR _ _ _ _) |- _ ] =>
-      inversion H; subst; auto
-    end.
-  * eapply ChorEnv.WellScoped_epr; eauto.
-    inversion HWT; subst; clear HWT.
-    match goal with
-    | [ H : Insn.WellFormed (Insn.EPR _ _ _ _) |- _ ] =>
-      inversion H; subst; auto
-    end.
-Qed. *)
-Admitted.
+* eapply ChorEnv.WellScoped_epr; eauto.
+  inversion HWT; subst; clear HWT.
+  match goal with
+  | [ H : Insn.WellFormed (Insn.EPR _ _ _ _) |- _ ] =>
+    inversion H; subst; auto
+  end.
+* eapply ChorEnv.WellScoped_epr; eauto.
+  inversion HWT; subst; clear HWT.
+  match goal with
+  | [ H : Insn.WellFormed (Insn.EPR _ _ _ _) |- _ ] =>
+    inversion H; subst; auto
+  end.
+Qed.
 
 
 Lemma WellScoped_preservation : forall C Theta ρ l C' Theta' ρ',
@@ -97,7 +90,7 @@ Lemma WellScoped_preservation : forall C Theta ρ l C' Theta' ρ',
   Choreography.WellFormed C ->
   ChorEnv.WellScoped Theta ρ ->
   ChorEnv.WellScoped Theta' ρ'.
-(* Proof.
+Proof.
   intros ? ? ? ? ? ? ? Hstep.
   induction Hstep; intros HWT HWS;
   try match goal with
@@ -105,22 +98,20 @@ Lemma WellScoped_preservation : forall C Theta ρ l C' Theta' ρ',
     rewrite H in *; clear A H
   end; auto.
 
-  * eapply WellScoped_preservationC; eauto.
-    inversion HWT; subst; auto.
-  * inversion HWT; subst; clear HWT.
-    assert (Config.WellScoped TA' cfg').
-    { eapply Expr.Preservation.WellScoped_preservation; eauto. }
-    intros D. ChorEnv.simplify.
-    eapply Config.WellScoped_monotonic; eauto.
-    eapply Expr.BaseProofs.step_dim_monotonic; eauto.
-    
-  * eapply WellScoped_preservationB; eauto.
-  * inversion HWT; subst; clear HWT.
-    apply IHHstep; auto.
-  * inversion HWT; subst; clear HWT.
-    apply IHHstep; auto.
-Qed. *)
-Admitted.
+* eapply WellScoped_preservationC; eauto.
+  inversion HWT; subst; auto.
+* inversion HWT; subst; clear HWT.
+  assert (Config.WellScoped TA' cfg').
+  { eapply Expr.Preservation.WellScoped_preservation; eauto. }
+  intros D. ChorEnv.simplify.
+  eapply Config.WellScoped_monotonic; eauto.
+  eapply Expr.BaseProofs.step_dim_monotonic; eauto.
+* eapply WellScoped_preservationB; eauto.
+* inversion HWT; subst; clear HWT.
+  apply IHHstep; auto.
+* inversion HWT; subst; clear HWT.
+  apply IHHstep; auto.
+Qed.
 
 
 
@@ -136,16 +127,11 @@ Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
       ChorEnv.Equal T1
         (Actor.Map.add B (ChorEnv.find B T1) (
              Actor.Map.add A (ChorEnv.find A T1) T2)).
-(* Proof.
+Proof.
   intros A B T1 cfg1 q1 q2 T2 cfg2 Heq Hepr HWS.
   unfold ChorEnv.epr in Hepr.
   destruct (Config.epr_cfg cfg1) as [[idx1 idx2] cfg'] eqn:Eqnepr.
   inversion Hepr; subst; clear Hepr.
-
-  (*
-  remember (Var.fresh (ChorEnv.find A T1)) as q1 eqn:Hq1.
-  remember (Var.fresh (ChorEnv.find B (ChorEnv.add A q1 idx1 T1))) as q2 eqn:Hq2.
-  *)
 
   split.
   2:{
@@ -153,7 +139,7 @@ Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     ChorEnv.simplify.
   }
   exists q1, q2.
-  assert (~ Var.Map.In q1 (ChorEnv.find A T1)).
+  assert (~ Var.Map.In q1 (ChorEnv.find A T1)) as Hq1.
   {
     intros Hin.
     inversion Eqnepr; subst; clear Eqnepr.
@@ -161,7 +147,7 @@ Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     apply (Config.wf_qrefs _ cfg1) in Hin; auto.
     lia.
   }
-  assert (~ Var.Map.In q2 (ChorEnv.find B T1)).
+  assert (~ Var.Map.In q2 (ChorEnv.find B T1)) as Hq2.
   {
     intros Hin.
     inversion Eqnepr; subst; clear Eqnepr.
@@ -178,18 +164,15 @@ Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
     ChorEnv.simplify.
     apply Var.Map.Proofs.partition_add_r; auto with var_db.
   }
-Qed. *)
-Admitted.
+Qed.
    
 Lemma nilnostep : forall T cfg l C' T' cfg',
     ~ step Choreography.Empty T cfg l C' T' cfg'. 
-(* Proof.
-  intros.
-  intros Habsurd.
-  inversion Habsurd; subst.
+Proof.
+  intros T cfg l C' T' cfg' Hstep.
+  inversion Hstep.
   inversion H.
-Qed. *)
-Admitted.
+Qed.
 
 Lemma epr_partition : forall T1 Theta2 A B T cfg q1 q2 T' cfg' D,
   ChorEnv.epr A B T cfg = (q1, q2, T', cfg') ->
@@ -199,8 +182,8 @@ Lemma epr_partition : forall T1 Theta2 A B T cfg q1 q2 T' cfg' D,
   exists T1', ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') /\
               Var.Map.Partition (ChorEnv.find D T') (ChorEnv.find D T1') Theta2 /\
               (forall D0, D0 <> D -> Var.Map.Equal (ChorEnv.find D0 T1') (ChorEnv.find D0 T')).
-(* Proof.
-  intros T1 Theta2 A B T cfg q1 q2 T' cfg' D Hepr HA HB Hpart Heq.
+Proof.
+  intros T1 Theta2 A B T cfg q1 q2 T' cfg' D Hepr HDA HDB Hpart Heq.
   unfold ChorEnv.epr in Hepr.
   destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hcfg0.
   unfold ChorEnv.epr. rewrite Hcfg0.
@@ -209,13 +192,12 @@ Lemma epr_partition : forall T1 Theta2 A B T cfg q1 q2 T' cfg' D,
   split; [reflexivity | ].
   split.
   + ChorEnv.simplify.
-  + intros D0 ?.
+  + intros D0 HD0.
     ChorEnv.simplify.
     { rewrite Heq; auto; try reflexivity. }
     { rewrite Heq; auto; try reflexivity. }
     { rewrite Heq; auto; try reflexivity. }
-Qed. *)
-Admitted.
+Qed.
 
 (* Step_partition_pairs asserts that T1 differs from T1' by the same context that T2 differs from T2' *)
 Definition Step_partition_pairs (T1 T1' T2 T2' : ChorEnv.t nat) :=
@@ -228,42 +210,42 @@ Lemma spps_on : forall A Theta1 Theta2 (T1 T2 T3 : ChorEnv.t nat),
     Var.Map.Partition (ChorEnv.find A T1) Theta1 Theta2 ->
     ChorEnv.Equal T3 (Actor.Map.add A (ChorEnv.find A T3) T2) /\
       Var.Map.Partition (ChorEnv.find A T2) Theta1 (ChorEnv.find A T3).
-(* Proof.
-  intros.  
-  unfold Step_partition_pairs in H.
+Proof.
+  intros A Theta1 Theta2 T1 T2 T3 Hpairs Hpartition.
+  unfold Step_partition_pairs in Hpairs.
   split.
   {
-    unfold ChorEnv.Equal.
-    intro.
-    assert (A = A0 \/ A <> A0) as [HAeqA0 | HneqA0].
-    tauto.
+    intros A0.
+    destruct (Actor.eq_dec A A0) as [Heq | Hneq].
     {
-      rewrite <- HAeqA0 in *.
+      rewrite <- Heq.
       rewrite HelperLemmas.find_add.
       Var.simplify.
     }
     {
-      specialize (H A0 (Var.Map.empty _)).
-      rewrite HelperLemmas.find_ab_neq2 in H; auto.
-      rewrite HelperLemmas.find_ab_neq2; auto.
-      assert (Var.Map.Partition (ChorEnv.find A0 T1) (ChorEnv.find A0 T1) (Var.Map.empty nat)).
-      apply Var.Map.Proofs.partition_empty_r.
-      specialize (H H1).
-      apply Var.Map.Proofs.partition_empty2_eq in H.
-      rewrite H.
+      specialize (Hpairs A0 (Var.Map.empty nat)).
+      rewrite HelperLemmas.find_ab_neq2 in Hpairs by congruence.
+      rewrite HelperLemmas.find_ab_neq2 by congruence.
+      assert (Hempty : Var.Map.Partition
+        (ChorEnv.find A0 T1) (ChorEnv.find A0 T1) (Var.Map.empty nat)).
+      { apply Var.Map.Proofs.partition_empty_r. }
+      specialize (Hpairs Hempty).
+      apply Var.Map.Proofs.partition_empty2_eq in Hpairs.
+      rewrite Hpairs.
       Var.simplify.
     }
   }
   {
-    specialize (H A Theta1).
-    rewrite find_add in H.
-    specialize (H (@Var.Map.Properties.Partition_sym _ (ChorEnv.find A T1) Theta1 Theta2 H0)).
+    specialize (Hpairs A Theta1).
+    rewrite find_add in Hpairs.
+    specialize (Hpairs
+      (@Var.Map.Properties.Partition_sym _
+        (ChorEnv.find A T1) Theta1 Theta2 Hpartition)).
     pose proof (@Var.Map.Properties.Partition_sym _
-                  (ChorEnv.find A T2) (ChorEnv.find A T3) Theta1 H).
-    auto.
+      (ChorEnv.find A T2) (ChorEnv.find A T3) Theta1 Hpairs).
+    exact H.
   }
-Qed. *)
-Admitted.
+Qed.
 
 (* Partition_except l T1 T2
   says that T1 and T2 are the same on all the actors in l, and T2 is a subset of T1 on all other actors
@@ -282,25 +264,20 @@ Lemma ws_partition_except : forall l (T1 T2 : ChorEnv.t nat) cfg,
     ChorEnv.WellScoped T1 cfg ->
     Partition_except l T1 T2 ->
     ChorEnv.WellScoped T2 cfg.
-(* Proof.
+Proof.
   intros l T1 T2 cfg Hws [Hpart Heq] A.
-  specialize (Hws A). destruct Hws as [Hwf Hws].
+  specialize (Hws A).
+  destruct Hws as [Hwf Hscope].
   split; auto.
   intros z Hz.
-
-  (* If A is in actors(l) then we're done *)
-
-  (* If not...then z is still in find A T1 *)
-  apply Hws.
+  apply Hscope.
   destruct (Actor.Map.FSetProofs.in_dec A (Label.actors l)) as [Hin | Hin].
-  + rewrite Heq; auto.
-  + apply Hpart in Hin.
-    destruct Hin as [Theta Hpart'].
+  - rewrite Heq; auto.
+  - destruct (Hpart A Hin) as [Theta Hpartition].
     Var.Map.Tactics.reflect_partition.
     rewrite Heq0.
     Var.simplify.
-Qed. *)
-Admitted.
+Qed.
 
 
 Lemma epr_part' : forall T1 A B T cfg q1 q2 T' cfg',
@@ -309,7 +286,7 @@ Lemma epr_part' : forall T1 A B T cfg q1 q2 T' cfg',
   ChorEnv.WellScoped T cfg ->
   exists T1', ChorEnv.epr A B T1 cfg = (q1, q2, T1', cfg') /\
               Step_partition_pairs T T1 T' T1'.
-(* Proof.
+Proof.
   intros T1 A B T cfg q1 q2 T' cfg' Hepr [Hpart Heq] HWS.
   unfold ChorEnv.epr in *.
   destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0] eqn:Hcfg.
@@ -357,32 +334,32 @@ Lemma epr_part' : forall T1 A B T cfg q1 q2 T' cfg',
   
   + (* D <> A, D <> B *)
     apply Var.Map.Proofs.partition_add_l; auto.
-Qed. *)
-Admitted.
+Qed.
 
 
 Lemma partition_functional_2 : forall T (M M1 M2 M2' : Var.Map.t T),
   Var.Map.Partition M M1 M2 -> Var.Map.Partition M M1 M2' ->
   Var.Map.Equal M2 M2'.
-(* Proof.
+Proof.
   intros T M M1 M2 M2' Hpart Hpart'.
   Var.Map.Tactics.reflect_partition.
   Var.reflect_find.
   specialize (Heq z).
   Var.simplify.
   destruct (Var.Map.find z M1) as [v | ] eqn:H1; auto.
-  destruct (Var.Map.find z M2) eqn:H2.
+  destruct (Var.Map.find z M2) as [v2 | ] eqn:H2.
   {
     exfalso.
-    apply (Hdisj0 z). split; Var.solve.
+    apply (Hdisj0 z).
+    split; Var.solve.
   }
-  destruct (Var.Map.find z M2') eqn:H2'; auto.
+  destruct (Var.Map.find z M2') as [v' | ] eqn:H2'; auto.
   {
     exfalso.
-    apply (Hdisj z). split; Var.solve.
+    apply (Hdisj z).
+    split; Var.solve.
   }
-Qed. *)
-Admitted.
+Qed.
 
 
 
@@ -574,26 +551,20 @@ Lemma concat_inversion_eq : forall {X} (m m1 m2 : Var.Map.t X),
   Var.Map.Properties.Disjoint m m2 ->
   Var.Map.Equal (Var.Map.concat m m1) (Var.Map.concat m m2) ->
   Var.Map.Equal m1 m2.
-(* Proof.
+Proof.
   intros X m m1 m2 H1 H2 Heq.
   intros z.
   specialize (Heq z).
-  Search Map.find Map.concat.
   repeat rewrite Map.Proofs.concat_find in Heq.
   destruct (Map.find z m) as [v | ] eqn:Hfind; auto.
-  { (* z ∈ m ==> z ∉ m1 /\ z ∉ m2 *)
+  {
     destruct (Map.find z m1) as [v1 | ] eqn:Hfind1.
-    { (* contradiction *)
-      exfalso. apply (H1 z). Var.solve.
-    }
+    { exfalso. apply (H1 z). Var.solve. }
     destruct (Map.find z m2) as [v2 | ] eqn:Hfind2.
-    { (* contradiction *)
-      exfalso. apply (H2 z). Var.solve.
-    }
+    { exfalso. apply (H2 z). Var.solve. }
     auto.
   }
-Qed. *)
-Admitted.
+Qed.
 
 
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
