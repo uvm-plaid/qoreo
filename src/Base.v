@@ -2344,7 +2344,7 @@ Module Var.
 End Var.
 
 Inductive unitary :=
-| H | X | Y | Z | CNOT | SGATE | Sdag | TGATE | Tdag.
+| H | X | Y | Z | CNOT | SGATE | Sdag | CS | TGATE | Tdag | CT | CTdag | CSdag.
 
 
 Module Config.
@@ -2445,6 +2445,10 @@ Module Config.
   | Y, [q] => @pad 1 q n Quantum.σy
   | Z, [q] => @pad 1 q n Quantum.σz
   | CNOT, [q1; q2] => pad_ctrl n q1 q2 Quantum.σx
+  | CS, [q1; q2] => pad_ctrl n q1 q2 Quantum.Sgate
+  | CT, [q1; q2] => pad_ctrl n q1 q2 Quantum.Tgate
+  | CSdag, [q1; q2] => pad_ctrl n q1 q2 Quantum.Sgate†
+  | CTdag, [q1; q2] => pad_ctrl n q1 q2 Quantum.Tgate†
   | SGATE, [q] => @pad 1 q n Quantum.Sgate
   | Sdag, [q]  => @pad 1 q n Quantum.Sgate†
   | TGATE, [q] => @pad 1 q n Quantum.Tgate

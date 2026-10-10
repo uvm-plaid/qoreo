@@ -11,3 +11,5 @@ examples/Teleportation.v
 examples/MeasureSend.v
 examples/b92.v
 examples/Protocols.v
+examples/dis_qft.v
+examples/unitary_test.v

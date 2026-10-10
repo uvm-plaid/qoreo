@@ -13,7 +13,19 @@ def Unitary(gate: str, value: Any) -> Any:
         control, target = value
         control.cnot(target)
         return (control, target)
-
+    #Check if you can find a faster implementation
+    if gate == "CS":
+        if not isinstance(value, tuple) or len(value) != 2:
+            raise TypeError(f"CNOT expects a pair of qubits, got {value!r}")
+        control, target = value
+        control.T()
+        target.T()
+        control.cnot(target)
+        target.rot_Z(n=7,d=2)
+        control.cnot(target)
+        
+        return (control, target)
+    #Add CSdag, CTdag, CT
     if gate == "H":
         value.H()
         return value
@@ -31,6 +43,12 @@ def Unitary(gate: str, value: Any) -> Any:
         return value
     if gate == "TGATE":
         value.T()
+        return value
+    if gate == "Sdag":
+        value.rot_Z(n=7,d=1)
+        return value
+    if gate == "Tdag":
+        value.rot_Z(n=7,d=2)
         return value
 
     raise NotImplementedError(f"unsupported unitary: {gate}")

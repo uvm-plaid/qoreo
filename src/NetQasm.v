@@ -56,6 +56,10 @@ Definition render_unitary (u : unitary) : string :=
   | Y => "Y"
   | Z => "Z"
   | CNOT => "CNOT"
+  | CS => "CS"
+  | CT => "CT"
+  | CSdag => "CSdag"
+  | CTdag => "CTdag"
   | SGATE => "SGATE"
   | Sdag => "Sdag"
   | TGATE => "TGATE"
@@ -152,7 +156,7 @@ Fixpoint last_bound_var (P : Network.Process.t) : option Var.t :=
 Definition render_app (self : Actor.t) (P : Network.Process.t) : string :=
   let classicals := classical_peers P in
   let eprs := epr_peers P in
-  "import qoreo_netqasm_runtime as qr" +:+ nl +:+ nl +:+
+  "import qoreo_netsquid_runtime as qr" +:+ nl +:+ nl +:+
   "def main(app_config=None):" +:+ nl +:+
   line 1 ("rt = qr.Runtime(" +:+
             actor_literal self +:+ ", app_config, " +:+

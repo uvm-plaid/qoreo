@@ -8,3 +8,5 @@ extracted/
 generated/
 ocaml/*.cmi
 ocaml/*.cmo
+__pycache__/
+*.pyc

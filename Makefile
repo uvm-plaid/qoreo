@@ -35,7 +35,7 @@ generate-measure-send-py: examples/MeasureSend.vo ocaml/write_apps.ml ocaml/gene
 	ocamlc -I extracted -I ocaml -o extracted/generate_measure_send unix.cma extracted/measure_send_netqasm.cmo ocaml/write_apps.cmo ocaml/generate_measure_send.cmo
 	./extracted/generate_measure_send generated/measure_send
 
-generate-b92-py: examples/b92.vo ocaml/write_apps.ml ocaml/generate_b92.ml python/qoreo_netqasm_runtime.py
+generate-b92-py: examples/b92.vo ocaml/write_apps.ml ocaml/generate_b92.ml python/qoreo_netqasm_runtime.py python/qoreo_netsquid_runtime.py
 	mkdir -p extracted generated
 	ocamlc -I extracted -c extracted/b92_netqasm.mli
 	ocamlc -I extracted -c extracted/b92_netqasm.ml
@@ -43,3 +43,21 @@ generate-b92-py: examples/b92.vo ocaml/write_apps.ml ocaml/generate_b92.ml pytho
 	ocamlc -I extracted -I ocaml -c ocaml/generate_b92.ml
 	ocamlc -I extracted -I ocaml -o extracted/generate_b92 unix.cma extracted/b92_netqasm.cmo ocaml/write_apps.cmo ocaml/generate_b92.cmo
 	./extracted/generate_b92 generated/b92
+
+generate-dqft-py: examples/dis_qft.vo ocaml/write_apps.ml ocaml/generate_dqft.ml python/qoreo_netsquid_runtime.py
+	mkdir -p extracted generated
+	ocamlc -I extracted -c extracted/dqft_netqasm.mli
+	ocamlc -I extracted -c extracted/dqft_netqasm.ml
+	ocamlc -I extracted -I ocaml -c ocaml/write_apps.ml
+	ocamlc -I extracted -I ocaml -c ocaml/generate_dqft.ml
+	ocamlc -I extracted -I ocaml -o extracted/generate_dqft unix.cma extracted/dqft_netqasm.cmo ocaml/write_apps.cmo ocaml/generate_dqft.cmo
+	./extracted/generate_dqft generated/dqft
+
+generate-unitary-py: examples/unitary_test.vo ocaml/write_apps.ml ocaml/generate_unitary.ml python/qoreo_netsquid_runtime.py
+	mkdir -p extracted generated
+	ocamlc -I extracted -c extracted/unitary_test_netqasm.mli
+	ocamlc -I extracted -c extracted/unitary_test_netqasm.ml
+	ocamlc -I extracted -I ocaml -c ocaml/write_apps.ml
+	ocamlc -I extracted -I ocaml -c ocaml/generate_unitary.ml
+	ocamlc -I extracted -I ocaml -o extracted/generate_unitary unix.cma extracted/unitary_test_netqasm.cmo ocaml/write_apps.cmo ocaml/generate_unitary.cmo
+	./extracted/generate_unitary generated/unitary_test

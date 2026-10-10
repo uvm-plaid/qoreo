@@ -404,6 +404,10 @@ Inductive typ :=
 Definition type_of_unitary (U : unitary) : typ :=
 match U with
 | CNOT => Tensor QUBIT QUBIT
+| CS => Tensor QUBIT QUBIT
+| CT => Tensor QUBIT QUBIT
+| CSdag => Tensor QUBIT QUBIT
+| CTdag => Tensor QUBIT QUBIT
 | _ => QUBIT
 end.
 
