@@ -204,7 +204,6 @@ Module Choreography.
            (subst A x v C2)
       end.
 
-      Print Pattern.t.
 
     
     Inductive Val : t -> Prop :=
@@ -390,7 +389,6 @@ Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreograp
 
 
 (** Typing Relation *)
-Print Choreography.t.
 Inductive WellTyped :
   ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Typ.t -> Prop :=
 

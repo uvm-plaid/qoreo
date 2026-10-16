@@ -43,6 +43,10 @@ Require Import Stdlib.Structures.Equalities.
 Import Actor.Map.Tactics.
 
 Module Insn.
+  Section Insn.
+    Variable proc : Set.
+    Variable proc_subst : Var.t -> Expr.t -> proc -> proc.
+
     Inductive t :=
     | Let : Var.t -> Expr.t -> t
     | LetBang : Var.t -> Expr.t -> t
@@ -50,6 +54,12 @@ Module Insn.
     | Send : Expr.t -> Actor.t -> t
     | Receive : Var.t -> Actor.t ->  t
     | EPR : Var.t -> Actor.t -> t
+    (* let x = broadcastIf e As then P1 else P2
+       in P' *)
+    | LetIfSend : Var.t -> Expr.t -> Actor.FSet.t -> proc -> proc -> t
+    (* let x = receiveIf A then P1 else P2
+       in P' *)
+    | LetIfReceive : Var.t -> Actor.t -> proc -> proc -> t
     .
 
     Definition subst (x : Var.t) (v : Expr.t) (I : t) : t :=
@@ -87,9 +97,17 @@ Module Insn.
 
 End Insn.
 
+Print Insn.t.
 Module Process.
+  (* What are processes??? e.g. when does Send ... || Receive ... work together? *)
     Inductive t :=
-    | Empty
+    | Ret : Expr.t -> t
+    | LetIn : Var.t -> Expr.t -> t -> t
+    | LetBang : Var.t -> Expr.t -> t -> t
+    | LetPair : Var.t -> Var.t -> Expr.t -> t -> t
+    | Send    : Expr.t -> Actor.t -> t -> t
+    | Receive 
+
     | Do : Insn.t -> t -> t
     (* BroadcastIf e As P1 P2 . P
        Send e to all the actors in As;
