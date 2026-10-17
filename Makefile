@@ -38,9 +38,11 @@ ocaml/write_apps.cmo: ocaml/write_apps.ml
 clean: CoqMakefile clean-generated
 	$(MAKE) -f CoqMakefile clean
 	rm -f CoqMakefile CoqMakefile.conf
+	rm -rf extracted
 
-clean-generated: 
-	rm -rf extracted generated
+clean-generated:
+	rm -rf generated
+	rm -f extracted/*.cmi extracted/*.cmo extracted/generate_*
 
 %: CoqMakefile
 	$(MAKE) -f CoqMakefile $@
