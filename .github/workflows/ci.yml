@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "4.14.x"
+
+      - name: Install Rocq and QuantumLib
+        run: |
+          opam pin add --yes coq-quantumlib \
+            https://github.com/jpaykin/QuantumLib.git#jpaykin/v9.1
+          opam install --yes rocq-prover.9.1.0 coq-quantumlib
+
+      - name: Build proofs and generated examples
+        run: make
