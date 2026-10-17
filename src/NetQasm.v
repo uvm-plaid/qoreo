@@ -249,8 +249,8 @@ Definition render_app (b : Backend) (self : Actor.t) (P : Network.Process.t) (xs
             render_peer_list classicals +:+ ", " +:+
             render_peer_list eprs +:+ ")") +:+
   line 1 "with rt.connection():" +:+
-  render_process_body 1 P +:+
-  line 2 ("return (" +:+ join ", " (List.map var_name xs) +:+ ")").
+  render_branch 2 (render_process_body 2 P) +:+
+  line 1 ("return (" +:+ join ", " (List.map var_name xs) +:+ ")").
   
   Definition epp_vars (p : Actor.t) (env : Var.Map.t Actor.t) (xs : list Var.t) 
               : list Var.t :=

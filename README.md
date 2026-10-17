@@ -12,7 +12,7 @@ Qoreo uses the QuantumLib library for formalizing quantum computing (https://git
 opam pin coq-quantumlib https://github.com/jpaykin/QuantumLib.git#jpaykin/v9.1
 ```
 
-Once dependencies have been installed, you can build the Rocq proofs using `make proofs`. The workflow uses CoqMakefile.
+Once dependencies have been installed, run `make` to build the Rocq proofs and generate all example applications. To run the simulation tests locally, install the Python dependencies described below and use `make test-examples`. The GitHub Actions workflow runs `make` only. The workflow uses CoqMakefile.
 
 
 # Structure
@@ -88,6 +88,8 @@ python -m pip install squidasm --extra-index-url=https://pypi.netsquid.org
 
 SquidASM depends on NetSquid, which requires special credentials to install. You can register and obtain credentials at the [NetSquid website](https://netsquid.org/).
 
+GitHub Actions builds the proofs and generated applications with `make`. Simulation tests are available locally through `make test-examples` but are not run in CI because NetSquid requires special package-index credentials.
+
 ## Extracting the examples
 
 The `src/Examples/` directory contains the extractable examples:
@@ -122,12 +124,18 @@ The compilation pipeline uses:
 
 ## Running the examples
 
-The `test_examples/` directory contains simulation tests. B92 uses SquidASM; DQFT and unitary use the Qoreo NetSquid runtime. Generate the applications first:
+The `test_examples/` directory contains simulation tests for B92, DQFT, unitary gates, conditionals, and distributed Grover. B92 uses SquidASM; the others use the Qoreo NetSquid runtime. Generate the applications first:
 
 ```
 make B92
 make DQFT
 make UnitaryTest
+```
+
+Run every simulation test with:
+
+```
+make test-examples
 ```
 
 Run the B92 test with the Python environment containing NetSquid and SquidASM dependencies:

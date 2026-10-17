@@ -1,4 +1,7 @@
 .*
+!.github/
+!.github/workflows/
+!.github/workflows/ci.yml
 *.vo*
 *.aux
 *.glob
