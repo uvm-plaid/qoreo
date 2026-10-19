@@ -5,7 +5,7 @@
 
   - `Expr.t` - Qoreo AST
   - `Expr.step` - small-step operational semantics
-  - `Expr.typ` - Qoreo types
+  - `Expr.Typ.t` - Qoreo types
   - `Expr.WellTyped` - typing relation
 
   *)
@@ -16,6 +16,37 @@ From Qoreo.Base Require Var Config.
 Import Config.
 Import Var.Map.Tactics.
 
+
+
+Module Typ.
+(**********)
+(** Types *)
+(**********)
+
+  Inductive t :=
+  | BIT | QUBIT
+  | Tensor : t -> t -> t
+  | Lolli : t -> t -> t
+  | BANG : t -> t.
+
+  Definition type_of_unitary (U : Unitary.t) : t :=
+  match U with
+  | Unitary.CNOT | Unitary.CS | Unitary.CT | Unitary.CSdag | Unitary.CTdag | Unitary.CRZ _ => Tensor QUBIT QUBIT
+  | _ => QUBIT
+  end.
+
+
+  Fixpoint typ_eq_dec (t1 t2 : t) : bool :=
+    match t1,t2 with
+    | BIT, BIT | QUBIT, QUBIT => true
+    | BANG t, BANG t' => typ_eq_dec t t'
+    | Tensor t1 t2, Tensor t1' t2'
+    | Lolli t1 t2, Lolli t1' t2' =>
+        typ_eq_dec t1 t1' && typ_eq_dec t2 t2'
+    | _,_ => false
+    end.
+End Typ.
+Export Typ.
 
 Open Scope qoreo.
 
@@ -32,8 +63,8 @@ Inductive t :=
 | QRef : Var.t -> t
 | New : t -> t
 | Unitary : Unitary.t -> t -> t
-| Lambda : Var.t -> t -> t
-| Fix : Var.t -> Var.t -> t -> t
+| Lambda : Var.t -> Typ.t -> t -> t
+| Fix : Var.t -> Var.t -> Typ.t (* input type *) -> Typ.t (* return type *) -> t -> t
 | App : t -> t -> t
 .
 
@@ -49,10 +80,10 @@ Inductive Val : t -> Prop :=
 | PairVal : forall v1 v2,
   Val v1 -> Val v2 ->
   Val (Pair v1 v2)
-| LambdaVal : forall x e,
-  Val (Lambda x e)
-| FixVal    : forall f x e,
-  Val (Fix f x e)
+| LambdaVal : forall x tp e,
+  Val (Lambda x tp e)
+| FixVal    : forall f x alpha beta e,
+  Val (Fix f x alpha beta e)
 .
 #[global] Hint Constructors Val : var_db.
 
@@ -76,8 +107,8 @@ Fixpoint vars (e : t) : Var.FSet.t :=
   | LetPair x1 x2 e1 e2 =>
     Var.FSet.add x1 (Var.FSet.add x2 (Var.FSet.union (vars e1) (vars e2)))
   
-  | Lambda x e' => Var.FSet.add x (vars e')
-  | Fix f x e' => Var.FSet.add f (Var.FSet.add x (vars e'))
+  | Lambda x _ e' => Var.FSet.add x (vars e')
+  | Fix f x _ _ e' => Var.FSet.add f (Var.FSet.add x (vars e'))
   
   end.
 
@@ -116,15 +147,15 @@ Inductive Fresh x : Expr.t -> Prop :=
 | FQRef : forall q, Fresh x (QRef q)
 | FNew : forall e, Fresh x e -> Fresh x (New e)
 | FUnitary : forall u e, Fresh x e -> Fresh x (Unitary u e)
-| FLambda : forall y e,
+| FLambda : forall y alpha e,
   ~ Var.V.eq x y ->
   Fresh x e ->
-  Fresh x (Lambda y e)
-| FFix : forall f y e,
+  Fresh x (Lambda y alpha e)
+| FFix : forall f y alpha beta e,
   ~ Var.V.eq x f ->
   ~ Var.V.eq x y ->
   Fresh x e ->
-  Fresh x (Fix f y e)
+  Fresh x (Fix f y alpha beta e)
 | FApp : forall e1 e2,
   Fresh x e1 -> Fresh x e2 ->
   Fresh x (App e1 e2)
@@ -151,10 +182,11 @@ Fixpoint subst x v e :=
   | QRef q => QRef q
   | New e => New (subst x v e)
   | Unitary u e => Unitary u (subst x v e)
-  | Lambda y e =>
-    Lambda y (if Var.eq_dec x y then e else subst x v e)
-  | Fix f y e =>
-    Fix f y (if Var.eq_dec x f then e
+  | Lambda y alpha e =>
+    Lambda y alpha (if Var.eq_dec x y then e else subst x v e)
+  | Fix f y alpha beta e =>
+    Fix f y alpha beta
+            (if Var.eq_dec x f then e
              else if Var.eq_dec x y then e
              else subst x v e)
   | App e1 e2 => App (subst x v e1) (subst x v e2)
@@ -256,21 +288,21 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   step (App e1 e2) refs cfg
         (App e1 e2') refs' cfg'
 
-| AppB : forall x e v refs cfg e' refs',
+| AppB : forall x α e v refs cfg e' refs',
 
   Val v ->
   e' = subst x v e ->
   Var.Map.Equal refs refs' ->
 
-  step (App (Lambda x e) v) refs cfg
+  step (App (Lambda x α e) v) refs cfg
         e' refs' cfg
 
-| AppFixB : forall f x e e0 refs cfg e' refs',
+| AppFixB : forall f x α β e e0 refs cfg e' refs',
 
-  e' = subst x e0 (subst f (Fix f x e) e) ->
+  e' = subst x e0 (subst f (Fix f x α β e) e) ->
   Var.Map.Equal refs refs' ->
 
-  step (App (Fix f x e) (Bang e0)) refs cfg e' refs' cfg
+  step (App (Fix f x α β e) (Bang e0)) refs cfg e' refs' cfg
 
 (* New *)
 | NewC : forall e refs cfg e' refs' cfg',
@@ -331,29 +363,13 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
 .
 
 
-(**********)
-(** Types *)
-(**********)
-
-Inductive typ :=
-| BIT | QUBIT
-| Tensor : typ -> typ -> typ
-| Lolli : typ -> typ -> typ
-| BANG : typ -> typ.
-
-Definition type_of_unitary (U : Unitary.t) : typ :=
-match U with
-| Unitary.CNOT | Unitary.CS | Unitary.CT | Unitary.CSdag | Unitary.CTdag | Unitary.CRZ _ => Tensor QUBIT QUBIT
-| _ => QUBIT
-end.
-
 
 (* Typing judgment: Γ; Δ; Θ ⊢ t : τ 
  *  Γ : a finite map of non-linear variables to types
  *  Δ : a finite map of linear variables to types
  *  Θ : a finite map of qref variables to natural number indices
  *)
-Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t -> typ -> Prop :=
+Inductive WellTyped : Var.Map.t Typ.t -> Var.Map.t Typ.t -> Var.Map.t nat -> Expr.t -> Typ.t -> Prop :=
 
 | WTQVar : forall Γ Δ Θ x τ,
   ~ Var.Map.In x Γ ->
@@ -459,7 +475,7 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
 | WTLambda : forall Γ Δ Θ x e τ1 τ2,
   ~ Var.Map.In x Δ ->
   WellTyped (Var.Map.remove x Γ) (Var.Map.add x τ1 Δ) Θ e τ2 ->
-  WellTyped Γ Δ Θ (Lambda x e) (Lolli τ1 τ2)
+  WellTyped Γ Δ Θ (Lambda x τ1 e) (Lolli τ1 τ2)
 
 | WTFix : forall Γ Δ Θ f x e τ1 τ2,
 
@@ -469,7 +485,7 @@ Inductive WellTyped : Var.Map.t typ -> Var.Map.t typ -> Var.Map.t nat -> Expr.t 
   Var.Map.Empty Θ  ->
   f <> x ->
 
-  WellTyped Γ Δ Θ (Fix f x e) (Lolli (BANG τ1) τ2)
+  WellTyped Γ Δ Θ (Fix f x τ1 τ2 e) (Lolli (BANG τ1) τ2)
 
 | WTApp : forall Δ1 Δ2 Θ1 Θ2 τ Γ Δ Θ e1 e2 τ',
   WellTyped Γ Δ1 Θ1 e1 (Lolli τ τ') ->

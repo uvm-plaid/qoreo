@@ -158,7 +158,7 @@ Require Import Lia.
 
 
 Definition singleton {T} x (tau : T) := Var.Map.add x tau (Var.Map.empty T).
-Lemma wtqvar : forall x (τ : typ),
+Lemma wtqvar : forall x (τ : Typ.t),
   Expr.WellTyped (Var.Map.empty _) (Var.Map.add x τ (Var.Map.empty _)) (Var.Map.empty _) (Expr.Var x) τ.
 Proof.
   intros. econstructor; eauto; Var.simplify.

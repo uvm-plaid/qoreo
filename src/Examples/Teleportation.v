@@ -52,7 +52,7 @@ Proof.
   { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 3 QUBIT (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 3 Typ.QUBIT (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
   }
   2:{
@@ -66,7 +66,7 @@ Proof.
   { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 3 QUBIT (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 3 QUBIT (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
   }
   2:{ ChorEnv.simplify. auto with var_db. }
@@ -78,7 +78,7 @@ Proof.
   { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 5 (BANG BIT) (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 5 (BANG BIT) (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
     rewrite Var.Map.Proofs.add_neq_sym; auto.
     reflexivity.
@@ -92,7 +92,7 @@ Proof.
   { ChorEnv.simplify. repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 6 (BANG BIT) (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 6 (BANG BIT) (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
     Var.solve.
   }
@@ -105,7 +105,7 @@ Proof.
   }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.empty typ)).
+    instantiate (1 := (Var.Map.empty Typ.t)).
     repeat (solve_wt; ChorEnv.simplify).
   }
   2:{ ChorEnv.simplify. auto with var_db. }
@@ -157,15 +157,15 @@ Proof.
 
   unfold ChorEnv.remove. ChorEnv.simplify.
 
-  eapply Choreography.Weakening.weakening_gen with (G := Actor.Map.empty (Var.Map.t typ)) (G0 := ChorEnv.add Bob 8 BIT (ChorEnv.add Bob 7 BIT (Actor.Map.empty _))).
+  eapply Choreography.Weakening.weakening_gen with (G := Actor.Map.empty (Var.Map.t Typ.t)) (G0 := ChorEnv.add Bob 8 BIT (ChorEnv.add Bob 7 BIT (Actor.Map.empty _))).
   2:{
     intros B. split. ChorEnv.simplify; auto with var_db.
     ChorEnv.simplify. repeat solve_wt; auto with var_db; lia.
   }
 
   ChorEnv.simplify.
-  assert (Heq' :ChorEnv.Equal (Actor.Map.remove Alice (Actor.Map.empty (Var.Map.t typ)))
-                (Actor.Map.empty (Var.Map.t typ))).
+  assert (Heq' :ChorEnv.Equal (Actor.Map.remove Alice (Actor.Map.empty (Var.Map.t Typ.t)))
+                (Actor.Map.empty (Var.Map.t Typ.t))).
   { ChorEnv.solve. }
   rewrite Heq'; clear Heq'.
 
