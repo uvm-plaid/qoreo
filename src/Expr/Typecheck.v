@@ -170,4 +170,11 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       end
   end.
 
-
+Definition toplevel_typecheck (e : Expr.t) : option Typ.t :=
+  match typecheck (Var.Map.empty Typ.t) (Var.Map.empty Typ.t) (Var.Map.empty nat) e with
+  | None => None
+  | Some {| Df := D; Tf := T; tf := t |} =>
+      if Var.Map.domain_eqb D (Var.Map.empty Typ.t) &&
+           Var.Map.domain_eqb T (Var.Map.empty nat)
+      then Some t else None
+  end.
