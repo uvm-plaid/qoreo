@@ -438,58 +438,65 @@ Module Network.
   Qed.
 End Network.
 
-Print Choreography.t.
-Search ({Actor.FSet.In _ _} + {~ Actor.FSet.In _ _}).
+Print Choreography.Pattern.t.
+Fixpoint epp_pat (A : Actor.t) (pat : Choreography.Pattern.t) : Pattern.t :=
+  match pat with
+  | Choreography.Pattern.Var B x =>
+    if Actor.eq_dec A B
+    then Pattern.Var x
+    else Pattern.Unit
+  | Choreography.Pattern.Unit => Pattern.Unit
+  | Choreography.Pattern.Pair pat1 pat2 =>
+    Pattern.Pair (epp_pat A pat1) (epp_pat A pat2)
+  | Choreography.Pattern.Bang B x =>
+    if Actor.eq_dec A B
+    then Pattern.Bang x
+    else Pattern.Unit
+  end.
 
-Fixpoint epp (p : Actor.t) (c : Choreography.t) : option Process.t :=
+Fixpoint epp (p : Actor.t) (c : Choreography.t) : Process.t :=
   match c with
   | Choreography.Var A x =>
     if Actor.eq_dec A p
-    then Some (Process.Var x)
-    else None
+    then Process.Var x
+    else Process.Unit
 
   | Choreography.Loc A e =>
     if Actor.eq_dec A p
-    then Some (Process.Ret e)
-    else None
+    then Process.Ret e
+    else Process.Unit
 
-  | Choreography.Unit => Some Process.Unit (* None? *)
+  | Choreography.Unit => Process.Unit
   | Choreography.Pair C1 C2 =>
-    match epp p C1, epp p C2 with
-    | Some P1, Some P2 => Some (Process.Pair P1 P2)
-    | Some P1, None    => Some P1
-    | None,    Some P2 => Some P2
-    | None,    None    => None
-    end
+    Process.Pair (epp p C1) (epp p C2)
 
-  | Choreography.LetIn p C1 C2 => _
+  | Choreography.LetIn pat C1 C2 =>
+    Process.LetIn (epp_pat p pat) (epp p C1) (epp p C2)
+
   | Choreography.Send A e B =>
     if Actor.eq_dec A p
-    then Some (Process.Send e B)
+    then Process.Send e B
     else if Actor.eq_dec B p
-    then Some (Process.Receive A)
-    else None
+    then Process.Receive A
+    else Process.Unit
 
   | Choreography.EPR A B =>
     if Actor.eq_dec A p
-    then Some (Process.EPR B)
+    then Process.EPR B
     else if Actor.eq_dec B p
-    then Some (Process.EPR A)
-    else None
+    then Process.EPR A
+    else Process.Unit
 
   | Choreography.If A e C1 C2 =>
-    let epp' := fun C => match epp p C with
-              | Some P => P
-              | None   => Process.Unit
-              end in
     let tgts := Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2) in
     if Actor.eq_dec A p
-    then Some (Process.SendIf e tgts (epp' C1) (epp' C2))
+    then Process.SendIf e tgts (epp p C1) (epp p C2)
     else if Actor.Map.FSetProofs.in_dec p tgts
-    then Some (Process.ReceiveIf A (epp' C1) (epp' C2))
-    else None
+    then Process.ReceiveIf A (epp p C1) (epp p C2)
+    else Process.Unit
 
 end.
+
 
 (*
 Inductive EPP : list Actor.t -> Choreography.t -> Network.t -> Prop :=
@@ -499,6 +506,9 @@ Inductive EPP : list Actor.t -> Choreography.t -> Network.t -> Prop :=
     EPP Actors C N ->
     EPP (A::Actors) C (Actor.Map.add A P N).
 *)
+
+(*
+Print Choreography.t.
 Inductive EPP : Actor.t -> Choreography.t -> Process.t -> Prop :=
 | EPP_nil : forall A, EPP A Choreography.Empty Process.Empty
 
@@ -559,7 +569,9 @@ Inductive EPP : Actor.t -> Choreography.t -> Process.t -> Prop :=
   EPP A (Choreography.Do I C) P
 
 (* TODO: EPP_if *)
+
 .
+*)
 
 
 Inductive EPP_N C : Network.t -> Prop :=
@@ -568,11 +580,11 @@ Inductive EPP_N C : Network.t -> Prop :=
   EPP_N C N
 | EPP_N_add : forall A PA N,
   Actor.Map.MapsTo A PA N ->
-  EPP A C PA ->
+  epp A C = PA ->
   EPP_N C (Actor.Map.remove A N) ->
   EPP_N C N.
 
-
+(*
 Definition eppI (D : Actor.t) (I : Choreography.Insn.t) :=
   match I with
   | Choreography.Insn.Send A v B x =>
@@ -593,3 +605,4 @@ Definition eppI (D : Actor.t) (I : Choreography.Insn.t) :=
     if Actor.eq_dec D A then [Insn.LetPair x1 x2 e]
     else []
   end.
+  *)
