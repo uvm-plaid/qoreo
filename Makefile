@@ -1,16 +1,20 @@
-PYTHON_GENERATION_TARGETS := \
-	generate-measure-send-py \
-	generate-b92-py \
-	generate-dqft-py \
-	generate-unitary-py \
-	generate-teleportation-py
+PYTHON_GENERATION_EXAMPLES := \
+	MeasureSend \
+	B92 \
+	DQFT \
+	UnitaryTest \
+	Teleportation \
+	ConditionalTest \
+	DistributedGrover
 
-.PHONY: all clean $(PYTHON_GENERATION_TARGETS) examples
+ocaml_module = $(shell printf '%s' '$1' | awk '{ if ($$0 ~ /^[A-Z]+$$/) print substr($$0, 1, 1) tolower(substr($$0, 2)); else print }')
+
+.PHONY: all clean clean-generated $(PYTHON_GENERATION_EXAMPLES) examples
 
 all: CoqMakefile
 	$(MAKE) -f CoqMakefile
 
-examples: $(PYTHON_GENERATION_TARGETS)
+examples: $(PYTHON_GENERATION_EXAMPLES)
 
 proofs: CoqMakefile
 	$(MAKE) -f CoqMakefile
@@ -18,62 +22,31 @@ proofs: CoqMakefile
 CoqMakefile: _CoqProject
 	rocq makefile -f _CoqProject -o CoqMakefile
 
-clean: CoqMakefile
+ocaml/write_apps.cmo: ocaml/write_apps.ml
+	ocamlc -I extracted -I ocaml -c $<
+
+clean: CoqMakefile clean-generated
 	$(MAKE) -f CoqMakefile clean
 	rm -f CoqMakefile CoqMakefile.conf
-	rm -rf extracted generated
+	rm -rf extracted
+
+clean-generated:
+	rm -rf generated
+	rm -f extracted/*.cmi extracted/*.cmo extracted/generate_*
 
 %: CoqMakefile
 	$(MAKE) -f CoqMakefile $@
 
-generate-teleportation-py: EXTRACTED_MODULE = teleportation_netqasm
-generate-teleportation-py: GENERATOR = teleportation
-generate-teleportation-py: OUTPUT_DIR = teleportation
-generate-teleportation-py: src/Examples/Teleportation.vo ocaml/generate_teleportation.ml python/qoreo_netqasm_runtime.py
-
-generate-measure-send-py: EXTRACTED_MODULE = measure_send_netqasm
-generate-measure-send-py: GENERATOR = measure_send
-generate-measure-send-py: OUTPUT_DIR = measure_send
-generate-measure-send-py: src/Examples/MeasureSend.vo ocaml/generate_measure_send.ml python/qoreo_netqasm_runtime.py
-
-generate-b92-py: EXTRACTED_MODULE = b92_netqasm
-generate-b92-py: GENERATOR = b92
-generate-b92-py: OUTPUT_DIR = b92
-generate-b92-py: src/Examples/B92.vo ocaml/generate_b92.ml python/qoreo_netqasm_runtime.py
-
-generate-dqft-py: EXTRACTED_MODULE = dqft_netqasm
-generate-dqft-py: GENERATOR = dqft
-generate-dqft-py: OUTPUT_DIR = dqft
-generate-dqft-py: src/Examples/dis_qft.vo ocaml/generate_dqft.ml python/qoreo_netsquid_runtime.py
-
-generate-unitary-py: EXTRACTED_MODULE = unitary_test_netqasm
-generate-unitary-py: GENERATOR = unitary
-generate-unitary-py: OUTPUT_DIR = unitary_test
-generate-unitary-py: src/Examples/unitary_test.vo ocaml/generate_unitary.ml python/qoreo_netsquid_runtime.py
-
-
-generate-conditional-py: EXTRACTED_MODULE = conditional_test_netqasm
-generate-conditional-py: GENERATOR = conditional
-generate-conditional-py: OUTPUT_DIR = conditional
-generate-conditional-py: src/Examples/conditional_test.vo ocaml/generate_conditional_test.ml python/qoreo_netquid_runtime.py
-
-
-$(PYTHON_GENERATION_TARGETS): generate-%-py: ocaml/write_apps.ml
+$(PYTHON_GENERATION_EXAMPLES): %: \
+	src/Examples/%.vo \
+	ocaml/write_apps.cmo \
+	ocaml/generate_apps.ml \
+	python/qoreo_netqasm_runtime.py \
+	python/qoreo_netsquid_runtime.py
 	mkdir -p extracted generated
-	ocamlc -I extracted -c extracted/$(EXTRACTED_MODULE).mli
-	ocamlc -I extracted -c extracted/$(EXTRACTED_MODULE).ml
-	ocamlc -I extracted -I ocaml -c ocaml/write_apps.ml
-	ocamlc -I extracted -I ocaml -c ocaml/generate_$(GENERATOR).ml
-	ocamlc -I extracted -I ocaml -o extracted/generate_$(GENERATOR) unix.cma extracted/$(EXTRACTED_MODULE).cmo ocaml/write_apps.cmo ocaml/generate_$(GENERATOR).cmo
-	./extracted/generate_$(GENERATOR) generated/$(OUTPUT_DIR)
-
-
-generate-grover-py: examples/distributed_grover.vo ocaml/write_apps.ml ocaml/generated_dgro.ml python/qoreo_netsquid_runtime.py
-	mkdir -p extracted generated
-	ocamlc -I extracted -c extracted/distributed_grover_netqasm.mli
-	ocamlc -I extracted -c extracted/distributed_grover_netqasm.ml
-	ocamlc -I extracted -I ocaml -c ocaml/write_apps.ml
-	ocamlc -I extracted -I ocaml -c ocaml/generated_dgro.ml
-	ocamlc -I extracted -I ocaml -o extracted/generate_dgro unix.cma extracted/distributed_grover_netqasm.cmo ocaml/write_apps.cmo ocaml/generated_dgro.cmo
-	./extracted/generate_dgro generated/grover
-
+	ocamlc -I extracted -c -o extracted/$(call ocaml_module,$*).cmi extracted/$*.mli
+	ocamlc -I extracted -c -o extracted/$(call ocaml_module,$*).cmo extracted/$*.ml
+	cp ocaml/generate_apps.ml extracted/generate_$*.ml
+	ocamlc -I extracted -I ocaml -open $(call ocaml_module,$*) -c extracted/generate_$*.ml
+	ocamlc -I extracted -I ocaml -o extracted/generate_$* unix.cma extracted/$(call ocaml_module,$*).cmo ocaml/write_apps.cmo extracted/generate_$*.cmo
+	./extracted/generate_$* generated/$*

@@ -9,7 +9,7 @@ import netsquid as ns
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PYTHON_DIR = os.path.join(ROOT, "python")
-GENERATED_DIR = os.path.join(ROOT, "generated", "unitary_test")
+GENERATED_DIR = os.path.join(ROOT, "generated", "UnitaryTest")
 
 sys.path.insert(0, GENERATED_DIR)
 sys.path.insert(0, PYTHON_DIR)

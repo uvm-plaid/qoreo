@@ -28,8 +28,6 @@ The repository contains the Rocq formalization, extraction/generation tools, Pyt
 │   ├── Network/          # Process/network semantics and endpoint projection
 │   ├── Examples/         # Example choreographies
 │   ├── NetQasm.v         # Rendering projected processes as Python applications
-│   ├── NewChoreography.v # Experimental choreography representation
-│   └── expr/             # Earlier expression-language sources
 ├── ocaml/                # Drivers that write generated party applications
 ├── python/               # NetQASM and NetSquid runtime implementations
 ├── test_examples/        # B92, DQFT, and unitary simulation tests
@@ -46,12 +44,32 @@ The main Rocq components are:
 * `src/Examples/` contains B92, measurement/send, teleportation, protocols, distributed QFT, and unitary-gate examples.
 * `src/NetQasm.v` renders projected processes as Python source.
 
-The code-generation pipeline is split between `ocaml/write_apps.ml`, the per-example drivers in `ocaml/`, and the runtime modules in `python/`.
+The code-generation pipeline uses the shared driver in `ocaml/generate_apps.ml`, the writer in `ocaml/write_apps.ml`, and the runtime modules in `python/`.
 
 
 # Contributing to the repository
 
 To add a new Rocq `.v` file, place it in the appropriate `src/` subdirectory and add it to `_CoqProject`. Qoreo uses Rocq modules to organize data structures; for example, variables and their operations are defined under `Var` in `src/Base/Var.v`.
+
+## Adding an example
+
+For a new example named `my_example`:
+
+1. Add `src/Examples/MyExample.v` and list it in `_CoqProject`. Use the existing files in `src/Examples/` as a guide for defining the choreography and its parties. Keep Coq source filenames in CamelCase; the extraction and Make target stem can remain `my_example`.
+2. If the example should generate Python applications, define an `apps` value using the appropriate renderer. Export it at the top level of the Coq file, then add Rocq extraction at the end:
+
+   ```rocq
+   End MyExample.
+   Definition example_apps := MyExample.apps.
+
+   Extraction Language OCaml.
+   Set Extraction Output Directory "extracted".
+   Extraction "MyExample.ml" example_apps.
+   ```
+
+   `MyExample.apps` above is the value defined inside the example module; the top-level `example_apps` alias is the common extraction interface. The extraction filename must match the example file stem, including its capitalization.
+3. Add `MyExample` to `PYTHON_GENERATION_EXAMPLES` in the `Makefile`. The shared pattern rule infers `src/Examples/MyExample.vo`, uses `ocaml/generate_apps.ml`, and provides `make MyExample`, writing output to `generated/MyExample/`.
+4. Verify the example with `make MyExample` (or build all generated examples with `make examples`). If it needs a simulation or behavior test, add one under `test_examples/`.
 
 # Extracting to NetQASM
 
@@ -77,20 +95,24 @@ The `src/Examples/` directory contains the extractable examples:
 * `MeasureSend.v` - Alice creates a qubit, applies `H`, measures it, and sends the resulting classical bit to Bob
 * `Teleportation.v` - a teleportation choreography
 * `B92.v` - a B92 quantum key distribution choreography
-* `dis_qft.v` - a distributed quantum Fourier transform example
-* `unitary_test.v` - a unitary-gate example
+* `DQFT.v` - a distributed quantum Fourier transform example
+* `UnitaryTest.v` - a unitary-gate example
+* `ConditionalTest.v` - a conditional choreography example
+* `DistributedGrover.v` - a distributed Grover search example
 
 Generate applications with the corresponding Make targets:
 
 ```
-make generate-measure-send-py
-make generate-teleportation-py
-make generate-b92-py
-make generate-dqft-py
-make generate-unitary-py
+make MeasureSend
+make Teleportation
+make B92
+make DQFT
+make UnitaryTest
+make ConditionalTest
+make DistributedGrover
 ```
 
-Each target builds the corresponding Rocq example, extracts rendered application data into `extracted/`, compiles the OCaml generator, and writes party applications under `generated/<example>/`. The generator also copies the runtime module it uses into that output directory.
+Each target builds the corresponding Rocq example, extracts rendered application data into `extracted/`, compiles the OCaml generator, and writes party applications under `generated/<Example>/`. The generator also copies the Python runtime modules into that output directory.
 
 The compilation pipeline uses:
 
@@ -103,9 +125,9 @@ The compilation pipeline uses:
 The `test_examples/` directory contains simulation tests. B92 uses SquidASM; DQFT and unitary use the Qoreo NetSquid runtime. Generate the applications first:
 
 ```
-make generate-b92-py
-make generate-dqft-py
-make generate-unitary-py
+make B92
+make DQFT
+make UnitaryTest
 ```
 
 Run the B92 test with the Python environment containing NetSquid and SquidASM dependencies:

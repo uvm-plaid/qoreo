@@ -1,7 +1,7 @@
 import sys
 import tempfile
 
-sys.path.insert(0, "generated/b92")
+sys.path.insert(0, "generated/B92")
 
 from app_alice import main as alice_main
 from app_bob import main as bob_main

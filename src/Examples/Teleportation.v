@@ -1,5 +1,5 @@
 From Stdlib Require Import String.
-From Qoreo Require Import Base.Config Expr.Expr Expr.Proofs Choreography.Choreography Choreography.Proofs Network.Network NetQasm.
+From Qoreo Require Import Base.Config Expr.Expr Expr.Weakening Choreography.Choreography Choreography.Weakening Network.Network NetQasm.
 Import Config.Unitary.
 From Qoreo.Choreography Require Import Notation.
 From Stdlib Require Import Lia.
@@ -220,4 +220,5 @@ Definition apps : option (list AppFile.t) :=
 
 Extraction Language OCaml.
 Set Extraction Output Directory "extracted".
-Extraction "teleportation_netqasm.ml" apps.
+Definition example_apps := apps.
+Extraction "Teleportation.ml" example_apps.
