@@ -21,10 +21,10 @@ Module ExampleNotation.
   Definition new (b : bool) : Expr.t :=
     Expr.New (Expr.Bit b).
 
-  Definition apply1 (u : unitary) (x : Var.t) : Expr.t :=
+  Definition apply1 (u : Config.Unitary.t) (x : Var.t) : Expr.t :=
     Expr.Unitary u (ref x).
 
-  Definition apply2 (u : unitary) (x y : Var.t) : Expr.t :=
+  Definition apply2 (u : Config.Unitary.t) (x y : Var.t) : Expr.t :=
     Expr.Unitary u (Expr.Pair (ref x) (ref y)).
 
   Definition if_ (cond_ then_ else_ : Expr.t) : Expr.t :=
@@ -58,24 +58,3 @@ Module ExampleNotation.
   Notation "'New[' b ']'" := (new b)
     (at level 0, b at next level).
 End ExampleNotation.
-
-Module ExampleExtraction.
-  Definition render_party (choreo : Choreography.t) (p : Actor.t)
-    : option AppFile.t :=
-    match Network.epp p choreo with
-    | Some proc =>
-        Some {| AppFile.party := p; AppFile.source := render_app p proc |}
-    | None => None
-    end.
-
-  Fixpoint render_parties (choreo : Choreography.t) (ps : list Actor.t)
-    : option (list AppFile.t) :=
-    match ps with
-    | [] => Some []
-    | p :: ps' =>
-        match render_party choreo p, render_parties choreo ps' with
-        | Some app, Some apps => Some (app :: apps)
-        | _, _ => None
-        end
-    end.
-End ExampleExtraction.

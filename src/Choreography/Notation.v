@@ -1,12 +1,12 @@
 From Stdlib Require Import String.
 From Stdlib Require Lists.List.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
-Import List.ListNotations.
+Export List.ListNotations.
 From Stdlib Require Import Setoid.
 
 
 From Qoreo.Base Require Config.
-Import Config.Unitary.
+Export Config.Unitary.
 From Qoreo Require Import Expr.Expr Choreography.Choreography.
 From Qoreo Require Import Network.Network NetQasm.
 Require Extraction.
@@ -54,8 +54,8 @@ Declare Scope example_scope.
 
   (** Extract the underlying choreography from a monadic computation. *)
   Definition mk {T} (m : Qoreo T) : Choreography.t :=
-    let (s,_) := m empty_state in
-    chor s.
+    let (st, _) := m empty_state in 
+    chor st.
 
   (** Allocate a fresh variable and map it to the actor [A] in the underlying state. *)
   Definition fresh A : Qoreo Var.t :=
@@ -219,23 +219,16 @@ Ltac right_associate A :=
     ret b.
 
 
-Module ExampleExtraction.
-  Definition render_party (b : Backend) (choreo : Choreography.t) (p : Actor.t)
-    : option AppFile.t :=
-    match Network.epp p choreo with
-    | Some proc =>
-        Some {| AppFile.party := p; AppFile.source := render_app b p proc |}
-    | None => None
-    end.
-
-  Fixpoint render_parties b (choreo : Choreography.t) (ps : list Actor.t)
-    : option (list AppFile.t) :=
-    match ps with
-    | [] => Some []
-    | p :: ps' =>
-        match render_party b choreo p, render_parties b choreo ps' with
-        | Some app, Some apps => Some (app :: apps)
-        | _, _ => None
-        end
-    end.
-End ExampleExtraction.
+Definition render_Qoreo (b : Backend) (ps : list Actor.t)
+                        (M : Qoreo (list Var.t)) 
+  : option (list AppFile.t) :=
+  let (st, xs) := M empty_state in
+  let f := fun (env : Actor.Map.t (list Var.t)) (p : Actor.t) =>
+    Actor.Map.add p (epp_vars p (vars st) xs) env
+  in
+  let env_map : Actor.Map.t (list Var.t) :=
+      List.fold_left f ps (Actor.Map.empty _)
+  in
+  NetQasm.render_parties b (chor st)
+          ps
+          env_map.

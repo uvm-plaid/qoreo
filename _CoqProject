@@ -38,3 +38,5 @@ src/Examples/B92.v
 src/Examples/Protocols.v
 src/Examples/dis_qft.v
 src/Examples/unitary_test.v
+src/Examples/conditional_test.v
+src/Examples/distributed_grover.v

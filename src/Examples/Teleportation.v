@@ -172,15 +172,17 @@ Proof.
   auto.
 Qed.
 
-Definition choreo : Choreography.t :=
-  mk (
+Import List.ListNotations.
+
+Definition choreo : Qoreo (list Var.t) :=
     do q ← "alice" [- Unitary H (New (Bit false))-] ;;
-    teleport "alice" "bob" q
-  ).
+    do q ← teleport "alice" "bob" q ;;
+    ret [q].
 
-Eval compute in choreo.
 
-Eval compute in (Network.epp "alice" choreo).
+Eval compute in (mk choreo).
+
+Eval compute in (Network.epp "alice" (mk choreo)).
 (*
   do q ← Unitary H (New (Bit false)) ;;
   do a ← establish_entanglement Bob ;;
@@ -193,7 +195,7 @@ Eval compute in (Network.epp "alice" choreo).
 *)
 
 
-Eval compute in (Network.epp "bob" choreo).
+Eval compute in (Network.epp "bob" (mk choreo)).
 (*
   do b ← establish_entanglement Alice ;;
   do x ← Receive Alice ;;
@@ -203,19 +205,18 @@ Eval compute in (Network.epp "bob" choreo).
 *)
 
 
-Eval compute in (Network.epp "bob" choreo).
+Eval compute in (Network.epp "bob" (mk choreo)).
 
 Import List.ListNotations.
 Definition parties : list Actor.t :=
   ["alice"; "bob"].
 
 
-Import ExampleExtraction.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
 
 Definition apps : option (list AppFile.t) :=
-    ExampleExtraction.render_parties NetQASM choreo parties.
+    Notation.render_Qoreo NetQASM parties choreo.
 
 Extraction Language OCaml.
 Set Extraction Output Directory "extracted".

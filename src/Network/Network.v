@@ -109,12 +109,12 @@ Module Process.
     | Receive 
 
     | Do : Insn.t -> t -> t
-    (* BroadcastIf e As P1 P2 . P
+    (* MulticastIf e As P1 P2 . P
        Send e to all the actors in As;
        if e=True then proceed as P1; P
        otherwise proceed as P2; P
       *)
-    | BroadcastIf : Expr.t -> Actor.FSet.t -> t -> t -> t -> t
+    | MulticastIf : Expr.t -> Actor.FSet.t -> t -> t -> t -> t
     (* ReceiveIf x A P1 P2 . P
        Receive x from A;
        if x=True then proceed as P1; P
@@ -127,8 +127,8 @@ Module Process.
       match P1 with
       | Empty => P2
       | Do I0 P1' => Do I0 (seq P1' P2)
-      | BroadcastIf e Bs P11 P12 P1' =>
-        BroadcastIf e Bs P11 P12 (seq P1' P2)
+      | MulticastIf e Bs P11 P12 P1' =>
+        MulticastIf e Bs P11 P12 (seq P1' P2)
       | ReceiveIf A P11 P12 P1' =>
         ReceiveIf A P11 P12 (seq P1' P2)
       end.
@@ -142,8 +142,8 @@ Module Process.
                  else subst x v P'
       in
       Do (Insn.subst x v I0) P''
-    | BroadcastIf e As P1 P2 P0 =>
-      BroadcastIf (Expr.subst x v e) As (subst x v P1) (subst x v P2) (subst x v P0)
+    | MulticastIf e As P1 P2 P0 =>
+      MulticastIf (Expr.subst x v e) As (subst x v P1) (subst x v P2) (subst x v P0)
     | ReceiveIf A P1 P2 P0 =>
       ReceiveIf A (subst x v P1) (subst x v P2) (subst x v P0)
     end.
@@ -247,7 +247,7 @@ Module Network.
       ~ Actor.FSet.In A Bs ->
 
       Actor.Map.MapsTo A
-        (Process.BroadcastIf (Expr.Bit b) Bs PA1 PA2 PA)
+        (Process.MulticastIf (Expr.Bit b) Bs PA1 PA2 PA)
         N ->
       Actor.Map.MapsTo A
         (if b then Process.seq PA1 PA 
@@ -404,7 +404,7 @@ Fixpoint epp (p : Actor.t) (c : Choreography.t): option Process.t :=
     then 
       match epp p C1, epp p C2, epp p C with
       | Some P1, Some P2, Some P0 =>
-        Some (Process.BroadcastIf e Bs P1 P2 P0)
+        Some (Process.MulticastIf e Bs P1 P2 P0)
       | _, _, _ => None
       end
     else if Actor.Map.FSetProofs.in_dec p Bs

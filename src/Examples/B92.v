@@ -3,7 +3,6 @@ From Qoreo Require Import Base.Config Expr.Expr Choreography.Choreography.
 Import Config.Unitary.
 Import Expr.
 From Qoreo.Choreography Require Import Notation.
-Import ExampleExtraction.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
 
@@ -57,8 +56,7 @@ Module B92.
      and ai is her prepared bit.  Bob packages ((m1,~b1),(m2,~b2),(m3,~b3))
      where mi is his measurement result and ~bi is his inferred key bit.
      In each conclusive round (ri=1) the key bits agree: ai = ~bi. *)
-  Definition choreo : Choreography.t :=
-  mk (
+  Definition choreo : Qoreo (list Var.t) :=
     do (ad1, bd1) ← b92_round "alice" "bob" ;;
     do (a1, r1)   ← ret ad1 ;;
     do (b1, m1)   ← ret bd1 ;;
@@ -68,20 +66,24 @@ Module B92.
     do (ad3, bd3) ← b92_round "alice" "bob" ;;
     do (a3, r3)   ← ret ad3 ;;
     do (b3, m3)   ← ret bd3 ;;
-    do _ ← "alice" [- Pair (Pair (Pair (Var r1) (Var a1))
+    do va ← "alice" [- Pair (Pair (Pair (Var r1) (Var a1))
                                  (Pair (Var r2) (Var a2)))
                            (Pair (Var r3) (Var a3)) -] ;;
-    "bob"          [- Pair (Pair (Pair (Var m1) (If (Var b1) (Bit false) (Bit true)))
+    do vb ← "bob"   [- Pair (Pair (Pair (Var m1) (If (Var b1) (Bit false) (Bit true)))
                                  (Pair (Var m2) (If (Var b2) (Bit false) (Bit true))))
-                           (Pair (Var m3) (If (Var b3) (Bit false) (Bit true))) -]
-  ).
+                           (Pair (Var m3) (If (Var b3) (Bit false) (Bit true))) -] ;;
+    ret [va;vb].
 
   Definition parties : list Actor.t :=
     ["alice"; "bob"].
 
 
   Definition apps : option (list AppFile.t) :=
-    ExampleExtraction.render_parties NetQASM choreo parties.
+    Notation.render_Qoreo
+              NetQASM
+              parties
+              choreo.
+
 End B92.
 
 Extraction Language OCaml.

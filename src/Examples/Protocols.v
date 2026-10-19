@@ -3,7 +3,6 @@ From Qoreo Require Import Base.Config Expr.Expr Choreography.Choreography.
 Import Config.Unitary.
 Import Expr.
 From Qoreo.Choreography Require Import Notation.
-Import ExampleExtraction.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
 
@@ -134,23 +133,31 @@ Definition DGZH (As : list Actor.t) (K : list Var.t -> Qoreo unit) : Qoreo unit 
     end.
 
 (* Distributed variational algorithm (VQA) taken from Distributed Quantum Computing - A Survey (Caleffi) - Fig 10 *)
-(* Assume we have a parameterized RY/RZ rotation gates *)
-From QuantumLib Require Import Complex.
-Definition RZ (theta : R) : unitary. Admitted.
-Definition RY (theta : R) : unitary. Admitted.
+
+Import QArith_base.
+Import Config.Unitary.
 
 Record dvar_params := {
-    t1 : R ; t2 : R ; t3 : R ; t4 : R ; t5 : R ; t6 : R ; t7 : R ; t8 : R ; t9 : R ; t10 : R
+    t1 : Q ; t2 : Q ; t3 : Q ; t4 : Q ; t5 : Q ; t6 : Q ; t7 : Q ; t8 : Q ; t9 : Q ; t10 : Q
 }.
+About Unitary. Print Unitary.t.
+Fixpoint unitaries (ls : list Unitary.t) (e : Expr.t) : Expr.t :=
+    match ls with
+    | [] => e
+    | g::ls' => Unitary g (unitaries ls' e)
+    end.
+Definition RY theta e :=
+    (* TODO: is this correct? *)
+    unitaries [H; SGATE; RZ theta; Sdag; H] e.
 
 
 (* q1 owned by Alice, q2/q3 owned by Bob *)
 (* The function `success` takes the three qubits' measurement results and returns a measurement of success *)
 Definition DVQA (Alice Bob : Actor.t) (params : dvar_params) (success : Expr.t) : Qoreo unit :=
     (* Layers 1 and 2 of rotations *)
-    do q1 ← Alice [- Unitary (RZ (t4 params)) (Unitary (RY (t1 params)) (New (Bit false))) -];;
-    do q2 ← Bob   [- Unitary (RZ (t5 params)) (Unitary (RY (t2 params)) (New (Bit false))) -];;
-    do q3 ← Bob   [- Unitary (RZ (t6 params)) (Unitary (RY (t3 params)) (New (Bit false))) -];;
+    do q1 ← Alice [- Unitary (RZ (t4 params)) (RY (t1 params) (New (Bit false))) -];;
+    do q2 ← Bob   [- Unitary (RZ (t5 params)) (RY (t2 params) (New (Bit false))) -];;
+    do q3 ← Bob   [- Unitary (RZ (t6 params)) (RY (t3 params) (New (Bit false))) -];;
 
     (* Establish entanglement *)
     do (a,b) ← get_entangled_pair Alice Bob ;;
@@ -169,9 +176,9 @@ Definition DVQA (Alice Bob : Actor.t) (params : dvar_params) (success : Expr.t) 
     do q1 ← Alice [- If z (Unitary Unitary.Z b) b -];;
 
     (* Layers 3 and 4 of rotations *)
-    do q1 ← Alice [- Unitary (RZ (t8 params)) (Unitary (RY (t7 params)) q1) -];;
+    do q1 ← Alice [- Unitary (RZ (t8 params)) (RY (t7 params) q1) -];;
     do (q2,q3) ← Bob [-- Unitary CNOT (Pair q2 q3) -];;
-    do q2 ← Bob [- Unitary (RY (t9 params)) q2 -];;
+    do q2 ← Bob [- RY (t9 params) q2 -];;
     do q3 ← Bob [- Unitary (RZ (t10 params)) q3 -];;
 
     (* Alice and Bob measure their results; Bob sends results to Alice *)

@@ -13,7 +13,7 @@
 From Stdlib Require Import FSets.FMapList FSets.FSetList FSets.FMapFacts OrderedType OrderedTypeEx.
 From QuantumLib Require Import Matrix Pad Quantum.
 From Qoreo.Base Require Var Config.
-Import Config.Unitary.
+Import Config.
 Import Var.Map.Tactics.
 
 
@@ -31,11 +31,12 @@ Inductive t :=
 | Meas : t -> t
 | QRef : Var.t -> t
 | New : t -> t
-| Unitary : unitary -> t -> t
+| Unitary : Unitary.t -> t -> t
 | Lambda : Var.t -> t -> t
 | Fix : Var.t -> Var.t -> t -> t
 | App : t -> t -> t
 .
+
 
 Inductive Val : t -> Prop :=
 | QRefVal : forall q,
@@ -340,9 +341,9 @@ Inductive typ :=
 | Lolli : typ -> typ -> typ
 | BANG : typ -> typ.
 
-Definition type_of_unitary (U : unitary) : typ :=
+Definition type_of_unitary (U : Unitary.t) : typ :=
 match U with
-| CNOT | CS | CT | CSdag | CTdag => Tensor QUBIT QUBIT
+| Unitary.CNOT | Unitary.CS | Unitary.CT | Unitary.CSdag | Unitary.CTdag | Unitary.CRZ _ => Tensor QUBIT QUBIT
 | _ => QUBIT
 end.
 

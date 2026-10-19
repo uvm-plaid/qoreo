@@ -604,7 +604,8 @@ Proof.
     simpl. unfold Config.find.
     Var.reflect_find.
     unfold super.
-    destruct g; simpl; auto with wf_db.
+    destruct g; simpl; auto with wf_db;
+      try (auto using Config.WF_rz with wf_db).
 
   * subst. unfold Config.apply_gate.
     destruct HWS.
@@ -612,7 +613,8 @@ Proof.
     simpl. unfold Config.find.
     Var.reflect_find.
     unfold super.
-    destruct g; simpl; auto with wf_db.
+    destruct g; simpl; auto with wf_db;
+    try (auto using Config.WF_rz with wf_db).
 Qed.
 
 (** Combined preservation lemma *)
