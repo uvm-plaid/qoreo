@@ -92,7 +92,12 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
           match (typecheck G D1 T1 e2,
                   typecheck G D1 T1 e3) with
           | (None,_) | (_, None) => None
-          | (Some _, Some _) => None (* need decidable Var.Map equality for this case *)
+          | (Some ltp2, Some ltp3) =>
+              if
+                Var.Map.domain_eqb ltp2.(Df) ltp3.(Df) &&
+                  Var.Map.domain_eqb ltp2.(Tf) ltp3.(Tf) &&
+                  typ_eq_dec ltp2.(tf) ltp3.(tf)                                              
+              then Some ltp2 else None
           end
       | _ => None
       end
@@ -133,7 +138,38 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
           end
       | _ => None
       end
-  | _ => None  
+  | Lambda x t e =>
+      match Var.Map.find x G, Var.Map.find x D with
+      | None, None =>
+          match typecheck G (Var.Map.add x t D) T e with
+          | None => None
+          | Some ltp =>
+              match Var.Map.find x ltp.(Df) with
+              | Some _ => None
+              | None => Some ltp
+              end
+          end
+      | _, _ => None
+      end
+  | Fix f x t1 t2 e =>
+      match Var.Map.find x G, Var.Map.find x D with
+      | None, None =>
+          let G' := Var.Map.add x t1 G in
+          match Var.Map.find f G', Var.Map.find f D with
+          | None, None =>
+              match typecheck (Var.Map.add f (Lolli (BANG t1) t2) G') D T e with
+              | None => None
+              | Some ltp =>
+                  if
+                    Var.Map.domain_eqb ltp.(Df) D &&
+                      Var.Map.domain_eqb ltp.(Tf) T &&
+                      typ_eq_dec ltp.(tf) t2                                              
+                  then Some ltp else None
+              end
+          | _, _ => None
+          end
+      | _, _ => None
+      end
   end.
 
 
