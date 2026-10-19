@@ -28,12 +28,6 @@ From Stdlib Require Import Bool.Bool.
 From Stdlib Require Import Setoid.
 From Stdlib Require Import Morphisms (* for Proper *).
 
-From Qoreo.Base Require Var Config ChorEnv.
-From Qoreo.Expr Require Expr.
-From Qoreo.Choreography Require Choreography.
-From Stdlib Require Import Morphisms (* for Proper *).
-
-Module Label := Choreography.Label.
 Module Choreography := Choreography.Choreography.
 
 From Stdlib Require Lists.List.
@@ -42,173 +36,241 @@ Open Scope list_scope.
 Require Import Stdlib.Structures.Equalities.
 Import Actor.Map.Tactics.
 
-Module Insn.
-  Section Insn.
-    Variable proc : Set.
-    Variable proc_subst : Var.t -> Expr.t -> proc -> proc.
+(* We actually will want our own patterns here, without Actor names. *)
+Print Choreography.Pattern.t.
+Module Pattern.
+  Inductive t :=
+  | Var : Var.t -> t
+  | Unit : t
+  | Pair : t -> t -> t
+  | Bang : Var.t -> t.
 
-    Inductive t :=
-    | Let : Var.t -> Expr.t -> t
-    | LetBang : Var.t -> Expr.t -> t
-    | LetPair : Var.t -> Var.t -> Expr.t -> t
-    | Send : Expr.t -> Actor.t -> t
-    | Receive : Var.t -> Actor.t ->  t
-    | EPR : Var.t -> Actor.t -> t
-    (* let x = broadcastIf e As then P1 else P2
-       in P' *)
-    | LetIfSend : Var.t -> Expr.t -> Actor.FSet.t -> proc -> proc -> t
-    (* let x = receiveIf A then P1 else P2
-       in P' *)
-    | LetIfReceive : Var.t -> Actor.t -> proc -> proc -> t
-    .
+  Fixpoint in_pat (x : Var.t) (p : t) : bool :=
+    match p with
+    | Var y | Bang y =>
+      if Var.eq_dec x y then true else false
+    | Unit => false
+    | Pair p1 p2 => in_pat x p1 || in_pat x p2
+    end.
+End Pattern.
 
-    Definition subst (x : Var.t) (v : Expr.t) (I : t) : t :=
-        match I with
-        | Let y e => Let y (Expr.subst x v e)
-        | LetBang y e => LetBang y (Expr.subst x v e)
-        | LetPair y1 y2 e => LetPair y1 y2 (Expr.subst x v e)
-        | Send e A => Send (Expr.subst x v e) A
-        | Receive y A => Receive y A
-        | EPR y A => EPR y A
-        end.
 
-    Definition binders (I : t) : Var.FSet.t :=
-        match I with
-        | Let y _ | LetBang y _ | Receive y _ | EPR y _ => Var.FSet.singleton y
-        | LetPair y1 y2 _ => Var.FSet.add y1 (Var.FSet.singleton y2)
-        | Send _ _ => Var.FSet.empty
-        end.
+Module Label.
+  Inductive t :=
+  | Internal : Var.Map.t nat -> Config.t -> 
+               Var.Map.t nat -> Config.t -> t
+  | Send : Expr.t -> Actor.t -> t
+  | Receive : Actor.t -> Expr.t -> t
+  | EPR  : Actor.t -> nat -> t
+  | SendIf : bool -> Actor.FSet.t -> t
+  | ReceiveIf : bool -> Actor.t -> t.
 
-    Inductive stepC : t -> Var.Map.t nat -> Config.t -> t -> Var.Map.t nat -> Config.t -> Prop :=
-    | LetC : forall x e refs ρ e' refs' ρ',
-        Expr.step e refs ρ e' refs' ρ' ->
-        stepC (Insn.Let x e) refs ρ (Insn.Let x e') refs' ρ'
-    | LetBangC : forall x e refs ρ e' refs' ρ',
-        Expr.step e refs ρ e' refs' ρ' ->
-        stepC (Insn.LetBang x e) refs ρ (Insn.LetBang x e') refs' ρ'
-    
-    | LetPairC : forall x1 x2 e refs ρ e' refs' ρ',
-        Expr.step e refs ρ e' refs' ρ' ->
-        stepC (Insn.LetPair x1 x2 e) refs ρ (Insn.LetPair x1 x2 e') refs' ρ'
-    
-    | SendC : forall e B refs ρ e' refs' ρ',
-        Expr.step e refs ρ e' refs' ρ' ->
-        stepC (Insn.Send e B) refs ρ (Insn.Send e' B) refs' ρ'.
+  Inductive Equiv : t -> t -> Prop :=
+  | InternalEquiv : forall T1 T1' T2 T2' cfg1 cfg2,
+    Var.Map.Equal T1 T1' ->
+    Var.Map.Equal T2 T2' ->
+    Equiv (Internal T1 cfg1 T2 cfg2) (Internal T1' cfg1 T2' cfg2)
+  | SendEquiv : forall e A,
+    Equiv (Send e A) (Send e A)
+  | ReceiveEquiv : forall A e,
+    Equiv (Receive A e) (Receive A e)
+  | EPREquiv : forall A q,
+    Equiv (EPR A q) (EPR A q)
+  | SendIfEquiv : forall b tgt1 tgt2,
+    Actor.FSet.Equal tgt1 tgt2 ->
+    Equiv (SendIf b tgt1) (SendIf b tgt2)
+  | ReceiveIfEquiv :forall b A,
+    Equiv (ReceiveIf b A) (ReceiveIf b A).
 
-End Insn.
+  #[global] Instance InternalProper : Proper (Var.Map.Equal ==> eq ==> Var.Map.Equal ==> eq ==> Equiv) Internal.
+  intros T1 T1' HT1 ? cfg1 ? T2 T2' HT2 ? cfg2 ?; subst.
+  constructor; auto.
+  Qed.
 
-Print Insn.t.
+  #[global] Instance SendIfProper : Proper (eq ==> Actor.FSet.Equal ==> Equiv) SendIf.
+  intros ? ? ? T1 T2 HT; subst.
+  constructor; auto.
+  Qed.
+
+  #[global] Instance EquivEquivalence : Equivalence Equiv.
+  Proof.
+    split.
+    * intros l. induction l; constructor; 
+      try reflexivity.
+    * intros l1 l2 Hequiv.
+      induction Hequiv; constructor; auto;
+      symmetry; auto.
+    * intros l1 l2 l3 H. revert l3.
+      induction H; intros l3 H';
+      inversion H'; subst; clear H';
+      try (constructor; auto).
+      + rewrite H. auto.
+      + rewrite H0; auto.
+      + rewrite H; auto. 
+  Qed.
+End Label.
+
 Module Process.
-  (* What are processes??? e.g. when does Send ... || Receive ... work together? *)
-    Inductive t :=
+    Inductive t : Type :=
+
+    | Var   : Var.t -> t
+    | LetIn : Pattern.t -> t -> t -> t
+
     | Ret : Expr.t -> t
-    | LetIn : Var.t -> Expr.t -> t -> t
-    | LetBang : Var.t -> Expr.t -> t -> t
-    | LetPair : Var.t -> Var.t -> Expr.t -> t -> t
-    | Send    : Expr.t -> Actor.t -> t -> t
-    | Receive 
 
-    | Do : Insn.t -> t -> t
-    (* MulticastIf e As P1 P2 . P
-       Send e to all the actors in As;
-       if e=True then proceed as P1; P
-       otherwise proceed as P2; P
-      *)
-    | MulticastIf : Expr.t -> Actor.FSet.t -> t -> t -> t -> t
-    (* ReceiveIf x A P1 P2 . P
-       Receive x from A;
-       if x=True then proceed as P1; P
-       otherwise proceed as P2; P
-      *)
-    | ReceiveIf : Actor.t -> t -> t -> t -> t
+    | Unit    : t
+    | Pair    : t -> t -> t
+    | Send : Expr.t -> Actor.t -> t
+    | Receive : Actor.t -> t
+    | EPR : Actor.t -> t
+    | SendIf  : Expr.t -> Actor.FSet.t -> t -> t -> t
+    | ReceiveIf    : Actor.t -> t -> t -> t
     .
-
-    Fixpoint seq (P1 P2 : t) : t :=
-      match P1 with
-      | Empty => P2
-      | Do I0 P1' => Do I0 (seq P1' P2)
-      | MulticastIf e Bs P11 P12 P1' =>
-        MulticastIf e Bs P11 P12 (seq P1' P2)
-      | ReceiveIf A P11 P12 P1' =>
-        ReceiveIf A P11 P12 (seq P1' P2)
-      end.
 
     Fixpoint subst (x : Var.t) (v : Expr.t) (P : t) : t :=
     match P with
-    | Empty => Empty
-    | Do I0 P' =>
-      let P'' := if Var.FSet.mem x (Insn.binders I0)
-                 then P'
-                 else subst x v P'
-      in
-      Do (Insn.subst x v I0) P''
-    | MulticastIf e As P1 P2 P0 =>
-      MulticastIf (Expr.subst x v e) As (subst x v P1) (subst x v P2) (subst x v P0)
-    | ReceiveIf A P1 P2 P0 =>
-      ReceiveIf A (subst x v P1) (subst x v P2) (subst x v P0)
+    | Var y => if Var.eq_dec x y then Ret v else Var y
+    | LetIn p P1 P2 =>
+      LetIn p (subst x v P1)
+        (if Pattern.in_pat x p
+          then P2
+          else subst x v P2)
+    | Ret e => Ret (Expr.subst x v e)
+    | Unit => Unit
+    | Pair P1 P2 => Pair (subst x v P1) (subst x v P2)
+    | Send e B => Send (Expr.subst x v e) B
+    | Receive B => Receive B
+    | EPR B => EPR B
+    | SendIf e tgts P1 P2 =>
+      SendIf (Expr.subst x v e) tgts (subst x v P1) (subst x v P2)
+    | ReceiveIf B P1 P2 =>
+      ReceiveIf B (subst x v P1) (subst x v P2)
     end.
+
+    Fixpoint subst_pat p (v : t) P :=
+    match p, v with
+      | Pattern.Var x, Ret v' =>
+        subst x v' P
+      | Pattern.Bang x, Ret (Expr.Bang e') =>
+        subst x e' P
+      | Pattern.Unit, Unit => P
+      | Pattern.Pair p1 p2, Pair v1 v2 =>
+        subst_pat p1 v1 (subst_pat p2 v2 P)
+
+      | _, _ => P
+      end.
+
+    Inductive Val : t -> Prop :=
+    | VRet : forall v, Expr.Val v -> Val (Ret v)
+    | VUnit : Val Unit
+    | VPair :forall v1 v2,
+      Val v1 -> Val v2 -> Val (Pair v1 v2)
+    .
+
 
     (* Semantics *)
 
-    Inductive step : Process.t -> Var.Map.t nat -> Config.t -> Process.t -> Var.Map.t nat -> Config.t -> Prop :=
-    | DoC : forall I P refs ρ I' refs' ρ',
-        Insn.stepC I refs ρ I' refs' ρ' ->
-        step (Do I P) refs ρ (Do I' P) refs' ρ'
+    Print t. 
 
-    | LetB : forall x v P refs ρ P' refs',
-        Expr.Val v ->
-        P' = Process.subst x v P ->
-        Var.Map.Equal refs' refs ->
-        step (Do (Insn.Let x v) P) refs ρ P' refs' ρ
+    Inductive step : Process.t -> Label.t -> Process.t -> Prop :=
 
-    | LetBangB : forall x e P refs ρ P' refs',
-        P' = Process.subst x e P ->
-        Var.Map.Equal refs' refs ->
-        step (Do (Insn.LetBang x (Expr.Bang e)) P) refs ρ P' refs' ρ
+    | RetC : forall e T cfg e' T' cfg',
+      Expr.step e T cfg e' T' cfg' ->
+      step (Ret e)
+           (Label.Internal T cfg T' cfg')
+           (Ret e')
 
-    | LetPairB : forall x1 x2 v1 v2 P ρ refs P' refs',
-        Expr.Val v1 -> Expr.Val v2 ->
-        P' = Process.subst x1 v1 (Process.subst x2 v2 P) ->
-        Var.Map.Equal refs' refs ->
-        step (Do (Insn.LetPair x1 x2 (Expr.Pair v1 v2)) P) refs ρ P' refs' ρ
+    | LetInC : forall p P1 P2 l P1',
+      step P1 l P1' ->
+      step (LetIn p P1 P2)
+           l
+           (LetIn p P1' P2)
 
+    | LetInB : forall p v P2 T cfg P2' T' cfg',
+      Val v ->
+      P2' = subst_pat p v P2 ->
+      Var.Map.Equal T' T ->
+      cfg' = cfg ->
+      step (LetIn p v P2)
+           (Label.Internal T cfg T' cfg')
+           P2'
+
+
+    | PairC1 : forall P1 P2 l P1',
+      step P1 l P1' ->
+      step (Pair P1 P2) l (Pair P1' P2)
+
+    | PairC2 : forall P1 P2 l P2',
+      Val P1 ->
+      step P2 l P2' ->
+      step (Pair P1 P2) l (Pair P1 P2')
+
+    | SendC : forall e B T cfg e' T' cfg',
+      Expr.step e T cfg e' T' cfg' ->
+      step (Send e B)
+           (Label.Internal T cfg T' cfg')
+           (Send e' B)
+
+    | SendB : forall v B,
+      Expr.Val v ->
+      step (Send v B)
+           (Label.Send v B)
+           Unit
+
+    | ReceiveB : forall A v,
+      Expr.Val v ->
+      step (Receive A)
+           (Label.Receive A v)
+           Unit
+
+    | EPRB : forall B qB,
+      step (EPR B)
+           (Label.EPR B qB)
+           (Ret (Expr.QRef qB))
+
+    | SendIfC : forall e tgts P1 P2 T cfg T' cfg' e',
+      Expr.step e T cfg e' T' cfg' ->
+      step (SendIf e tgts P1 P2)
+           (Label.Internal T cfg T' cfg')
+           (SendIf e' tgts P1 P2)
+
+    
+    | SendIfB : forall (b : bool) tgts tgts' P1 P2 P',
+      P' = (if b then P1 else P2) ->
+      Actor.FSet.Equal tgts tgts' ->
+      step (SendIf (Expr.Bit b) tgts P1 P2)
+           (Label.SendIf b tgts')
+           P'
+
+    | ReceiveIfB : forall src P1 P2 (b : bool) P',
+      P' = (if b then P1 else P2) ->
+      step (ReceiveIf src P1 P2)
+           (Label.ReceiveIf b src)
+           P'
     .
 
   
-  Lemma stepCProper' : forall I refs1 cfg I' refs1' cfg',
-    Insn.stepC I refs1 cfg I' refs1' cfg' ->
-    forall refs2 refs2',
-    Var.Map.Equal refs1 refs2 ->
-    Var.Map.Equal refs1' refs2' ->
-    Insn.stepC I refs2 cfg I' refs2' cfg'.
+  Lemma stepProper' : forall P l1 P',
+    Process.step P l1 P' ->
+    forall l2,
+    Label.Equiv l1 l2 ->
+    Process.step P l2 P'.
   Proof.
-    intros ? ? ? ? ? ? Hstep.
-    inversion Hstep; subst; clear Hstep;
-      intros refs2 refs2' Hrefs Hrefs';
-      try (constructor; auto; Var.simplify; fail).
+    intros P l1 P' Hstep.
+    induction Hstep;
+      intros  l2 Hl;
+      try (constructor; auto; fail);
+      try (inversion Hl; subst; clear Hl;
+           constructor; auto; Var.simplify; fail).
+
+    * inversion Hl; subst; clear Hl.
+      constructor; auto.
+      rewrite H0. auto.
   Qed.
   
-  Global Instance stepCProper : Proper (eq ==> Var.Map.Equal ==> eq ==> eq ==> Var.Map.Equal ==> eq ==> iff) Insn.stepC.
+  Global Instance stepProper : Proper (eq ==> Label.Equiv ==> eq ==> iff) step.
   Proof.
-    intros ? P ? refs1 refs2 Hrefs ? ρ ? ? P' ? refs1' refs2' Hrefs' ? ρ' ?;
-      subst.
-    split; intros; eapply stepCProper'; eauto; symmetry; auto.
-  Qed.
-  Lemma stepProper' : forall P refs1 cfg P' refs1' cfg',
-    step P refs1 cfg P' refs1' cfg' ->
-    forall refs2 refs2',
-    Var.Map.Equal refs1 refs2 ->
-    Var.Map.Equal refs1' refs2' ->
-    step P refs2 cfg P' refs2' cfg'.
-  Proof.
-    intros ? ? ? ? ? ? Hstep.
-    induction Hstep; intros refs2 refs2' Hrefs Hrefs';
-      try (constructor; auto; Var.simplify; fail).
-  Qed.
-
-  Global Instance stepProper : Proper (eq ==> Var.Map.Equal ==> eq ==> eq ==> Var.Map.Equal ==> eq ==> iff) step.
-  Proof.
-    intros ? P ? refs1 refs2 Hrefs ? ρ ? ? P' ? refs1' refs2' Hrefs' ? ρ' ?;
+    intros ? P ? l1 l2 Hl ? P' ?;
       subst.
     split; intros; eapply stepProper'; eauto; symmetry; auto.
   Qed.
@@ -219,73 +281,86 @@ Module Network.
     Definition t := Actor.Map.t (Process.t).
 
     Inductive step :    Network.t -> ChorEnv.t nat -> Config.t ->
-                        Label.t ->
+                        Choreography.Label.t ->
                         Network.t -> ChorEnv.t nat -> Config.t -> Prop :=
 
-    | Loc : forall P P' refsA' N' N refs cfg A refs' cfg',
+    | Internal : forall P refsA' P' N refs cfg A N' refs' cfg',
       Actor.Map.MapsTo A P N ->
-      Process.step  P (ChorEnv.find A refs) cfg
-                    P' refsA' cfg' ->
+      Process.step P 
+                   (Label.Internal (ChorEnv.find A refs) cfg refsA' cfg')
+                   P' ->
       Actor.Map.Equal N' (Actor.Map.add A P' N) ->
       ChorEnv.Equal refs' (Actor.Map.add A refsA' refs) ->
       step  N refs cfg
-            (Label.Loc A)
+            (Choreography.Label.Loc A)
             N' refs' cfg'
 
-    | Send : forall PA PB y N refs refs' cfg cfg' A e B N',
-      A <> B ->
-      Actor.Map.MapsTo A (Process.Do (Insn.Send (Expr.Bang e) B) PA) N ->
-      Actor.Map.MapsTo B (Process.Do (Insn.Receive y A) PB) N ->
-      Actor.Map.Equal N' (Actor.Map.add A PA (Actor.Map.add B (Process.subst y e PB) N)) ->
+
+    | Send : forall PA PA' PB PB' N refs refs' cfg cfg' (A B : Actor.t) v N',
+
+      Actor.Map.MapsTo A PA N ->
+      Actor.Map.MapsTo B PB N ->
+
+      Expr.Val v ->
+      Process.step PA (Label.Send v B) PA' ->
+      Process.step PB (Label.Receive A v) PB' ->
+
+
+      Actor.Map.Equal N' (Actor.Map.add A PA' (Actor.Map.add B PB' N)) ->
       ChorEnv.Equal refs' refs ->
       cfg' = cfg ->
       
-      step N refs cfg (Label.Send A e B) N' refs' cfg'
+      step N refs cfg (Choreography.Label.Send A v B) N' refs' cfg'
 
-    | If : forall PA1 PA2 PA N refs refs' cfg cfg' A b Bs N',
+    | EPR : forall refs0 PA PA' PB PB' qA qB N refs cfg A B N' refs' cfg',
+      
+      Actor.Map.MapsTo A PA N ->
+      Actor.Map.MapsTo B PB N ->
+
+      ChorEnv.epr A B refs cfg = (qA, qB, refs0, cfg') ->
+      
+      Process.step PA (Label.EPR B qA) PA' ->
+      Process.step PB (Label.EPR A qB) PB' ->
+      
+      Actor.Map.Equal N' 
+        (Actor.Map.add A PA' (Actor.Map.add B PB' N)) ->
+
+      ChorEnv.Equal refs' refs0 ->
+
+      step N refs cfg (Choreography.Label.EPR A B) N' refs' cfg'
+
+
+    | If : forall PA PA' N refs refs' cfg cfg' A b Bs N',
 
       ~ Actor.FSet.In A Bs ->
 
-      Actor.Map.MapsTo A
-        (Process.MulticastIf (Expr.Bit b) Bs PA1 PA2 PA)
-        N ->
-      Actor.Map.MapsTo A
-        (if b then Process.seq PA1 PA 
-              else Process.seq PA2 PA)
-        N' ->
-      (forall B, Actor.FSet.In B Bs ->
-        exists PB1 PB2 PB,
-        Actor.Map.MapsTo B
-          (Process.ReceiveIf A PB1 PB2 PB)
-          N
-        /\
-        Actor.Map.MapsTo B
-          (if b
-            then Process.seq PB1 PB
-            else Process.seq PB2 PB)
-          N'
+      Actor.Map.MapsTo A PA N ->
+      Process.step PA (Label.SendIf b Bs) PA' ->
+      Actor.Map.MapsTo A PA' N' ->
+
+      (forall B,
+        Actor.FSet.In B Bs ->
+        exists PB PB',
+          Actor.Map.MapsTo B PB N 
+          /\
+          Process.step PB (Label.ReceiveIf b A) PB'
+          /\
+          Actor.Map.MapsTo B PB' N'
       ) ->
 
-      (forall C, C <> A -> ~ Actor.FSet.In C Bs ->
-        Actor.Map.find C N' = Actor.Map.find C N) ->
- 
+
+      (forall A0, A <> A0 ->
+        ~ Actor.FSet.In A0 Bs ->
+        Actor.Map.find A0 N' = Actor.Map.find A0 N
+        ) ->
+
       ChorEnv.Equal refs' refs ->
       cfg' = cfg ->
-      step N refs cfg (Label.If A b Bs) N' refs' cfg'
-    
-
-    | EPR : forall refs0 x y PA PB qA qB N refs cfg A B N' refs' cfg',
-      A <> B ->
-      Actor.Map.MapsTo A (Process.Do (Insn.EPR x B) PA) N ->
-      Actor.Map.MapsTo B (Process.Do (Insn.EPR y A) PB) N ->
-      ChorEnv.epr A B refs cfg = (qA, qB, refs0, cfg') ->
-      ChorEnv.Equal refs' refs0 ->
-      Actor.Map.Equal N' 
-        (Actor.Map.add A (Process.subst x (Expr.QRef qA) PA) (
-            Actor.Map.add B (Process.subst y (Expr.QRef qB) PB) N)) ->
-
-      step N refs cfg (Label.EPR A B) N' refs' cfg'
+  
+      step N refs cfg (Choreography.Label.If A b Bs) N' refs' cfg'
     .
+
+
 
     Record WF (Actors : Actor.FSet.t) (N : Network.t) :=
         {
@@ -319,24 +394,39 @@ Module Network.
       try (rewrite HTheta' in *);
       try (rewrite HN in *);
       try (rewrite HN' in *).
-      econstructor; eauto.
-      2:{ intros. rewrite <- HN, <- HN'. auto. }
+      unfold ChorEnv.epr in *.
+      destruct (Config.epr_cfg cfg) as [[q1 q2] cfg0']
+          eqn:Hcfg.
+        inversion H1; subst; clear H1.
+      econstructor;
+        [eauto | eauto | | eauto | eauto | eauto | ].
       {
-        intros B Hin.
-        destruct (H2 B Hin) as [PB1 [PB2 [PB [HBN HBN']]]].
-        exists PB1, PB2, PB.
-        rewrite HN in *.
-        rewrite HN' in *.
+        unfold ChorEnv.epr in *.
+        rewrite Hcfg.
+        reflexivity.
+      }
+      {
+        rewrite <- HTheta. auto.
+      }
+
+    * try (rewrite HTheta in *);
+      try (rewrite HTheta' in *);
+      try (rewrite HN in *);
+      try (rewrite HN' in *).
+      econstructor; eauto.
+      2:{
+        intros A0 ? ?.
+        rewrite <- HN, <- HN'.
         auto.
       }
-    * try (rewrite HN in *; clear N HN);
-      try (rewrite HN' in *; clear N' HN').
-      rename H2 into Hepr.
-      apply (ChorEnv.chor_epr_eq Theta0) in Hepr; auto.
-      destruct Hepr as [T2' [HT2 Hepr]].
-      econstructor; eauto.
-      rewrite <- HTheta'; auto.
-      rewrite HT2; auto. 
+      {
+        intros B HB.
+        specialize (H3 B HB).
+        destruct H3 as [PB [PB' [H3 [HBstep H3']]]].
+        exists PB, PB'.
+        rewrite <- HN, <- HN'.
+        repeat split; auto.
+      }
   Qed.
 
   Global Instance stepProper : Proper (Actor.Map.Equal ==> ChorEnv.Equal ==> eq ==> eq ==> Actor.Map.Equal ==> ChorEnv.Equal ==> eq ==> iff) step.
@@ -346,75 +436,59 @@ Module Network.
     split; intros Hstep;
     eapply stepProper'; eauto; symmetry; auto.
   Qed.
-
-  Definition Empty (N : t) := forall A PA, Actor.Map.MapsTo A PA N -> PA = Process.Empty.
 End Network.
 
-Definition doo (x : Insn.t) (xso : option Process.t) : option Process.t :=
-  match xso with
-  | None => None
-  | Some xs => Some (Process.Do x xs)
-  end.
+Print Choreography.t.
+Search ({Actor.FSet.In _ _} + {~ Actor.FSet.In _ _}).
 
-Fixpoint epp (p : Actor.t) (c : Choreography.t): option Process.t :=
+Fixpoint epp (p : Actor.t) (c : Choreography.t) : option Process.t :=
   match c with
-  | Choreography.Empty => Some Process.Empty
-  | Choreography.Do (Choreography.Insn.Send A1 e A2 x) C =>
-      match (Actor.eq_dec A1 p, Actor.eq_dec A2 p) with
-      | (left _, left _)  => None
-      | (left _, right _) => doo (Insn.Send e A2) (epp p C)
-      | (right _, left _) => doo (Insn.Receive x A1) (epp p C)
-      | _ => epp p C
-      end
-  | Choreography.Do (Choreography.Insn.EPR A1 x1 A2 x2) C =>
-      match (Actor.eq_dec A1 p, Actor.eq_dec A2 p) with
-      | (left _, left _)  => None
-      | (left _, right _) => doo (Insn.EPR x1 A2) (epp p C)
-      | (right _, left _) => doo (Insn.EPR x2 A1) (epp p C)
-      | _ => epp p C
-      end
-  | Choreography.Do (Choreography.Insn.Let A1 x e) C =>
-      if Actor.eq_dec A1 p
-      then doo (Insn.Let x e) (epp p C)
-      else epp p C
-  | Choreography.Do (Choreography.Insn.LetBang A1 x e) C =>
-      if Actor.eq_dec A1 p
-      then doo (Insn.LetBang x e) (epp p C)
-      else epp p C
-  | Choreography.Do (Choreography.Insn.LetPair A1 x1 x2 e) C =>
-      if Actor.eq_dec A1 p
-      then doo (Insn.LetPair x1 x2 e) (epp p C)
-      else epp p C
-  (* | _ => None *)
-
-  | Choreography.If A e C1 C2 C =>
-  (*
-    if p = A
-    then 
-      - send/broadcast e to all of the actos in C1/C2
-      - If e then epp A C1 else epp A C2 ; epp A C
-    else if p ∈ actors(C1) ∪ actors(C2)
-    then
-      - receive flag from A
-      - If flag then epp p C1 else epp p C2 ; epp p C
-    else epp p C
-    *)
-    let Bs := Actor.FSet.remove A (Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2)) in
+  | Choreography.Var A x =>
     if Actor.eq_dec A p
-    then 
-      match epp p C1, epp p C2, epp p C with
-      | Some P1, Some P2, Some P0 =>
-        Some (Process.MulticastIf e Bs P1 P2 P0)
-      | _, _, _ => None
-      end
-    else if Actor.Map.FSetProofs.in_dec p Bs
-    then 
-      match epp p C1, epp p C2, epp p C with
-      | Some P1, Some P2, Some P0 =>
-        Some (Process.ReceiveIf A P1 P2 P0)
-      | _, _, _ => None
-      end
-    else epp p C
+    then Some (Process.Var x)
+    else None
+
+  | Choreography.Loc A e =>
+    if Actor.eq_dec A p
+    then Some (Process.Ret e)
+    else None
+
+  | Choreography.Unit => Some Process.Unit (* None? *)
+  | Choreography.Pair C1 C2 =>
+    match epp p C1, epp p C2 with
+    | Some P1, Some P2 => Some (Process.Pair P1 P2)
+    | Some P1, None    => Some P1
+    | None,    Some P2 => Some P2
+    | None,    None    => None
+    end
+
+  | Choreography.LetIn p C1 C2 => _
+  | Choreography.Send A e B =>
+    if Actor.eq_dec A p
+    then Some (Process.Send e B)
+    else if Actor.eq_dec B p
+    then Some (Process.Receive A)
+    else None
+
+  | Choreography.EPR A B =>
+    if Actor.eq_dec A p
+    then Some (Process.EPR B)
+    else if Actor.eq_dec B p
+    then Some (Process.EPR A)
+    else None
+
+  | Choreography.If A e C1 C2 =>
+    let epp' := fun C => match epp p C with
+              | Some P => P
+              | None   => Process.Unit
+              end in
+    let tgts := Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2) in
+    if Actor.eq_dec A p
+    then Some (Process.SendIf e tgts (epp' C1) (epp' C2))
+    else if Actor.Map.FSetProofs.in_dec p tgts
+    then Some (Process.ReceiveIf A (epp' C1) (epp' C2))
+    else None
+
 end.
 
 (*

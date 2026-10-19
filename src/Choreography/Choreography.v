@@ -93,6 +93,16 @@ Module Pattern.
     | Pair p1 p2 => Actor.FSet.union (actors p1) (actors p2)
     end.
 
+    Fixpoint in_pat A (x : Var.t) (p : Pattern.t) : bool :=
+      match p with
+      | Pattern.Var B y | Pattern.Bang B y =>
+        if Actor.eq_dec A B 
+        then if Var.eq_dec x y then true else false
+        else false
+      | Pattern.Unit => false
+      | Pattern.Pair p1 p2 => in_pat A x p1 || in_pat A x p2
+      end.
+
   Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> t -> Typ.t -> Prop :=
   | WTVar : forall G D A x tau,
 
@@ -174,15 +184,6 @@ Module Choreography.
         Actor.FSet.add A (Actor.FSet.union (actors C1) (actors C2))
       end.
 
-    Fixpoint in_pat A (x : Var.t) (p : Pattern.t) : bool :=
-      match p with
-      | Pattern.Var B y | Pattern.Bang B y =>
-        if Actor.eq_dec A B 
-        then if Var.eq_dec x y then true else false
-        else false
-      | Pattern.Unit => false
-      | Pattern.Pair p1 p2 => in_pat A x p1 || in_pat A x p2
-      end.
 
     Fixpoint subst A (x : Var.t) (v : Expr.t) (C : t) : t :=
       match C with
@@ -192,7 +193,7 @@ Module Choreography.
         then if Var.eq_dec x y then Loc A v else Var B y
         else Var B y
       | LetIn p C1 C2 =>
-          LetIn p (subst A x v C1) (if in_pat A x p then C2 else subst A x v C2)
+          LetIn p (subst A x v C1) (if Pattern.in_pat A x p then C2 else subst A x v C2)
 
       | Unit => Unit
       | Pair C1 C2 => Pair (subst A x v C1) (subst A x v C2)
@@ -232,7 +233,7 @@ Module Choreography.
 
     Definition rebound_in A (x : Var.t) (C : t) : bool :=
       match C with
-      | LetIn p _ _ => in_pat A x p
+      | LetIn p _ _ => Pattern.in_pat A x p
       | _ => false
       end.
 
