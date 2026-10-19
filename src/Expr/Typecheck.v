@@ -7,8 +7,6 @@ Export Var.Map.Tactics.
 
 Structure ltp := { Df : Var.Map.t Typ.t; Tf : Var.Map.t nat; tf : Expr.Typ.t }.
 
-About Var.Map.domain_eqb.
-  
 (*
   Invariants:
    - Var.Map.find x (Var.Map.remove x D) = None
