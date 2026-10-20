@@ -23,7 +23,7 @@ Definition essentially_empty {A} (m : ChorEnv.t A) : bool :=
   Actor.Map.M.fold f m true.
 
 Definition toplevel_typecheck (T : ChorEnv.t nat ) (C : Choreography.t) : typecheck_result :=
-  match typecheck ChorEnv.empty ChorEnv.empty ChorEnv.empty C with
+  match typecheck ChorEnv.empty ChorEnv.empty T C with
   | None => failure
   | Some {| Df := D; Tf := _ |} => if essentially_empty D then success else failure
   end.
