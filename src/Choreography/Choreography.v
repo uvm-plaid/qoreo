@@ -36,7 +36,8 @@ Module Label.
     | Send : Actor.t -> Expr.t -> Actor.t -> t
     | EPR  : Actor.t -> Actor.t -> t
     | Loc  : Actor.t -> t
-    | Subst : Actor.FSet.t -> t (* possibly multiple local actions happening at once *)
+    (*| Subst : Actor.FSet.t -> t (* possibly multiple local actions happening at once *) *)
+    | Epsilon (* don't count these *) : t
     | If   : Actor.t -> bool -> Actor.FSet.t -> t
     .
 
@@ -52,7 +53,8 @@ Module Label.
         match l with
         | Send A _ B | EPR A B => Actor.FSet.add A (Actor.FSet.singleton B)
         | Loc A    => Actor.FSet.singleton A
-        | Subst As => As
+        (*| Subst As => As*)
+        | Epsilon => Actor.FSet.empty
         | If A _ Bs => Actor.FSet.add A Bs
         end.
 End Label.
@@ -156,7 +158,7 @@ End Pattern.
 Module Choreography.
     Inductive t : Type :=
 
-    | Var   : Actor.t -> Var.t -> t
+    (*| Var   : Actor.t -> Var.t -> t*)
     | LetIn : Pattern.t -> t -> t -> t
 
     | Loc : Actor.t -> Expr.t -> t
@@ -171,7 +173,7 @@ Module Choreography.
 
     Fixpoint actors (C : t) : Actor.FSet.t :=
       match C with
-      | Loc A _ | Var A _ => Actor.FSet.singleton A
+      | Loc A _ (*| Var A _*) => Actor.FSet.singleton A
       | LetIn p C1 C2 =>
         Actor.FSet.union (Pattern.actors p) (Actor.FSet.union (actors C1) (actors C2))
       
@@ -188,10 +190,10 @@ Module Choreography.
     Fixpoint subst A (x : Var.t) (v : Expr.t) (C : t) : t :=
       match C with
       | Loc B e => Loc B (if Actor.eq_dec A B then Expr.subst x v e else e)
-      | Var B y =>
+      (*| Var B y =>
         if Actor.eq_dec A B 
         then if Var.eq_dec x y then Loc A v else Var B y
-        else Var B y
+        else Var B y*)
       | LetIn p C1 C2 =>
           LetIn p (subst A x v C1) (if Pattern.in_pat A x p then C2 else subst A x v C2)
 
@@ -251,17 +253,45 @@ Import Choreography.
 
       step (LetIn p C1 C2) T cfg l (LetIn p C1' C2) T' cfg'
 
-    | LetInB : forall p v C T cfg X C' T' cfg',
+    | LetInVarB  : forall A x v C T cfg C' T' cfg',
 
-      Val v ->
-      C' = subst_pat p v C ->
-      Actor.FSet.Equal X (Pattern.actors p) ->
+      Expr.Val v ->
+
+      C' = subst A x v C ->
       ChorEnv.Equal T' T ->
       cfg' = cfg ->
 
-      step (LetIn p v C) T cfg
-           (Label.Subst X)
+      step (LetIn (Pattern.Var A x) (Loc A v) C) T cfg
+           (Label.Loc A)
            C' T' cfg'
+    | LetInBangB  : forall A x e C T cfg C' T' cfg',
+
+      C' = subst A x e C ->
+      ChorEnv.Equal T' T ->
+      cfg' = cfg ->
+
+      step (LetIn (Pattern.Bang A x) (Loc A (Expr.Bang e)) C) T cfg
+           (Label.Loc A)
+           C' T' cfg'
+
+    | LetInPairB : forall p1 p2 v1 v2 C T cfg T' cfg',
+
+      Val v1 -> Val v2 ->
+      ChorEnv.Equal T' T ->
+      cfg' = cfg ->
+
+      step (LetIn (Pattern.Pair p1 p2) (Pair v1 v2) C) T cfg
+           Label.Epsilon
+           (LetIn p1 v1 (LetIn p2 v2 C)) T' cfg'
+
+    | LetInUnitB : forall C T cfg T' cfg',
+
+      ChorEnv.Equal T' T ->
+      cfg' = cfg ->
+
+      step (LetIn Pattern.Unit Unit C) T cfg
+           Label.Epsilon
+           C T' cfg'
 
     | LetInDelay : forall (p : Pattern.t) C1 C2 T cfg l C2' T' cfg',
 
@@ -393,12 +423,14 @@ Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreograp
 Inductive WellTyped :
   ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Typ.t -> Prop :=
 
+(*
 | WTVar : forall G D T A x (tau : Expr.typ),
   ~ Var.Map.In x (G!A) ->
   ChorEnv.Equal D (Actor.Map.singleton A (Var.Map.singleton x tau)) ->
   ChorEnv.Empty T ->
 
   WellTyped G D T (Choreography.Var A x) (Typ.Local A tau)
+  *)
 
 | WTLetIn : forall tau D1 D2 T1 T2 G' G1' D1' D' T G D p C1 C2 tau',
   WellTyped G D1 T1 C1 tau ->
