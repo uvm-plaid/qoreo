@@ -55,22 +55,18 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       | Some ltp => Some {| Df := ltp.(Df); Tf := ltp.(Tf); tf := BANG ltp.(tf) |}
       end
   | LetIn x e1 e2 =>
-      match Var.Map.find x G with
-      | Some _ => None
-      | None =>
-          match typecheck G D T e1 with
-          | None => None
-          | Some ltp1 =>
-              match Var.Map.find x ltp1.(Df) with
-              | Some _ => None
-              | None =>
-                  match typecheck G (Var.Map.add x ltp1.(tf) ltp1.(Df)) ltp1.(Tf) e2 with
-                  | None => None
-                  | Some ltp2 =>
-                      match Var.Map.find x ltp2.(Df) with
-                      | Some _ => None
-                      | None => Some ltp2
-                      end
+      match typecheck G D T e1 with
+      | None => None
+      | Some ltp1 =>
+          match Var.Map.find x ltp1.(Df) with
+          | Some _ => None
+          | None =>
+              match typecheck (Var.Map.remove x G) (Var.Map.add x ltp1.(tf) ltp1.(Df)) ltp1.(Tf) e2 with
+              | None => None
+              | Some ltp2 =>
+                  match Var.Map.find x ltp2.(Df) with
+                  | Some _ => None
+                  | None => Some ltp2
                   end
               end
           end
@@ -109,19 +105,21 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
           end
       end
   | LetPair x y e1 e2 =>
-      match (Var.Map.find x G, Var.Map.find y G)  with
-      | (None, None) =>
-          match typecheck G D T e1 with
-          | Some {| Df := D1; Tf := T1; tf := Tensor t1 t2 |} =>
-              match typecheck G (Var.Map.add x t1 (Var.Map.add y t2 D1)) T1 e2 with
+      match typecheck G D T e1 with
+      | Some {| Df := D1; Tf := T1; tf := Tensor t1 t2 |} =>
+          match Var.Map.find x D1, Var.Map.find y D1 with
+          | None, None =>
+              match typecheck
+                      (Var.Map.remove x (Var.Map.remove y G))
+                      (Var.Map.add x t1 (Var.Map.add y t2 D1)) T1 e2 with
               | Some ltp2 =>   
-                  match (Var.Map.find x ltp2.(Df), Var.Map.find y ltp2.(Df))  with
-                  | (None, None) => Some ltp2
-                  | _ => None
+                  match Var.Map.find x ltp2.(Df), Var.Map.find y ltp2.(Df)  with
+                  | None, None => Some ltp2
+                  | _, _ => None
                   end
               | _ => None
               end
-          | _ => None
+          | _, _ => None
           end
       | _ => None
       end
@@ -137,9 +135,9 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       | _ => None
       end
   | Lambda x t e =>
-      match Var.Map.find x G, Var.Map.find x D with
-      | None, None =>
-          match typecheck G (Var.Map.add x t D) T e with
+      match Var.Map.find x D with
+      | None =>
+          match typecheck (Var.Map.remove x G) (Var.Map.add x t D) T e with
           | None => None
           | Some ltp =>
               match Var.Map.find x ltp.(Df) with
@@ -147,27 +145,19 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
               | None => Some ltp
               end
           end
-      | _, _ => None
+      | _ => None
       end
   | Fix f x t1 t2 e =>
-      match Var.Map.find x G, Var.Map.find x D with
-      | None, None =>
-          let G' := Var.Map.add x t1 G in
-          match Var.Map.find f G', Var.Map.find f D with
-          | None, None =>
-              match typecheck (Var.Map.add f (Lolli (BANG t1) t2) G') D T e with
-              | None => None
-              | Some ltp =>
-                  if
-                    Var.Map.domain_eqb ltp.(Df) D &&
-                      Var.Map.domain_eqb ltp.(Tf) T &&
-                      typ_eq_dec ltp.(tf) t2                                              
-                  then Some ltp else None
-              end
-          | _, _ => None
-          end
-      | _, _ => None
-      end
+      if Var.eq_dec f x then None else
+        match typecheck (Var.Map.add f (Lolli (BANG t1) t2) (Var.Map.add x t1 G)) D T e with
+        | None => None
+        | Some  {| Df := D'; Tf := T'; tf := t2' |} as sltp =>
+            if
+              Var.Map.domain_eqb D' D &&
+                Var.Map.domain_eqb T' T &&
+                typ_eq_dec t2' t2                                              
+            then sltp else None
+        end
   end.
 
 Variant typecheck_result : Type := success (t : Typ.t) | failure.
