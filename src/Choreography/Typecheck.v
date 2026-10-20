@@ -22,10 +22,8 @@ Definition essentially_empty {A} (m : ChorEnv.t A) : bool :=
   let f := fun _ m' b =>  Var.Map.domain_eqb m' (Var.Map.empty A) && b in
   Actor.Map.M.fold f m true.
 
-Definition toplevel_typecheck (C : Choreography.t) : typecheck_result :=
+Definition toplevel_typecheck (T : ChorEnv.t nat ) (C : Choreography.t) : typecheck_result :=
   match typecheck ChorEnv.empty ChorEnv.empty ChorEnv.empty C with
   | None => failure
-  | Some {| Df := D; Tf := T |} =>
-      if essentially_empty D && essentially_empty T
-      then success else failure
+  | Some {| Df := D; Tf := _ |} => if essentially_empty D then success else failure
   end.
