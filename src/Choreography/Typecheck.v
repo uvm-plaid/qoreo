@@ -18,11 +18,14 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
 
 Variant typecheck_result : Type := success | failure.
 
+Definition essentially_empty {A} (m : ChorEnv.t A) : bool :=
+  let f := fun _ m' b =>  Var.Map.domain_eqb m' (Var.Map.empty A) && b in
+  Actor.Map.M.fold f m true.
+
 Definition toplevel_typecheck (C : Choreography.t) : typecheck_result :=
   match typecheck ChorEnv.empty ChorEnv.empty ChorEnv.empty C with
   | None => failure
   | Some {| Df := D; Tf := T |} =>
-      if Actor.Map.domain_eqb D (ChorEnv.empty) &&
-           Actor.Map.domain_eqb T (ChorEnv.empty)
+      if essentially_empty D && essentially_empty T
       then success else failure
   end.
