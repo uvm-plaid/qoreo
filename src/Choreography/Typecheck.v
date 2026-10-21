@@ -32,7 +32,8 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
       match Expr.Typecheck.typecheck (ChorEnv.find A G) (ChorEnv.find A D) (ChorEnv.find A T) e with
       | Some {| Expr.Typecheck.Df := Delta;
                Expr.Typecheck.Tf := Theta;
-               Expr.Typecheck.tf := BANG t|} => None (* WIP *)          
+               Expr.Typecheck.tf := BANG t|} =>
+          typecheck (ChorEnv.add B y t G) (Actor.Map.add A Delta D) (Actor.Map.add A Theta T) C
       | _ => None           
       end 
   | _ => None (* WIP *)
