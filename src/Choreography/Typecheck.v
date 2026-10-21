@@ -50,8 +50,8 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
                Expr.Typecheck.Tf := Theta;
                Expr.Typecheck.tf := t|} =>
           match typecheck
-                  (ChorEnv.add A x t G)
-                  (Actor.Map.add A Delta D)
+                  (ChorEnv.remove A x G)
+                  (Actor.Map.add A (Var.Map.add x t Delta) D)
                   (Actor.Map.add A Theta T) C with
           | Some ltap as sltap =>
               match Var.Map.find x (ChorEnv.find A ltap.(Df)) with
@@ -62,6 +62,26 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
           end
       | _ => None           
       end 
+  | Choreography.Do (Insn.LetPair A x y e) C =>
+      if Var.eq_dec x y then None else
+        match Expr.Typecheck.typecheck (ChorEnv.find A G) (ChorEnv.find A D) (ChorEnv.find A T) e with
+        | Some {| Expr.Typecheck.Df := Delta;
+                 Expr.Typecheck.Tf := Theta;
+                 Expr.Typecheck.tf := Expr.Typ.Tensor t1 t2|} =>
+            match typecheck
+                    (ChorEnv.remove A x (ChorEnv.remove A y G))
+                    (Actor.Map.add A (Var.Map.add x t1 (Var.Map.add y t2 Delta)) D)
+                    (Actor.Map.add A Theta T) C with
+            | Some ltap as sltap =>
+                let Delta := ChorEnv.find A ltap.(Df) in
+                match Var.Map.find x Delta, Var.Map.find y Delta with
+                | None, None => sltap
+                | _, _ => None
+                end
+            | _ => None
+            end
+        | _ => None           
+        end 
   | _ => None (* WIP *)
   end.
 
