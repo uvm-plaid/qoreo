@@ -74,9 +74,9 @@ if __name__ == "__main__":
         # Alice and Bob each own 1 qubit.
         result = (int(alice_result), int(bob_result))
         counts[result] = counts.get(result, 0) + 1
-
+    #Change print statements here according to the result you've passed.
     print("\nDISTRIBUTED GROVER RESULTS")
-    print("Marked state: |11>")
+    print("Marked state: |01>")
     print(f"Shots: {shots}\n")
 
     for a in (0, 1):
@@ -84,5 +84,5 @@ if __name__ == "__main__":
             count = counts.get((a, b), 0)
             print(f"{a}{b}: {count}")
 
-    success = counts.get((1, 1), 0)
+    success = counts.get((0, 1), 0)
     print(f"\nSuccess probability: {success / shots:.2%}")
