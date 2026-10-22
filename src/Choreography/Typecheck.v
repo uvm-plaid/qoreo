@@ -9,6 +9,11 @@ Export Var.Map.Tactics.
 
 Structure ltap := { Df : ChorEnv.t Expr.Typ.t; Tf : ChorEnv.t nat }.
 
+(* checks equivalence of two ChorEnvs wrt a given set of actors. *)
+Definition chorenv_eq_on {T}
+  (cmp : T -> T -> bool) (As : Actor.FSet.t) (CE1 : ChorEnv.t T) (CE2 : ChorEnv.t T) : bool :=
+  Actor.FSet.for_all (fun A => Var.Map.equal cmp (ChorEnv.find A CE1) (ChorEnv.find A CE1)) As.
+
 Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreography.t) : option ltap :=
   match C with
   | Choreography.Empty => Some {| Df := D; Tf := T |}
@@ -82,14 +87,38 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
             end
         | _ => None           
         end 
-  | _ => None (* WIP *)
+  | Choreography.If A e C1 C2 C =>
+      match Expr.Typecheck.typecheck (ChorEnv.find A G) (ChorEnv.find A D) (ChorEnv.find A T) e with
+      | Some {| Expr.Typecheck.Df := Delta;
+               Expr.Typecheck.Tf := Theta;
+               Expr.Typecheck.tf := Expr.Typ.BIT|} =>
+          let D' := Actor.Map.add A Delta D in
+          let T' := Actor.Map.add A Theta T in
+          match typecheck G D' T' C1, typecheck G D' T' C2 with
+          | Some {| Df := D1; Tf := T1 |}, Some {| Df := D2; Tf := T2 |} =>
+              let As := Actor.FSet.union (Actor.Map.domain D1) (Actor.Map.domain D2) in
+              if (chorenv_eq_on Expr.Typ.typ_eq_dec As D1 D2) &&
+                   (chorenv_eq_on Nat.eqb As T1 T2) then
+                let Bs :=
+                  Actor.FSet.diff As
+                    (Actor.FSet.union (Choreography.actors C2) (Choreography.actors C1)) in
+                if (chorenv_eq_on Expr.Typ.typ_eq_dec Bs D1 D') &&
+                     (chorenv_eq_on Nat.eqb Bs T1 T')
+                then typecheck G D1 T1 C
+                else None
+              else None
+          | _, _ => None
+          end
+      | _ => None
+      end
   end.
 
 Variant typecheck_result : Type := success | failure.
 
-Definition essentially_empty {A} (CE : ChorEnv.t A) : bool :=
-  let f := fun _ m b =>  Var.Map.domain_eqb m (Var.Map.empty A) && b in
-  Actor.Map.M.fold f CE true.
+Definition essentially_empty {T} (CE : ChorEnv.t T) : bool :=
+  Actor.FSet.for_all 
+    (fun A => Var.Map.is_empty (ChorEnv.find A CE)) 
+    (Actor.Map.domain CE).
 
 Definition toplevel_typecheck (T : ChorEnv.t nat ) (C : Choreography.t) : typecheck_result :=
   match typecheck ChorEnv.empty ChorEnv.empty T C with
