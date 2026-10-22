@@ -3,6 +3,7 @@ From Stdlib Require Import String List QArith.
 From Qoreo.Base Require Import Config Var Actor.
 From Qoreo.Expr Require Import Expr.
 From Qoreo.Choreography Require Import Choreography.
+From Qoreo.Choreography Require Typecheck.
 From Qoreo.Network Require Import Network.
 From Qoreo.Choreography Require Import Notation.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
@@ -52,16 +53,16 @@ Module DistributedGrover.
 
     (* Alice: X-basis measurement *)
     do a ← Alice [- Unitary H a -] ;;
-    do mA ← Alice [- Meas a -] ;;
+    do mA ← Alice [!- Meas a -] ;;
 
     (* Bob: Y-basis measurement *)
     do b ← Bob [- Unitary Sdag b -] ;;
     do b ← Bob [- Unitary H b -] ;;
-    do mB ← Bob [- Meas b -] ;;
+    do mB ← Bob [!- Meas b -] ;;
 
     (* Exchange measurement outcomes *)
-    do mA_bob ← send Alice mA Bob ;;
-    do mB_alice ← send Bob mB Alice ;;
+    do mA_bob ← send Alice (Bang mA) Bob ;;
+    do mB_alice ← send Bob (Bang mB) Alice ;;
 
     (* Alice applies corrections *)
     do qA ← Alice [- Unitary SGATE qA -] ;;
@@ -117,8 +118,8 @@ Module DistributedGrover.
     do qA ← Alice [- Unitary H qA -] ;;
     do qB ← Bob [- Unitary H qB -] ;;
 
-    do resultA ← Alice [- Meas qA -] ;;
-    do resultB ← Bob [- Meas qB -] ;;
+    do resultA ← Alice [!- Meas qA -] ;;
+    do resultB ← Bob [!- Meas qB -] ;;
 
     ret [resultA; resultB].
 
@@ -127,6 +128,13 @@ Module DistributedGrover.
       do result ← grover "alice" "bob" ;;
       ret result
     ).
+
+  Lemma typecheck_grover :
+      Typecheck.toplevel_typecheck ChorEnv.empty choreo
+      = Typecheck.success.
+  Proof.
+    reflexivity.
+  Qed.
 
   Definition parties : list Actor.t :=
     ["alice"; "bob"].

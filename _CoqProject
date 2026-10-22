@@ -24,6 +24,7 @@ src/Choreography/Progress.v
 src/Choreography/Proofs.v
 src/Choreography/Substitution.v
 src/Choreography/Weakening.v
+src/Choreography/Typecheck.v
 
 src/Choreography/Notation.v
 src/Choreography/OldNotation.v
@@ -41,3 +42,4 @@ src/Examples/DQFT.v
 src/Examples/UnitaryTest.v
 src/Examples/ConditionalTest.v
 src/Examples/DistributedGrover.v
+src/Examples/TypecheckTest.v

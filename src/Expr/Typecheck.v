@@ -34,7 +34,7 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       end
   | Meas e1 =>
       match typecheck G D T e1 with
-      | Some {| Df := D1; Tf := T1; tf := QUBIT |} => Some {| Df := D1; Tf := T1; tf := BIT |}
+      | Some {| Df := D1; Tf := T1; tf := QUBIT |} => Some {| Df := D1; Tf := T1; tf := BANG BIT |}
       | _ => None
       end
   | New e1 =>
@@ -50,9 +50,13 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       | _  => None
       end
   | Bang e =>
-      match typecheck G D T e with
+      match typecheck G (Var.Map.empty Typ.t) (Var.Map.empty nat) e with
       | None => None
-      | Some ltp => Some {| Df := ltp.(Df); Tf := ltp.(Tf); tf := BANG ltp.(tf) |}
+      | Some ltp =>
+          if Var.Map.domain_eqb ltp.(Df) (Var.Map.empty Typ.t) &&
+             Var.Map.domain_eqb ltp.(Tf) (Var.Map.empty nat)
+          then Some {| Df := D; Tf := T; tf := BANG ltp.(tf) |}
+          else None
       end
   | LetIn x e1 e2 =>
       match typecheck G D T e1 with
@@ -105,6 +109,7 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
           end
       end
   | LetPair x y e1 e2 =>
+      if Var.eq_dec x y then None else
       match typecheck G D T e1 with
       | Some {| Df := D1; Tf := T1; tf := Tensor t1 t2 |} =>
           match Var.Map.find x D1, Var.Map.find y D1 with

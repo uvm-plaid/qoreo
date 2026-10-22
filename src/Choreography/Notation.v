@@ -146,7 +146,7 @@ Declare Scope example_scope.
     (localPair A e)
     (no associativity, at level 50) : example_scope.
   Notation "A '[!-' e '-]'" :=
-    (localPair A e)
+    (localBang A e)
     (no associativity, at level 50) : example_scope.
 
 

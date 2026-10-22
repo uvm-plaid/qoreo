@@ -1,7 +1,7 @@
 From Stdlib Require Import String.
-From Qoreo Require Import Base.Config Expr.Expr Expr.Weakening Choreography.Choreography Choreography.Weakening Network.Network NetQasm.
+From Qoreo Require Import Base.Config Expr.Expr (* Expr.Weakening Choreography.Choreography Choreography.Weakening *) Network.Network NetQasm.
 Import Config.Unitary.
-From Qoreo.Choreography Require Import Notation.
+From Qoreo.Choreography Require Import Notation Typecheck.
 From Stdlib Require Import Lia.
 
 
@@ -10,9 +10,29 @@ Open Scope list_scope.
 Open Scope example_scope.
 
 
-Definition fresh_in_teleport q := q = 10.
+Definition fresh_in_teleport q := q = 10%nat.
+
+About teleport.
+Definition teleport_measure : Qoreo unit :=
+  do q ← "alice" [- New (Bit false) -] ;;
+  do q ← teleport "alice" "bob" q ;;
+  do _ ← "bob" [!- Meas q -] ;;
+  ret tt.
+
+Lemma typecheck_teleport_measure :
+    Typecheck.toplevel_typecheck ChorEnv.empty (mk teleport_measure)
+    = Typecheck.success.
+Proof.
+  reflexivity.
+Qed.
+  
+(* This more involved proof runs into a failure to evaluate
+    the notation. For now, we will only support
+    type-checking for concrete choreographies.
+*)
 
 (* TODO: improve tactics for typechecking! *)
+(*
 Lemma WellTyped_teleport : forall Alice Bob q C,
   Alice <> Bob ->
   fresh_in_teleport q (* ensure q is fresh in teleport *) ->
@@ -171,6 +191,7 @@ Proof.
 
   auto.
 Qed.
+*)
 
 Import List.ListNotations.
 

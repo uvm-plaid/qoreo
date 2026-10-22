@@ -12,7 +12,7 @@ Structure ltap := { Df : ChorEnv.t Expr.Typ.t; Tf : ChorEnv.t nat }.
 (* checks equivalence of two ChorEnvs wrt a given set of actors. *)
 Definition chorenv_eq_on {T}
   (cmp : T -> T -> bool) (As : Actor.FSet.t) (CE1 : ChorEnv.t T) (CE2 : ChorEnv.t T) : bool :=
-  Actor.FSet.for_all (fun A => Var.Map.equal cmp (ChorEnv.find A CE1) (ChorEnv.find A CE1)) As.
+  Actor.FSet.for_all (fun A => Var.Map.equal cmp (ChorEnv.find A CE1) (ChorEnv.find A CE2)) As.
 
 Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreography.t) : option ltap :=
   match C with
@@ -34,6 +34,7 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
         | _, _ => None
         end
   | Choreography.Do (Insn.Send A e B y) C =>
+      if Actor.eq_dec A B then None else
       match Expr.Typecheck.typecheck (ChorEnv.find A G) (ChorEnv.find A D) (ChorEnv.find A T) e with
       | Some {| Expr.Typecheck.Df := Delta;
                Expr.Typecheck.Tf := Theta;
@@ -68,7 +69,7 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
       | _ => None           
       end 
   | Choreography.Do (Insn.LetPair A x y e) C =>
-      if Var.eq_dec x y then None else
+        if Var.eq_dec x y then None else
         match Expr.Typecheck.typecheck (ChorEnv.find A G) (ChorEnv.find A D) (ChorEnv.find A T) e with
         | Some {| Expr.Typecheck.Df := Delta;
                  Expr.Typecheck.Tf := Theta;
@@ -96,13 +97,20 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
           let T' := Actor.Map.add A Theta T in
           match typecheck G D' T' C1, typecheck G D' T' C2 with
           | Some {| Df := D1; Tf := T1 |}, Some {| Df := D2; Tf := T2 |} =>
-              let As := Actor.FSet.union (Actor.Map.domain D1) (Actor.Map.domain D2) in
+              let As :=
+                Actor.FSet.union
+                  (Actor.FSet.union
+                     (Actor.FSet.union (Actor.Map.domain D1) (Actor.Map.domain D2))
+                     (Actor.FSet.union (Actor.Map.domain T1) (Actor.Map.domain T2)))
+                  (Actor.FSet.union (Actor.Map.domain D') (Actor.Map.domain T')) in
               if (chorenv_eq_on Expr.Typ.typ_eq_dec As D1 D2) &&
                    (chorenv_eq_on Nat.eqb As T1 T2) then
                 let Bs :=
                   Actor.FSet.diff As
                     (Actor.FSet.union (Choreography.actors C2) (Choreography.actors C1)) in
-                if (chorenv_eq_on Expr.Typ.typ_eq_dec Bs D1 D') &&
+                if (chorenv_eq_on Expr.Typ.typ_eq_dec Bs D' ChorEnv.empty) &&
+                     (chorenv_eq_on Nat.eqb Bs T' ChorEnv.empty) &&
+                     (chorenv_eq_on Expr.Typ.typ_eq_dec Bs D1 D') &&
                      (chorenv_eq_on Nat.eqb Bs T1 T')
                 then typecheck G D1 T1 C
                 else None
@@ -120,7 +128,7 @@ Definition essentially_empty {T} (CE : ChorEnv.t T) : bool :=
     (fun A => Var.Map.is_empty (ChorEnv.find A CE)) 
     (Actor.Map.domain CE).
 
-Definition toplevel_typecheck (T : ChorEnv.t nat ) (C : Choreography.t) : typecheck_result :=
+Definition toplevel_typecheck (T : ChorEnv.t nat) (C : Choreography.t) : typecheck_result :=
   match typecheck ChorEnv.empty ChorEnv.empty T C with
   | None => failure
   | Some {| Df := D; Tf := _ |} => if essentially_empty D then success else failure
