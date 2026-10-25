@@ -181,6 +181,16 @@ From Qoreo.Base Require Var Actor Config.
   Qed.
   #[global] Hint Rewrite @find_singleton : var_db.
 
+  Lemma find_singleton' : forall {T} (m : Var.Map.t T) A B,
+    Var.Map.Equal
+      (ChorEnv.find A (Actor.Map.singleton B m))
+      (if Actor.eq_dec A B then m else Var.Map.empty _).
+  Proof.
+    intros. unfold Actor.Map.singleton.
+    Var.simplify.
+  Qed.
+  #[global] Hint Rewrite @find_singleton' : var_db.
+
 
   (* Empty_except *)
 
@@ -466,6 +476,15 @@ From Qoreo.Base Require Var Actor Config.
       inversion H; subst; clear H
     | [ H : ChorEnv.Partition _ _ _ |- _ ] =>
       specialize (H A)
+    end.
+  Ltac specialize_with A :=
+    repeat match goal with
+    | [ H : ChorEnv.PartitionList _ _ |- _ ] =>
+      inversion H; subst; clear H
+    | [ H : ChorEnv.Partition _ _ _ |- _ ] =>
+      specialize (H A)
+    | [ H : ChorEnv.EmptyExcept _ _ |- _ ] => specialize (H A)
+    | [ H : ChorEnv.Empty _ |- _ ] => specialize (H A)
     end.
 
   (** Properties of epr *)

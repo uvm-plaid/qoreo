@@ -253,8 +253,8 @@ Module Process.
 
     Fixpoint subst_pat p (v : t) P :=
     match p, v with
-      (*| Pattern.Var x, Ret v' =>
-        subst x v' P*)
+      | Pattern.Var x, Ret v' =>
+        subst x v' P
       | Pattern.Bang x, Ret (Expr.Bang e') =>
         subst x e' P
       | Pattern.Unit, Unit => P
@@ -811,7 +811,7 @@ Proof.
     Actor.Map.Tactics.compare A0 A.
     { (* A0 = A *)
       econstructor; eauto;
-        Var.simplify.
+        ChorEnv.simplify.
     }
     (* A0 <> A *)
     unfold Actor.Map.singleton in *.

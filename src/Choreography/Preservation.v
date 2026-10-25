@@ -7,7 +7,7 @@ Import HelperLemmas.
 
 (** * Lemmas about well-formedness and well-scopedness *)
 
-
+(*
 Lemma WellTyped_WellFormed : forall Γ Delta Theta C,
   WellTyped Γ Delta Theta C ->
   Choreography.WellFormed C.
@@ -15,8 +15,9 @@ Proof.
   intros ? ? ? ? HWT.
   induction HWT; constructor; auto; constructor; auto.
 Qed.
+*)
 
-
+(*
 Lemma WellScoped_preservationC : forall I Theta ρ l I' Theta' ρ',
   Insn.stepC I Theta ρ l I' Theta' ρ' ->
   Insn.WellFormed I ->
@@ -83,21 +84,30 @@ Proof.
     inversion H; subst; auto
   end.
 Qed.
-
+*)
 
 Lemma WellScoped_preservation : forall C Theta ρ l C' Theta' ρ',
   Choreography.step C Theta ρ l C' Theta' ρ' ->
-  Choreography.WellFormed C ->
+  (*Choreography.WellFormed C ->*)
   ChorEnv.WellScoped Theta ρ ->
   ChorEnv.WellScoped Theta' ρ'.
 Proof.
   intros ? ? ? ? ? ? ? Hstep.
-  induction Hstep; intros HWT HWS;
+  induction Hstep; intros HWS;
   try match goal with
   | [ H : ChorEnv.Equal ?A ?B |- _ ] =>
     rewrite H in *; clear A H
-  end; auto.
+  end; subst; auto.
 
+  * intros D.
+    autorewrite with var_db.
+    Actor.Map.Tactics.compare D A.
+    {
+      eapply Expr.Preservation.WellScoped_preservation; eauto.
+    }
+    admit.
+
+(*  
 * eapply WellScoped_preservationC; eauto.
   inversion HWT; subst; auto.
 * inversion HWT; subst; clear HWT.
@@ -112,7 +122,8 @@ Proof.
 * inversion HWT; subst; clear HWT.
   apply IHHstep; auto.
 Qed.
-
+*)
+Admitted.
 
 
 Lemma epr_inversion : forall A B T1 cfg1 q1 q2 T2 cfg2,
@@ -165,14 +176,7 @@ Proof.
     apply Var.Map.Proofs.partition_add_r; auto with var_db.
   }
 Qed.
-   
-Lemma nilnostep : forall T cfg l C' T' cfg',
-    ~ step Choreography.Empty T cfg l C' T' cfg'. 
-Proof.
-  intros T cfg l C' T' cfg' Hstep.
-  inversion Hstep.
-  inversion H.
-Qed.
+
 
 Lemma epr_partition : forall T1 Theta2 A B T cfg q1 q2 T' cfg' D,
   ChorEnv.epr A B T cfg = (q1, q2, T', cfg') ->
@@ -386,7 +390,7 @@ Proof.
 Qed.
 Hint Rewrite @concat_id_empty : var_db.
 
-
+(*
 Lemma delay_inversion_C : forall I1 I2 C T1 cfg1 l T2 cfg2,
     Insn.stepC I1 T1 cfg1 l I2 T2 cfg2 ->
     ChorEnv.WellScoped T1 cfg1 ->    
@@ -646,7 +650,7 @@ Proof.
       end.
       exact Hparts.
 Qed.
-
+*)
 
 
 Lemma concat_inversion_eq : forall {X} (m m1 m2 : Var.Map.t X),
@@ -669,17 +673,6 @@ Proof.
   }
 Qed.
 
-
-(* TODO: move to Map.v *)
-Lemma partition_sym : forall {T} (A B C : Var.Map.t T),
-  Var.Map.Partition A B C -> Var.Map.Partition A C B.
-Proof.
-  intros.
-  Var.Map.Tactics.reflect_partition.
-  { apply Var.Map.Proofs.disjoint_sym; auto. }
-  rewrite Var.Map.Proofs.concat_sym; auto.
-  reflexivity.
-Qed.
 
 
 Lemma concat_disjoint_injective : forall {T} (M M1 M2 : Var.Map.t T),
@@ -798,6 +791,7 @@ Proof.
     Var.simplify.
 Qed.
 
+(*
 Lemma delay_inversion_IfDelay : forall A l 
         e C1 C2 C C'
         cfg cfg'
@@ -1028,6 +1022,7 @@ Proof.
       admit.
 
 Admitted.
+*)
 
 
 Lemma partition_except_transitivity : forall l T T1 T1',
@@ -1074,6 +1069,8 @@ Proof.
   intros l T T' [Hpart1 Hpart2].
   exists (ChorEnv_map (Actor.Map.domain T) (fun B => ))
 *)
+
+(*
 
 Lemma delay_inversion_IfDelay_exact :
   forall A e C1 C2 C T cfg C' T' cfg' l,
@@ -1167,6 +1164,7 @@ Proof.
       intros HB'. apply (Hempty B).
       Actor.simplify.
 Qed.
+*)
 
 Lemma concat_idempotent : forall {T} (m1 m2 : Var.Map.t T),
   (forall x, Var.Map.In x m1 -> Var.Map.find x m1 = Var.Map.find x m2) ->
@@ -1176,9 +1174,9 @@ Admitted.
 Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
     step C1 T1 cfg1 l C2 T2 cfg2 ->
     ChorEnv.WellScoped T1 cfg1 ->    
-    forall G D T1',
+    forall G D T1' tau,
       Partition_except l T1 T1' ->
-      WellTyped G D T1' C1 ->
+      WellTyped G D T1' C1 tau->
       exists T2',
         step C1 T1' cfg1 l C2 T2' cfg2 /\
           Step_partition_pairs T1 T1' T2 T2'.
@@ -2109,11 +2107,12 @@ Lemma delay_inversion : forall C1 T1 cfg1 l C2 T2 cfg2,
           Var.Map.Tactics.reflect_partition; [ | reflexivity].
           Var.simplify.
 Qed. *)
+(*
 Proof.
   intros C1 T1 cfg1 l C2 T2 cfg2 Hstep.
   induction Hstep.
   - (* StepC: delegate to delay_inversion_C. *)
-    intros HWS G D T1' Hpart HWT.
+    intros HWS G D T1' tau Hpart HWT.
     destruct (delay_inversion_C _ _ _ _ _ _ _ _ H HWS G D T1'
       Hpart HWT) as [T2' [Hstep' Hparts]].
     exists T2'; split; [econstructor; eauto | exact Hparts].
@@ -3348,8 +3347,9 @@ Proof.
        then weaken back and preserve the partition relation. *)
     eapply delay_inversion_IfDelay_exact; auto.
 Qed.
+*)
 
-
+(*
 Lemma WellTyped_preservation_stepC : forall G D T1 I C,
   WellTyped G D T1 (Choreography.Do I C) ->
   forall cfg1 l I' T2 cfg2,
@@ -3622,19 +3622,20 @@ Proof.
   * rewrite H0; clear T' H0.
     (*eapply WellTyped_preservation_seq; eauto.
     destruct b; eauto.*)
-
+*)
 Admitted.
 
 
+
 (** Preservation *)
-Theorem WellTyped_preservation : forall G D T1 C1,
-    WellTyped G D T1 C1 ->
+Theorem WellTyped_preservation : forall G D T1 C1 tau,
+    WellTyped G D T1 C1 tau ->
     forall cfg1 l C2 T2 cfg2,
       step C1 T1 cfg1 l C2 T2 cfg2 ->
       ChorEnv.WellScoped T1 cfg1 ->
         (forall A, Actor.FSet.In A (Label.actors l) ->
                    Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
-        WellTyped G D T2 C2.
+        WellTyped G D T2 C2 tau.
 Proof.
   (*
   intros G D T1 C1 HWT.
@@ -4729,18 +4730,17 @@ Admitted.
        substitution, partition, and branch-composition details for later. *)
   Admitted.
 
-Lemma preservation : forall G D T1 C1,
-    WellTyped G D T1 C1 ->
+Lemma preservation : forall G D T1 C1 tau,
+    WellTyped G D T1 C1 tau ->
     forall cfg1 l C2 T2 cfg2, 
       step C1 T1 cfg1 l C2 T2 cfg2 ->
       ChorEnv.WellScoped T1 cfg1 ->
         (forall A, Actor.FSet.In A (Label.actors l) ->
                    Var.Map.Empty (ChorEnv.find A G) /\  Var.Map.Empty (ChorEnv.find A D)) ->   
-        WellTyped G D T2 C2 /\ ChorEnv.WellScoped T2 cfg2.
+        WellTyped G D T2 C2 tau /\ ChorEnv.WellScoped T2 cfg2.
 Proof.
   intros.
   split.
   * eapply WellTyped_preservation; eauto.
   * eapply WellScoped_preservation; eauto.
-    eapply WellTyped_WellFormed; eauto.
 Qed. 

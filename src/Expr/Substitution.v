@@ -49,6 +49,10 @@ Proof.
   * reflect_partition. 
     erewrite IHe1; eauto; Var.simplify.
     erewrite IHe2; eauto; Var.simplify.
+  * (* Pair *)
+    reflect_partition. 
+    erewrite IHe1; eauto; Var.simplify.
+    erewrite IHe2; eauto; Var.simplify.
   * (* LetPair *)
     rename t into z.
     reflect_partition.
@@ -130,6 +134,10 @@ Proof.
       rewrite Var.Map.MProofs.Proofs.add_neq_sym; auto.
 
   * econstructor; eauto.
+  * econstructor; eauto;
+    reflect_partition; Var.simplify; eauto.
+  * econstructor; eauto;
+    reflect_partition; Var.simplify; eauto.
   * econstructor; eauto;
     reflect_partition; Var.simplify; eauto.
   * econstructor; eauto;
@@ -368,6 +376,35 @@ Proof.
         setoid_replace (Var.Map.add x τ Δ2)
           with Δ2 by Var.solve;
         auto.
+  * (* Unit *)
+    inversion He; subst; clear He.
+    (* contradiction *)
+    exfalso. contradict H.
+    apply Var.Map.Proofs.add_not_Empty.
+
+  * (* LetUnit *)
+    inversion He; subst; clear He.
+    partition_add_inversion; Var.simplify.
+
+    + (* x in e1 *)
+      erewrite (subst_not_in e2 x v); eauto.
+      eapply (WTLetUnit (Var.Map.remove x Δ1) Δ2 (Var.Map.concat Θ1 Θ0) Θ3);
+        eauto; Var.simplify.
+      eapply IHe1; eauto; Var.simplify.
+
+      setoid_replace (Var.Map.add x τ Δ1)
+        with Δ1
+        by Var.solve;
+      auto.
+
+    + (* x in e2 *)
+      erewrite (subst_not_in e1 x v); eauto.
+      eapply (WTLetUnit Δ1 (Var.Map.remove x Δ2) Θ0 (Var.Map.concat Θ3 Θ1));
+        eauto; Var.simplify.
+      eapply IHe2; eauto; Var.simplify.
+      setoid_replace (Var.Map.add x τ Δ2)
+        with Δ2
+        by Var.solve; auto.
 
   * (* Pair *)
     inversion He; subst; clear He.

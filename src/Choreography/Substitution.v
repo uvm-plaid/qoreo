@@ -5,10 +5,10 @@ Import HelperLemmas.
 
 
 (*** Substitution lemma for non-linear variables *)
-Lemma wt_subst_bang : forall C tau G D T A x v,
-    WellTyped (ChorEnv.add A x tau G) D T C ->
+Lemma wt_subst_bang : forall C tau G D T A x v tau',
+    WellTyped (ChorEnv.add A x tau G) D T C tau' ->
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) (Var.Map.empty _) v tau ->
-    WellTyped G D T (Choreography.subst A x v C).
+    WellTyped G D T (Choreography.subst A x v C) tau'.
 (* TODO Proof.
     intros C. induction C as [| I C IHC ].
     
@@ -499,8 +499,8 @@ Qed. *)
 Admitted.
 
 (** Substitution is the identity for variables that don't occur free in C *)
-Lemma subst_not_in : forall C A x v G D T,
-    WellTyped G D T C ->
+Lemma subst_not_in : forall C A x v G D T tau,
+    WellTyped G D T C tau ->
     ~ (Var.Map.In x (ChorEnv.find A D)) ->
     ~ (Var.Map.In x (ChorEnv.find A G)) ->
     (Choreography.subst A x v C) = C.
@@ -840,13 +840,13 @@ Lemma subst_not_in : forall C A x v G D T,
 Qed.*) Admitted.
 
 (** Substitution lemma for linear varibles *)
-Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
+Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v tau',
     Expr.WellTyped (Var.Map.empty _) (Var.Map.empty _) ThetaA1 v tau ->
-    WellTyped G (ChorEnv.add A x tau D) (Actor.Map.add A ThetaA2 T) C ->
+    WellTyped G (ChorEnv.add A x tau D) (Actor.Map.add A ThetaA2 T) C tau' ->
     Var.Map.Partition (ChorEnv.find A T) ThetaA1 ThetaA2 ->
     ~ Var.Map.In x (ChorEnv.find A G) ->
     ~ Var.Map.In x (ChorEnv.find A D) ->
-    WellTyped G D T (Choreography.subst A x v C).
+    WellTyped G D T (Choreography.subst A x v C) tau'.
 (* Proof.
   intros C. induction C as [| I C IHC ].
 

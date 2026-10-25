@@ -223,7 +223,7 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
 
 (* Unit *)
 | LetUnitC : forall e1 e2 refs cfg refs' cfg' e1',
-  step e1 refs cfg e1' refs cfg' ->
+  step e1 refs cfg e1' refs' cfg' ->
   step (LetUnit e1 e2) refs cfg (LetUnit e1' e2) refs' cfg'
 
 | LetUnitB : forall e refs cfg refs' cfg' e',

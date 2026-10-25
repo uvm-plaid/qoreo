@@ -316,6 +316,7 @@ Import Choreography.
       step (Pair C1 C2) T cfg l (Pair C1' C2) T' cfg'
     
     | PairC2 : forall (C1 C2 : t) T cfg l C2' T' cfg',
+      Choreography.Val C1 ->
       step C2 T cfg l C2' T' cfg' ->
       step (Pair C1 C2) T cfg l (Pair C1 C2') T' cfg'
 
@@ -323,7 +324,6 @@ Import Choreography.
       Expr.step e (ChorEnv.find A T) cfg e' ThetaA' cfg' ->
 
       ChorEnv.Equal T' (Actor.Map.add A ThetaA' T) ->
-      cfg' = cfg ->
       
       step (Send A e B) T cfg
            (Label.Loc A)
@@ -355,7 +355,6 @@ Import Choreography.
       Expr.step e (ChorEnv.find A T) cfg e' ThetaA' cfg' ->
 
       ChorEnv.Equal T' (Actor.Map.add A ThetaA' T) ->
-      cfg' = cfg ->
       
       step (If A e C1 C2) T cfg
            (Label.Loc A)
