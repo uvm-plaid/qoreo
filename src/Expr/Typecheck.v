@@ -50,11 +50,11 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       | _  => None
       end
   | Bang e =>
-      match typecheck G (Var.Map.empty Typ.t) (Var.Map.empty nat) e with
+      match typecheck G D T e with
       | None => None
       | Some ltp =>
-          if Var.Map.domain_eqb ltp.(Df) (Var.Map.empty Typ.t) &&
-             Var.Map.domain_eqb ltp.(Tf) (Var.Map.empty nat)
+          if Var.Map.domain_eqb ltp.(Df) D &&
+             Var.Map.domain_eqb ltp.(Tf) T
           then Some {| Df := D; Tf := T; tf := BANG ltp.(tf) |}
           else None
       end
@@ -77,12 +77,12 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       end
   | LetBang x e1 e2 =>
       match typecheck G D T e1 with
-      | None => None
-      | Some ltp1 =>
-          match Var.Map.find x ltp1.(Df) with
+      | Some {| Df := D1; Tf := T1; tf := BANG t |}  =>
+          match Var.Map.find x D1 with
           | Some _ => None
-          | None => typecheck (Var.Map.add x ltp1.(tf) G) ltp1.(Df) ltp1.(Tf) e2 
+          | None => typecheck (Var.Map.add x t G) D1 T1 e2 
           end
+      | _ => None
       end
   | If e1 e2 e3 =>
       match typecheck G D T e1 with

@@ -114,9 +114,7 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
                 let Bs :=
                   Actor.FSet.diff As
                     (Actor.FSet.union (Choreography.actors C2) (Choreography.actors C1)) in
-                if (chorenv_eq_on Expr.Typ.typ_eq_dec Bs D' ChorEnv.empty) &&
-                     (chorenv_eq_on Nat.eqb Bs T' ChorEnv.empty) &&
-                     (chorenv_eq_on Expr.Typ.typ_eq_dec Bs D1 D') &&
+                if (chorenv_eq_on Expr.Typ.typ_eq_dec Bs D1 D') &&
                      (chorenv_eq_on Nat.eqb Bs T1 T')
                 then typecheck G D1 T1 C
                 else None
