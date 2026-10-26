@@ -15,9 +15,10 @@ Definition chorenv_eq_on {T}
   Actor.FSet.for_all (fun A => Var.Map.equal cmp (ChorEnv.find A CE1) (ChorEnv.find A CE2)) As.
 
 (*
-  Correctness (where u+ is disjoint union):
-   Choreography.WellTyped G D (T u+ T') C <=>
-      Typecheck.typecheck G (D u+ D') (T u+ T') C = Some {| Df := D', Tf := T' |}
+  Correctness (where D u++ D' = D'' means for all A in dom(D) u dom(D'), D''(A) = D(A) u+ D'(A)
+  where u+ is disjoint union):
+   Choreography.WellTyped G D (T u++ T') C <=>
+      Typecheck.typecheck G (D u++ D') (T u++ T') C = Some {| Df := D', Tf := T' |}
  *)
 Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreography.t) : option ltap :=
   match C with
