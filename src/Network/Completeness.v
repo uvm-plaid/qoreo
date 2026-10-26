@@ -25,6 +25,8 @@ Import List.ListNotations.
 Open Scope list_scope.
 Require Import Stdlib.Structures.Equalities.
 Import Actor.Map.Tactics.
+From Qoreo.Network Require Import Proofs.
+
 
 
 Notation "T '!' A" := (ChorEnv.find A T)
@@ -288,7 +290,6 @@ Proof.
 
 Admitted.
 
-From Qoreo.Network Require Import Proofs.
 
 Theorem completeness : forall N T ρ l N' T' ρ',
 

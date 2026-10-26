@@ -17,7 +17,10 @@ Module DQFT.
   
   (*Definition dqft (Alice Bob : Actor.t) : Qoreo (Var.t * (Var.t * Var.t)) := *)
   (*Definition dqft (Alice Bob : Actor.t) : Qoreo unit := *)
-  Definition dqft (Alice Bob : Actor.t) (b0 b1 b2 : bool) : Qoreo (list Var.t) :=
+  Definition dqft (Alice Bob : Actor.t) (b0 b1 b2 : bool) : Choreography.t :=
+    
+
+
   do q0 ← Alice [- New (Bit b0) -] ;;
   do q1 ← Bob   [- New (Bit b1) -] ;;
   do q2 ← Bob   [- New (Bit b2) -] ;;
