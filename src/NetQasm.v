@@ -322,7 +322,7 @@ Definition render_import (b : Backend) :=
   | NetQASM  => "import qoreo_netqasm_runtime as qr"
   end.
 
-Definition render_app (b : Backend) (self : Actor.t) (P : Network.Process.t) (xs : list Var.t) : string :=
+Definition render_app (b : Backend) (self : Actor.t) (P : Network.Process.t) : string :=
   let classicals := classical_peers P in
   let eprs := epr_peers P in
   render_import b +:+ nl +:+ nl +:+
@@ -346,25 +346,22 @@ Definition render_app (b : Backend) (self : Actor.t) (P : Network.Process.t) (xs
 
   Definition render_party (b : Backend) (choreo : Choreography.t)
                           (p : Actor.t)
-                          (xs : list Var.t)
     : option AppFile.t :=
     match Network.epp p choreo with
     | proc =>
         Some {| AppFile.party := p;
-                AppFile.source := render_app b p proc xs
+                AppFile.source := render_app b p proc
              |}
     end.
 
   Fixpoint render_parties b (choreo : Choreography.t)
                             (ps : list Actor.t)
-                            (return_values : Actor.Map.t (list Var.t))
                             : option (list AppFile.t) :=
     match ps with
     | [] => Some []
     | p :: ps' =>
-      let p_xs := Prelim.maybe (Actor.Map.find p return_values) [] in
-        match render_party b choreo p p_xs,
-              render_parties b choreo ps' return_values with
+        match render_party b choreo p,
+              render_parties b choreo ps' with
         | Some app, Some apps => Some (app :: apps)
         | _, _ => None
         end

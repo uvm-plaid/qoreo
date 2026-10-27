@@ -541,6 +541,8 @@ Module Network.
       Process.step PA (Label.SendIf b Bs) PA' ->
       Actor.Map.MapsTo A PA' N' ->
 
+      (* Is it a problem that all of these receives need to happen "at once"?
+        Joe votes for: let's just do this anyway. *)
       (forall B,
         Actor.FSet.In B Bs ->
         exists PB PB',

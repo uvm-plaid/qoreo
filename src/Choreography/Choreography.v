@@ -86,6 +86,8 @@ Module Pattern.
   | Unit : t
   | Pair : t -> t -> t
   | Bang : Actor.t -> Var.t -> t
+  (* TODO: also want to add LetLocalPair and LetLocalUnit,
+     or something similar...  *)
   .
 
   Fixpoint actors (p : t) : Actor.FSet.t :=

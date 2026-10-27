@@ -74,17 +74,13 @@ Delimit Scope example_scope with QOREO.
       C1 C2.
 
   (** Convenient notations for local quantum operations. *)
-  Notation "'do' x '←' A '[-' e '-]' ;; C" :=
-    (let_var A x (Choreography.Loc A e) C)
-    (no associativity, at level 90) : example_scope.
-  Notation "'do' x '←' A '[!-' e '-]' ;; C" :=
-    (let_bang A x (Choreography.Loc A e) C)
-    (no associativity, at level 90) : example_scope.
+  Notation "A '[-' e '-]'" := (Choreography.Loc A e)
+    (no associativity, at level 70).
 
   Notation "x '@' A" :=
     (Choreography.Pattern.Var A (NetQasm.Var.encode x))
     (no associativity, at level 10) : example_scope.
-  Notation "'!' x '@' A" :=
+  Notation "x '@@' A" :=
     (Choreography.Pattern.Bang A (NetQasm.Var.encode x))
     (no associativity, at level 10) : example_scope.
   Notation "'(' p1 ',' p2 ')'" := (Choreography.Pattern.Pair p1 p2) : example_scope.
@@ -107,9 +103,11 @@ Delimit Scope example_scope with QOREO.
   Definition new (A : Actor.t) : Choreography.t :=
     Choreography.Loc A (New (Bit false)).
   
-  Definition string_to_var (x : string) : Expr.t :=
+  Coercion NetQasm.Var.encode : string >-> nat.
+  Coercion Var : Var.t >-> Expr.t.
+  Definition to_expr (x : string) : Expr.t :=
     Var (NetQasm.Var.encode x).
-  Coercion string_to_var : string >-> Expr.t.
+  Coercion to_expr : string >-> Expr.t.
 
   (*
   (** Bind the expression [e] to a fresh variable [x] at [A], and return [x]. *)
@@ -134,23 +132,40 @@ Delimit Scope example_scope with QOREO.
   *)
 
   (** Measure qubit [q] owned by [A] in the computational basis. *)
-  Definition meas (A : Actor.t) (q : Var.t) : Qoreo Var.t :=
-    do x ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.Let A x (Meas (Var q)));;
-    ret x.
+  Definition meas (A : Actor.t) (q : Var.t) : Choreography.t :=
+    Choreography.Loc A (Meas (Var q)).
 
   (** Send quantum data from actor [A] to actor [B]. *)
-  Definition send A (e : Expr.t) B : Qoreo Var.t :=
-    do x ← fresh B;;
-    do _ ← add_insn (Choreography.Insn.Send A e B x);;
-    ret x.
+  Definition send A (e : Expr.t) B : Choreography.t :=
+    Choreography.Send A e B.
 
-  (** Conditionally apply X gate based on classical bit [e]. *)
-  Definition if_X A (e : Expr.t) (q : Var.t) : Qoreo unit :=
-    add_insn (Choreography.Insn.Let A q (Expr.If e (Unitary X q) q)).
-  (** Conditionally apply Z gate based on classical bit [e]. *)
-  Definition if_Z A (e : Expr.t) (q : Var.t) : Qoreo unit :=
-    add_insn (Choreography.Insn.Let A q (Expr.If e (Unitary Z q) q)).
+  Fixpoint expr_of_pat (p : Choreography.Pattern.t) : Expr.t :=
+    match p with
+    | Choreography.Pattern.Var _ x => Expr.Var x
+    | Choreography.Pattern.Bang _ x => Expr.Bang (Expr.Var x)
+    | Choreography.Pattern.Unit => Expr.Unit
+    | Choreography.Pattern.Pair p1 p2 => Expr.Pair (expr_of_pat p1) (expr_of_pat p2)
+    end.
+  Coercion expr_of_pat : Choreography.Pattern.t >-> Expr.t.
+
+
+  (** Send a qubit from Alice to Bob via teleportation. *)
+  Definition teleport (A B : Actor.t) (q : Var.t) : Choreography.t :=
+    let a := "a" @ A in
+    let b := "b" @ B in
+    let q := "q" @ A in
+    let x := "x" in
+    let z := "z" in
+    do ("a"@A,b)  ← get_entangled_pair A B ;;
+    do (q,a)  ← A [- Unitary CNOT (Pair q a) -] ;;
+    do q      ← A [- Unitary H q -] ;;
+    do z@@A   ← A [- Meas q -] ;;
+    do x@@A   ← A [- Meas a -] ;;
+    do z@@B   ← send A z B ;;
+    do x@@B   ← send A x B ;;
+    do b      ← B [- Expr.If z (Unitary Z b) b -] ;;
+    do b      ← B [- Expr.If x (Unitary X b) b -] ;;
+    Choreography.Loc B b.
 
 
 
@@ -209,20 +224,7 @@ Ltac right_associate A :=
   end.
 
 
-  (** Send a qubit from Alice to Bob via teleportation. *)
-  Definition teleport (Alice Bob : Actor.t) (q : Var.t) : Qoreo Var.t :=
-    do (a, b) ← get_entangled_pair Alice Bob ;;
-    do (q, a) ← Alice [-- Unitary CNOT (Pair q a) -] ;;
-    do q      ← Alice [- Unitary H q -] ;;
-    do z      ← Alice [- Meas q -] ;;
-    do x      ← Alice [- Meas a -] ;;
-    do z      ← send Alice z Bob ;;
-    do x      ← send Alice x Bob ;;
-    do b      ← Bob [- Expr.If z (Unitary Z b) b -] ;;
-    do b      ← Bob [- Expr.If x (Unitary X b) b -] ;;
-    ret b.
-
-
+(*
 Definition render_Qoreo (b : Backend) (ps : list Actor.t)
                         (M : Qoreo (list Var.t)) 
   : option (list AppFile.t) :=
@@ -236,3 +238,4 @@ Definition render_Qoreo (b : Backend) (ps : list Actor.t)
   NetQasm.render_parties b (chor st)
           ps
           env_map.
+          *)
