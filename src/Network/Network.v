@@ -109,6 +109,8 @@ Module Pattern.
       if Actor.eq_dec A B then Var x else Unit
     | Choreography.Pattern.Bang B x =>
       if Actor.eq_dec A B then Bang x else Unit
+    | Choreography.Pattern.VarPair B x1 x2 =>
+      if Actor.eq_dec A B then Pair (Var x1) (Var x2) else Unit
     | Choreography.Pattern.Unit => Unit
     | Choreography.Pattern.Pair p1 p2 => Pair (epp A p1) (epp A p2)
     end.
@@ -144,6 +146,23 @@ Module Pattern.
         constructor;
         ChorEnv.simplify.
       Var.solve.
+    * specialize (H0 A0); specialize (H1 A0).
+      Actor.Map.Tactics.compare A0 A.
+      2:{ constructor; ChorEnv.simplify. }
+      eapply WTPair with
+        (Γ1 := Var.Map.empty _)
+        (Γ2 := Var.Map.empty _)
+        (Δ1 := Var.Map.singleton x1 tau1)
+        (Δ2 := Var.Map.singleton x2 tau2).
+      + constructor; Var.simplify. 
+      + constructor; Var.simplify. 
+      + rewrite H0. auto with var_db.
+      + rewrite H2.
+        Var.Map.Tactics.reflect_partition;
+          Var.simplify.
+        unfold Var.Map.singleton.
+        Var.solve.
+
     * constructor; auto. specialize (H0 A0). Var.solve.
     * econstructor; auto.
     * specialize (H A0); specialize (H1 A0).

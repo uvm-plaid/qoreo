@@ -40,14 +40,13 @@ Fixpoint join (sep : string) (xs : list string) : string :=
   | x :: xs' => x +:+ sep +:+ join sep xs'
   end.
 
-(*
 
 Definition nat_to_decimal (n : nat) : string :=
   NilZero.string_of_uint (Nat.to_uint n).
 
 Definition var_name (x : Var.t) : string := "x" +:+ nat_to_decimal x.
-*)
 
+(*
 Module Var.
   From Stdlib Require Import Strings.String Strings.Ascii Arith.
 
@@ -79,6 +78,7 @@ Module Var.
 End Var.
 
 Definition var_name (x : Var.t) : string := Var.decode x x.
+*)
 
 Definition actor_literal (a : Actor.t) : string := dq +:+ a +:+ dq.
 
@@ -122,7 +122,7 @@ Definition render_gate (u : Unitary.t) : string :=
 Fixpoint render_expr (e : Expr.t) : string :=
   match e with
   | Expr.Var x => var_name x
-  | Expr.Bang e1 => emit_call "qr.Bang" [render_expr e1]
+  | Expr.Bang e1 => render_expr e1
   | Expr.Bit b => bool_literal b
   | Expr.If e0 e1 e2 =>
       "(" +:+ render_expr e1 +:+ " if " +:+ render_expr e0 +:+ " else " +:+ render_expr e2 +:+ ")"
@@ -196,7 +196,7 @@ Fixpoint render_pattern (p : Network.Pattern.t) : string :=
   | Network.Pattern.Var x | Network.Pattern.Bang x => var_name x
   | Network.Pattern.Unit => "_"
   | Network.Pattern.Pair p1 p2 =>
-    "(" +:+ render_pattern p1 +:+ ", " +:+ render_pattern p2
+    "(" +:+ render_pattern p1 +:+ ", " +:+ render_pattern p2 +:+ ")"
   end.
 
 (* To render a process into Python, we will need to turn it

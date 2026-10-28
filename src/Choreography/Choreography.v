@@ -83,6 +83,7 @@ Import List.ListNotations.
 Module Pattern.
   Inductive t :=
   | Var : Actor.t -> Var.t -> t
+  | VarPair : Actor.t -> Var.t -> Var.t -> t
   | Unit : t
   | Pair : t -> t -> t
   | Bang : Actor.t -> Var.t -> t
@@ -92,7 +93,7 @@ Module Pattern.
 
   Fixpoint actors (p : t) : Actor.FSet.t :=
     match p with
-    | Var A _ | Bang A _ => Actor.FSet.singleton A
+    | Var A _ | Bang A _ | VarPair A _ _ => Actor.FSet.singleton A
     | Unit => Actor.FSet.empty
     | Pair p1 p2 => Actor.FSet.union (actors p1) (actors p2)
     end.
@@ -103,9 +104,18 @@ Module Pattern.
         if Actor.eq_dec A B 
         then if Var.eq_dec x y then true else false
         else false
+      | Pattern.VarPair B y1 y2 =>
+        if Actor.eq_dec A B
+        then if Var.eq_dec x y1 then true
+             else if Var.eq_dec x y2 then true
+             else false
+        else false
       | Pattern.Unit => false
       | Pattern.Pair p1 p2 => in_pat A x p1 || in_pat A x p2
       end.
+
+    
+    (* Assume v is a value of the same type as p *)
 
   Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> t -> Typ.t -> Prop :=
   | WTVar : forall G D A x tau,
@@ -115,6 +125,15 @@ Module Pattern.
     Var.Map.Singleton x tau (D!A) ->
 
     WellTyped G D (Var A x) (Typ.Local A tau)
+
+  | WTVarPair : forall G D x1 x2 A tau1 tau2,
+
+    x1 <> x2 ->
+    ChorEnv.Empty G ->
+    ChorEnv.EmptyExcept (Actor.FSet.singleton A) D ->
+    Var.Map.Equal (D!A) (Var.Map.add x1 tau1 (Var.Map.singleton x2 tau2)) ->
+
+    WellTyped G D (VarPair A x1 x2) (Typ.Local A (Expr.Tensor tau1 tau2))
 
   | WTUnit : forall G D,
     ChorEnv.Empty G ->
@@ -209,6 +228,20 @@ Module Choreography.
            (subst A x v C2)
       end.
 
+    Fixpoint subst_pat (p : Pattern.t) (v : t) (C : t) : t :=
+      match p, v with
+      | Pattern.Var A x, Loc A' v' =>
+        if Actor.eq_dec A A' then subst A x v' C else C
+      | Pattern.Bang A x, Loc A' (Expr.Bang e') =>
+        if Actor.eq_dec A A' then subst A x e' C else C
+      | Pattern.VarPair A x1 x2, Loc A' (Expr.Pair v1 v2) =>
+        if Actor.eq_dec A A' then subst A x1 v1 (subst A x2 v2 C) else C
+      | Pattern.Unit, _ => C
+      | Pattern.Pair p1 p2, Pair v1 v2 =>
+        subst_pat p1 v1 (subst_pat p2 v2 C)
+
+      | _, _ => C
+      end.
 
     
     Inductive Val : t -> Prop :=
@@ -216,20 +249,6 @@ Module Choreography.
     | VUnit : Val Unit
     | VPair : forall v1 v2, Val v1 -> Val v2 -> Val (Pair v1 v2)
     .
-
-    (* Assume v is a value of the same type as p *)
-    Fixpoint subst_pat (p : Pattern.t) (v : t) (C : t) : t :=
-      match p, v with
-      | Pattern.Var A x, Loc A' v' =>
-        if Actor.eq_dec A A' then subst A x v' C else C
-      | Pattern.Bang A x, Loc A' (Expr.Bang e') =>
-        if Actor.eq_dec A A' then subst A x e' C else C
-      | Pattern.Unit, _ => C
-      | Pattern.Pair p1 p2, Pair v1 v2 =>
-        subst_pat p1 v1 (subst_pat p2 v2 C)
-
-      | _, _ => C
-      end.
 
 
   (* TODO: lemmas about the actors that occur in (subst ...) and (subst ...) *)

@@ -5,14 +5,14 @@ From Stdlib Require Import Lia. (* lia *)
 
 Create HintDb var_db.
 
-  Module V := OrderedTypeEx.UOT_to_OT (OrderedTypeEx.Z_as_OT).
+  Module V := OrderedTypeEx.UOT_to_OT (OrderedTypeEx.Nat_as_OT).
   Include V.
   Module Map := FMap V.
   Module FSet := Map.S.
 
   Definition fresh {A} (m : Map.t A) :=
-    let f := fun x _ z_fresh => if Z.leb z_fresh x then (x+1)%Z else z_fresh in
-    Map.fold f m 0%Z.
+    let f := fun x _ z_fresh => if Nat.leb z_fresh x then (x+1)%nat else z_fresh in
+    Map.fold f m 0%nat.
 
   
   Ltac simplify :=
@@ -117,14 +117,14 @@ Create HintDb var_db.
       repeat rewrite H1. reflexivity.
     + intros ? ? ? ? ? ?.
     
-      destruct (Z.leb (k' + 1) k) eqn:H_k'_k;
-      destruct (Z.leb a k') eqn:Hk';
-      destruct (Z.leb a k) eqn:Hk;
-      destruct (Z.leb (k+1) k') eqn:H_k_k';
+      destruct (Nat.leb (k' + 1) k) eqn:H_k'_k;
+      destruct (Nat.leb a k') eqn:Hk';
+      destruct (Nat.leb a k) eqn:Hk;
+      destruct (Nat.leb (k+1) k') eqn:H_k_k';
       auto;
         try 
-        (try rewrite Z.leb_le in *;
-        try rewrite Z.leb_nle in *;
+        (try rewrite Nat.leb_le in *;
+        try rewrite Nat.leb_nle in *;
         lia).
       * rewrite H_k'_k; auto. reflexivity.
       * reflexivity.
@@ -135,7 +135,7 @@ Create HintDb var_db.
   Qed.   
 
   Lemma fresh_empty : forall T,
-    Var.fresh (Var.Map.empty T) = 0%Z.
+    Var.fresh (Var.Map.empty T) = 0%nat.
   Proof.
     intros. unfold Var.fresh.
     rewrite Var.Map.Properties.fold_spec_right.
@@ -145,20 +145,20 @@ Create HintDb var_db.
 
   Lemma fresh_add : forall T (m : Var.Map.t T) x v,
     ~ Var.Map.In x m ->
-    Var.fresh (Var.Map.add x v m) = Z.max (x+1)%Z (Var.fresh m).
+    Var.fresh (Var.Map.add x v m) = Nat.max (x+1)%nat (Var.fresh m).
   Proof.
     intros.
     unfold Var.fresh.
     rewrite Var.Map.Properties.fold_add; auto.
     
     + fold (Var.fresh m).
-      destruct (Z.leb (Var.fresh m) x) eqn:Hleb.
-      - apply Z.leb_le in Hleb.
-        rewrite Z.max_l; auto.
+      destruct (Nat.leb (Var.fresh m) x) eqn:Hleb.
+      - apply Nat.leb_le in Hleb.
+        rewrite Nat.max_l; auto.
         lia.
 
-      - rewrite Z.leb_nle in Hleb.
-        rewrite Z.max_r; auto.
+      - rewrite Nat.leb_nle in Hleb.
+        rewrite Nat.max_r; auto.
         lia.
 
     + clear m x v H.
@@ -166,23 +166,23 @@ Create HintDb var_db.
     + clear m x v H.
       intros z1 z2 v1 v2 w Hneq.
       repeat match goal with
-      | [ H : context[Z.leb ?x ?y] |- _ ] =>
+      | [ H : context[Nat.leb ?x ?y] |- _ ] =>
         let H := fresh "H" in
-        destruct (Z.leb x y) eqn:H;
-        try rewrite Z.leb_le in *;
-        try rewrite Z.leb_nle in *
-      | [ |- context[Z.leb ?x ?y] ] =>
+        destruct (Nat.leb x y) eqn:H;
+        try rewrite Nat.leb_le in *;
+        try rewrite Nat.leb_nle in *
+      | [ |- context[Nat.leb ?x ?y] ] =>
         let H := fresh "H" in
-        destruct (Z.leb x y) eqn:H;
-        try rewrite Z.leb_le in *;
-        try rewrite Z.leb_nle in *
+        destruct (Nat.leb x y) eqn:H;
+        try rewrite Nat.leb_le in *;
+        try rewrite Nat.leb_nle in *
       end;
       try lia.
   Qed.
 
   Lemma fresh_upper_bound : forall T (m : Var.Map.t T),
     forall x, Var.Map.In x m ->
-      (Var.fresh m > x)%Z.
+      (Var.fresh m > x)%nat.
   Proof.
     intros T m.
     induction m using Var.Map.Properties.map_induction;

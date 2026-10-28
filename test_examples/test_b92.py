@@ -14,11 +14,15 @@ NUM_RUNS = 5
 
 
 def flatten_rounds(packed):
-    """Convert (((r1,k1),(r2,k2)),(r3,k3)) into [(r1,k1),(r2,k2),(r3,k3)]."""
-    (pair12, pair3) = packed
-    (pair1, pair2) = pair12
-    return [pair1, pair2, pair3]
-
+    """Convert ((((r1,k1),(r2,k2)),(r3,k3)),()) into [(r1,k1),(r2,k2),(r3,k3)]."""
+    if (len(packed) == 2):
+        (elem1,elem2) = packed
+        if isinstance(elem1,tuple) and isinstance(elem2,tuple):
+            return (flatten_rounds(elem1) + flatten_rounds(elem2))
+        else:
+            return [packed]
+    else:
+        return []
 
 def extract_key(packed):
     """Return the key bits from conclusive rounds (those where the result bit is 1)."""
