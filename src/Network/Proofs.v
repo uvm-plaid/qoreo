@@ -1243,7 +1243,7 @@ Lemma completeness_send : forall C N refs cfg A v B N' refs' cfg',
   }
     *)
 
-  assert (HI : I = Choreography.Insn.Send A (Expr.Bang v) B y
+  assert (HI : I = Choreography.Insn.Send A (Expr.Typ.BANG v) B y
     \/ (~ Actor.FSet.In A (Choreography.Insn.actors I)
      /\ ~ Actor.FSet.In B (Choreography.Insn.actors I))).
   {

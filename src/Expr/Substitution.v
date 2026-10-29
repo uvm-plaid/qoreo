@@ -486,8 +486,8 @@ Proof.
     eapply IHe;
       [ eauto | 
       | eauto | Var.simplify | Var.simplify ].
-    setoid_replace (Var.Map.add x τ (Var.Map.add y τ1 Δ))
-      with         (Var.Map.add y τ1 (Var.Map.add x τ Δ))
+    setoid_replace (Var.Map.add x τ (Var.Map.add y t0 Δ))
+      with         (Var.Map.add y t0 (Var.Map.add x τ Δ))
       by Var.solve;
       auto.
     

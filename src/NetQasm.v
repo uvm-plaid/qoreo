@@ -87,7 +87,7 @@ Definition render_gate (u : Unitary.t) : string :=
 Fixpoint render_expr (e : Expr.t) : string :=
   match e with
   | Expr.Var x => var_name x
-  | Expr.Bang e1 => emit_call "qr.Bang" [render_expr e1]
+  | Expr.Bang e1 => render_expr e1
   | Expr.Bit b => bool_literal b
   | Expr.If e0 e1 e2 =>
       "(" +:+ render_expr e1 +:+ " if " +:+ render_expr e0 +:+ " else " +:+ render_expr e2 +:+ ")"

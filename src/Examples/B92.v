@@ -5,6 +5,7 @@ Import Expr.
 From Qoreo.Choreography Require Import Notation.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
+From Qoreo.Choreography Require Typecheck.
 
 Import List.ListNotations.
 Open Scope list_scope.
@@ -25,7 +26,7 @@ Module B92.
   Definition b92_round (Alice Bob : Actor.t) : Qoreo ((Var.t * Var.t) * (Var.t * Var.t)) :=
   (* Alice randomly picks her key bit by preparing |+⟩ and measuring. *)
   do coin_a ← Alice [- Unitary H (New (Bit false)) -] ;;
-  do a      ← Alice [- Meas coin_a -] ;;
+  do a      ← Alice [!- Meas coin_a -] ;;
 
   (* Alice prepares her transmission qubit: |0⟩ if a=0, |+⟩ if a=1. *)
   do q      ← Alice [- New (Bit false) -] ;;
@@ -36,17 +37,17 @@ Module B92.
 
   (* Bob randomly picks his measurement basis. *)
   do coin_b ← Bob [- Unitary H (New (Bit false)) -] ;;
-  do b      ← Bob [- Meas coin_b -] ;;
+  do b      ← Bob [!- Meas coin_b -] ;;
 
   (* Bob rotates into his chosen basis by applying H when b=1. *)
   do q_b    ← Bob [- If b (Unitary H q_b) q_b -] ;;
 
   (* Bob measures in his chosen basis.  A result of 1 means the round is
       conclusive: both Alice and Bob know they share the same key bit. *)
-  do r      ← Bob [- Meas q_b -] ;;
+  do r      ← Bob [!- Meas q_b -] ;;
 
   (* Bob announces the round result to Alice over the classical channel. *)
-  do r_recv ← send Bob r Alice ;;
+  do r_recv ← send Bob (Bang r) Alice ;;
 
   ret ((a, r_recv), (b, r)).
 
@@ -66,16 +67,23 @@ Module B92.
     do (ad3, bd3) ← b92_round "alice" "bob" ;;
     do (a3, r3)   ← ret ad3 ;;
     do (b3, m3)   ← ret bd3 ;;
-    do va ← "alice" [- Pair (Pair (Pair (Var r1) (Var a1))
+    do va ← "alice" [!- Bang (Pair (Pair (Pair (Var r1) (Var a1))
                                  (Pair (Var r2) (Var a2)))
-                           (Pair (Var r3) (Var a3)) -] ;;
-    do vb ← "bob"   [- Pair (Pair (Pair (Var m1) (If (Var b1) (Bit false) (Bit true)))
+                           (Pair (Var r3) (Var a3)))-] ;;
+    do vb ← "bob"   [!- Bang (Pair (Pair (Pair (Var m1) (If (Var b1) (Bit false) (Bit true)))
                                  (Pair (Var m2) (If (Var b2) (Bit false) (Bit true))))
-                           (Pair (Var m3) (If (Var b3) (Bit false) (Bit true))) -] ;;
+                           (Pair (Var m3) (If (Var b3) (Bit false) (Bit true))))-] ;;
     ret [va;vb].
 
   Definition parties : list Actor.t :=
     ["alice"; "bob"].
+
+  Lemma b92_typecheck :
+    Typecheck.toplevel_typecheck ChorEnv.empty (mk choreo)
+    = Typecheck.success.
+  Proof.
+    reflexivity.
+  Qed.
 
 
   Definition apps : option (list AppFile.t) :=

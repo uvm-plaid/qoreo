@@ -43,7 +43,7 @@ Lemma wt_subst_bang : forall C tau G D T A x v,
           unfold ChorEnv.add in H8.
           rewrite -> find_add in H8.
           pose proof
-            (Expr.wt_subst_bang e tau (ChorEnv.find A G) DeltaA1 ThetaA1 x v (Expr.BANG tau0)
+            (Expr.wt_subst_bang e tau (ChorEnv.find A G) DeltaA1 ThetaA1 x v (Expr.Typ.BANG tau0)
             HWTV H8) as HEWTSB.
 
           - eapply Send; auto.
@@ -148,7 +148,7 @@ Lemma wt_subst_bang : forall C tau G D T A x v,
               
               apply (IHC tau
                        (ChorEnv.remove B z (ChorEnv.remove A y G))
-                       (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A y Expr.QUBIT D))
+                       (ChorEnv.add B z Expr.Typ.QUBIT (ChorEnv.add A y Expr.Typ.QUBIT D))
                        T A x v H8 HWTV).
             }
           }
@@ -191,7 +191,7 @@ Lemma wt_subst_bang : forall C tau G D T A x v,
               apply (IHC
                        tau 
                        (ChorEnv.remove B z (ChorEnv.remove A' y G))
-                       (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A' y Expr.QUBIT D))
+                       (ChorEnv.add B z Expr.Typ.QUBIT (ChorEnv.add A' y Expr.Typ.QUBIT D))
                        T A x v H8 HWTV).
             }
           }
@@ -306,7 +306,7 @@ Lemma wt_subst_bang : forall C tau G D T A x v,
                unfold ChorEnv.add in H6.
                rewrite find_add in H6.
                pose proof
-                 (Expr.wt_subst_bang e tau (ChorEnv.find A G) DeltaA1 ThetaA1 x v (Expr.BANG tau0)
+                 (Expr.wt_subst_bang e tau (ChorEnv.find A G) DeltaA1 ThetaA1 x v (Expr.Typ.BANG tau0)
                     HWTV H6) as HEWTSB.
                eauto.
              }
@@ -394,7 +394,7 @@ Lemma wt_subst_bang : forall C tau G D T A x v,
               pose proof
                 (Expr.wt_subst_bang e tau
                    (ChorEnv.find A G) DeltaA1 ThetaA1
-                   x v (Expr.Tensor tau1 tau2)
+                   x v (Expr.Typ.Tensor tau1 tau2)
                    HWTV H4) as HEWTSB.
               eauto.
             }
@@ -529,7 +529,7 @@ Lemma subst_not_in : forall C A x v G D T,
           subst.
 
           apply(Expr.subst_not_in e x v 
-                  (ChorEnv.find A' G) DeltaA1 ThetaA1 (Expr.BANG tau)
+                  (ChorEnv.find A' G) DeltaA1 ThetaA1 (Expr.Typ.BANG tau)
                   H8 HninG
                   (nin_partition x (ChorEnv.find A' D) DeltaA1 DeltaA2 HninD H10)).
         }
@@ -601,7 +601,7 @@ Lemma subst_not_in : forall C A x v G D T,
           
           specialize (IHC
                         (ChorEnv.remove B z (ChorEnv.remove A' y G))
-                        (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A' y Expr.QUBIT D))
+                        (ChorEnv.add B z Expr.Typ.QUBIT (ChorEnv.add A' y Expr.Typ.QUBIT D))
                         T
                         H8).
 
@@ -609,9 +609,9 @@ Lemma subst_not_in : forall C A x v G D T,
                         (nin_remove_ce G A x A' y HninG)) as HninGzy.
 
           pose proof (find_nbeq
-                        (ChorEnv.add A' y Expr.QUBIT D)
-                        A x B z Expr.QUBIT HrbiB
-                        (find_nbeq D A x A' y Expr.QUBIT HrbiA HninD)) as HninDzy.
+                        (ChorEnv.add A' y Expr.Typ.QUBIT D)
+                        A x B z Expr.Typ.QUBIT HrbiB
+                        (find_nbeq D A x A' y Expr.Typ.QUBIT HrbiA HninD)) as HninDzy.
 
           apply (IHC HninDzy HninGzy).
         }
@@ -705,7 +705,7 @@ Lemma subst_not_in : forall C A x v G D T,
           subst.
 
           apply(Expr.subst_not_in e x v 
-                  (ChorEnv.find A' G) DeltaA1 ThetaA1 (Expr.BANG tau)
+                  (ChorEnv.find A' G) DeltaA1 ThetaA1 (Expr.Typ.BANG tau)
                   H6 HninG
                   (nin_partition x (ChorEnv.find A' D) DeltaA1 DeltaA2 HninD H8)).
         }
@@ -772,7 +772,7 @@ Lemma subst_not_in : forall C A x v G D T,
           subst.
 
           apply(Expr.subst_not_in e x v 
-                  (ChorEnv.find A' G) DeltaA1 ThetaA1 (Expr.Tensor tau1 tau2)
+                  (ChorEnv.find A' G) DeltaA1 ThetaA1 (Expr.Typ.Tensor tau1 tau2)
                   H4 HninG
                   (nin_partition x (ChorEnv.find A' D) DeltaA1 DeltaA2 HninD H9)).
         }
@@ -887,7 +887,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
           rewrite -> HDA'A in H8.
           pose proof 
             (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
-               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0) Hv H8) as HWTS.
+               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.Typ.BANG tau0) Hv H8) as HWTS.
           rewrite -> (find_add A ThetaA2 T) in H11.
           
           (* partioning facts. *)
@@ -946,7 +946,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
         (* case x not in e *)
         {
           pose proof (Expr.subst_not_in e x v
-                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.BANG tau0)
+                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.Typ.BANG tau0)
                         H8 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H10.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H10 HninDA) as Hini.
@@ -988,7 +988,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
                               Hv).
                 assert (IHWT : WellTyped (ChorEnv.add B y tau0 G)
                                          (ChorEnv.add A x tau (Actor.Map.add A
-                                            (Var.Map.remove (elt:=Expr.typ) x DeltaA2) D))
+                                            (Var.Map.remove (elt:=Expr.Typ.t) x DeltaA2) D))
                                          (Actor.Map.add A ThetaA3
                                             (Actor.Map.add A (Var.Map.concat ThetaA1 ThetaA3) T))
                                          C).
@@ -1007,7 +1007,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
                 specialize (IHC HPartitionB).
                 rewrite -> (find_ab_neq1 A B y tau0 G H7) in IHC.
                 specialize (IHC HninG).
-                rewrite -> (find_add A (Var.Map.remove (elt:=Expr.typ) x DeltaA2) D) in IHC.
+                rewrite -> (find_add A (Var.Map.remove (elt:=Expr.Typ.t) x DeltaA2) D) in IHC.
                 specialize (IHC (nin_remove DeltaA2 x)).
                 eauto.
               }
@@ -1095,19 +1095,19 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
     + inversion HC. subst.
       pose proof (nin_nbeq D A x tau A' y H9) as HninAA'.
       pose proof (nin_nbeq D A x tau B z H10) as HninAB.
-      rewrite -> (addadd5 D A' y Expr.QUBIT A x tau HninAA') in H8.
-      rewrite -> (addadd5 (ChorEnv.add A' y Expr.QUBIT D) B z Expr.QUBIT A x tau HninAB) in H8.
+      rewrite -> (addadd5 D A' y Expr.Typ.QUBIT A x tau HninAA') in H8.
+      rewrite -> (addadd5 (ChorEnv.add A' y Expr.Typ.QUBIT D) B z Expr.Typ.QUBIT A x tau HninAB) in H8.
       
-      pose proof (nin_nbeq_add1 D A x A' y Expr.QUBIT HninAA' HninD) as HaddAA'.
-      pose proof (nin_nbeq_add1 (ChorEnv.add A' y Expr.QUBIT D) A x B z
-                    Expr.QUBIT HninAB HaddAA') as HaddAB.
+      pose proof (nin_nbeq_add1 D A x A' y Expr.Typ.QUBIT HninAA' HninD) as HaddAA'.
+      pose proof (nin_nbeq_add1 (ChorEnv.add A' y Expr.Typ.QUBIT D) A x B z
+                    Expr.Typ.QUBIT HninAB HaddAA') as HaddAB.
 
       pose proof (nin_remove_ce G A x A' y HninG) as HninGy.
       pose proof (nin_remove_ce (ChorEnv.remove A' y G) A x B z HninGy) as HninGyz.
 
       (* specialize and apply IH *)
       specialize (IHC ThetaA1 ThetaA2 tau (ChorEnv.remove B z (ChorEnv.remove A' y G))
-                    (ChorEnv.add B z Expr.QUBIT (ChorEnv.add A' y Expr.QUBIT D))
+                    (ChorEnv.add B z Expr.Typ.QUBIT (ChorEnv.add A' y Expr.Typ.QUBIT D))
                     T A x v Hv H8 HinT HninGyz HaddAB).
 
       eapply EPR; auto.
@@ -1407,7 +1407,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
             
               pose proof
                 (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
-                   (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.BANG tau0)
+                   (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.Typ.BANG tau0)
                    Hv H6 HPartitionA HninG HDA'B) as HWTS.
               eauto.
             }
@@ -1438,7 +1438,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
         (* case x not in e *)
         {
           pose proof (Expr.subst_not_in e x v 
-                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.BANG tau0)
+                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.Typ.BANG tau0)
                         H6 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H8.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H8 HninDA) as Hini.
@@ -1600,7 +1600,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
           rewrite -> HDA'A in H4.
           pose proof
             (Expr.wt_subst e ThetaA1 ThetaA0 tau (ChorEnv.find A G) DeltaA1'
-               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.Tensor tau1 tau2) Hv H4) as HWTS.
+               (Var.Map.concat ThetaA1 ThetaA0) x v (Expr.Typ.Tensor tau1 tau2) Hv H4) as HWTS.
           pose proof (find_add A ThetaA2 T) as HFA.
           rewrite -> HFA in H10.
           (* partioning facts. *)
@@ -1664,7 +1664,7 @@ Lemma wt_subst_lin : forall C ThetaA1 ThetaA2 tau G D T A x v,
         (* case x not in e *)
         {
           pose proof (Expr.subst_not_in e x v
-                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.Tensor tau1 tau2)
+                        (ChorEnv.find A G) DeltaA1 ThetaA0 (Expr.Typ.Tensor tau1 tau2)
                         H4 HninG HninDA) as Hesubst.
           rewrite -> (add_find D A x tau) in H9.
           pose proof (ini (ChorEnv.find A D) DeltaA1 DeltaA2 x tau H9 HninDA) as Hini.

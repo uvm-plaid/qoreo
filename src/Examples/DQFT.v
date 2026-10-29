@@ -11,6 +11,7 @@ Open Scope example_scope.
 Import Unitary.
 From Stdlib Require Import List.
 Import ListNotations.
+From Qoreo.Choreography Require Typecheck.
 
 Module DQFT.
   (* Distributed QFT example taken from: https://arxiv.org/pdf/2606.18494 *)
@@ -58,9 +59,9 @@ Module DQFT.
   (*H on q2*)
   do q2 ← Bob [- Unitary H q2 -] ;;
 
-  do q0 ← Alice [- Meas q0 -] ;;
-  do q1 ← Bob [- Meas q1 -] ;;
-  do q2 ← Bob [- Meas q2 -] ;;
+  do q0 ← Alice [!- Meas q0 -] ;;
+  do q1 ← Bob [!- Meas q1 -] ;;
+  do q2 ← Bob [!- Meas q2 -] ;;
   
   ret [q0; q1; q2].
 
@@ -69,6 +70,13 @@ Module DQFT.
 
   Definition parties : list Actor.t :=
     ["alice"; "bob"].
+
+  Lemma dqft_typecheck :
+    Typecheck.toplevel_typecheck ChorEnv.empty (mk (dqft "alice" "bob" true false true))
+    = Typecheck.success.
+  Proof.
+    reflexivity.
+  Qed.
 
 
   Definition apps : option (list AppFile.t) :=
