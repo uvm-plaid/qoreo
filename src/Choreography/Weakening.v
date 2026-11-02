@@ -101,12 +101,12 @@ Lemma weakening_gen : forall C G D T tau,
                  (ChorEnv.remove A x G)
                  (ChorEnv.remove A x G0)
                  A0 B y HEpart_x).
-      + pose proof (remove_add_dj_env G0 D A0 A x Expr.QUBIT HEdisj)
+      + pose proof (remove_add_dj_env G0 D A0 A x Expr.Typ.QUBIT HEdisj)
           as HEdisj_x.
         apply (remove_add_dj_env
                  (ChorEnv.remove A x G0)
-                 (ChorEnv.add A x Expr.QUBIT D)
-                 A0 B y Expr.QUBIT HEdisj_x).
+                 (ChorEnv.add A x Expr.Typ.QUBIT D)
+                 A0 B y Expr.Typ.QUBIT HEdisj_x).
 
     (* Send *)
     - destruct (HE A) as [HEA HEB].
@@ -115,7 +115,7 @@ Lemma weakening_gen : forall C G D T tau,
                     DeltaA1 DeltaA2 HEB H1) as HPDJ.
       pose proof (Expr.Weakening.weakening_gen
                     (ChorEnv.find A G0) (ChorEnv.find A G)
-                    DeltaA1 ThetaA1 e (Expr.BANG tau) H0
+                    DeltaA1 ThetaA1 e (Expr.Typ.BANG tau) H0
                     (ChorEnv.find A G') HEA HPDJ) as HEWG.
       eapply Send.
       { assumption. }
@@ -143,7 +143,7 @@ Lemma weakening_gen : forall C G D T tau,
                     DeltaA1 DeltaA2 HEB H0) as HPDJ.
       pose proof (Expr.Weakening.weakening_gen
                     (ChorEnv.find A G0) (ChorEnv.find A G)
-                    DeltaA1 ThetaA1 e (Expr.BANG tau) H
+                    DeltaA1 ThetaA1 e (Expr.Typ.BANG tau) H
                     (ChorEnv.find A G') HEA HPDJ) as HEWG.
       eapply LetBang.
       { exact HEWG. }
@@ -206,7 +206,7 @@ Lemma weakening_gen : forall C G D T tau,
       { eapply (Expr.Weakening.weakening_gen
                   (ChorEnv.find A G0)
                   (ChorEnv.find A G)
-                  DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) H
+                  DeltaA1 ThetaA1 e (Expr.Typ.Tensor tau1 tau2) H
                   (ChorEnv.find A G') HEAA Hpdj). }
       { apply (IHHWT
                  (ChorEnv.remove A x1 (ChorEnv.remove A x2 G0))
@@ -249,7 +249,7 @@ Lemma weakening_gen : forall C G D T tau,
                     DeltaA1 DeltaA' HEB H0) as HPDJ.
       pose proof (Expr.Weakening.weakening_gen
                     (ChorEnv.find A G0) (ChorEnv.find A G)
-                    DeltaA1 ThetaA1 e Expr.BIT H
+                    DeltaA1 ThetaA1 e Expr.Typ.BIT H
                     (ChorEnv.find A G') HEA HPDJ) as HEWG.
       pose proof
         (partitioning (ChorEnv.find A D) DeltaA2 DeltaA1 DeltaA' DeltaA3

@@ -5,6 +5,7 @@ Import Expr.
 From Qoreo.Choreography Require Import Notation.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
+(*From Qoreo.Choreography Require Typecheck.*)
 
 Import List.ListNotations.
 Open Scope list_scope.
@@ -73,6 +74,14 @@ Module B92.
         ("alice" [- Pair (Pair ad1 ad2) ad3 -])
         ("bob" [- Pair (Pair bd1 bd2) bd3 -]).
 
+  (*
+  Lemma b92_typecheck :
+    Typecheck.toplevel_typecheck ChorEnv.empty (mk choreo)
+    = Typecheck.success.
+  Proof.
+    reflexivity.
+  Qed.
+  *)
 
   Definition apps : option (list AppFile.t) :=
     Notation.render_Qoreo

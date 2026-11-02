@@ -40,19 +40,19 @@ Import Actor.Map.Tactics.
 Module Typ.
   (*
   Inductive t :=
-  | Loc : Expr.typ -> t
+  | Loc : Expr.Typ.t -> t
   | Unit : t
   | Pair : t -> t -> t.
   *)
 
 
-  Fixpoint epp (A : Actor.t) (τ : Choreography.Typ.t) : Expr.typ :=
+  Fixpoint epp (A : Actor.t) (τ : Choreography.Typ.t) : Expr.Typ.t :=
     match τ with
     | Choreography.Typ.Local B τ' =>
-      if Actor.eq_dec A B then τ' else Expr.UNIT
-    | Choreography.Typ.Unit => Expr.UNIT
+      if Actor.eq_dec A B then τ' else Expr.Typ.Unit
+    | Choreography.Typ.Unit => Expr.Typ.Unit
     | Choreography.Typ.Pair τ1 τ2 =>
-      Expr.Tensor (epp A τ1) (epp A τ2)
+      Expr.Typ.Tensor (epp A τ1) (epp A τ2)
     end.
 
 
@@ -79,7 +79,7 @@ Module Pattern.
                     *)
     end.
 
-  Inductive WellTyped : Var.Map.t Expr.typ -> Var.Map.t Expr.typ -> t -> Expr.typ -> Prop :=
+  Inductive WellTyped : Var.Map.t Expr.Typ.t -> Var.Map.t Expr.Typ.t -> t -> Expr.Typ.t -> Prop :=
 
   | WTVar : forall Γ Δ x τ,
     ~ Var.Map.In x Γ ->
@@ -89,18 +89,18 @@ Module Pattern.
   | WTBang : forall Γ Δ x τ,
     Var.Map.MapsTo x τ Γ ->
     Var.Map.Empty Δ ->
-    WellTyped Γ Δ (Bang x) (Expr.BANG τ)
+    WellTyped Γ Δ (Bang x) (Expr.Typ.BANG τ)
 
   | WTUnit : forall Γ Δ,
     Var.Map.Empty Δ ->
-    WellTyped Γ Δ Unit Expr.UNIT
+    WellTyped Γ Δ Unit Expr.Typ.Unit
 
   | WTPair : forall Γ1 Γ2 Δ1 Δ2 Γ Δ p1 p2 τ1 τ2,
     WellTyped Γ1 Δ1 p1 τ1 ->
     WellTyped Γ2 Δ2 p2 τ2 ->
     Var.Map.Partition Γ Γ1 Γ2 ->
     Var.Map.Partition Δ Δ1 Δ2 ->
-    WellTyped Γ Δ (Pair p1 p2) (Expr.Tensor τ1 τ2)
+    WellTyped Γ Δ (Pair p1 p2) (Expr.Typ.Tensor τ1 τ2)
   .
 
   Fixpoint epp (A : Actor.t) (p : Choreography.Pattern.t) : t :=
@@ -292,7 +292,7 @@ Module Process.
 
     (* Types *)
 
-    Inductive WellTyped : Var.Map.t Expr.typ -> Var.Map.t Expr.typ -> Var.Map.t nat -> t -> Expr.typ -> Prop :=
+    Inductive WellTyped : Var.Map.t Expr.Typ.t -> Var.Map.t Expr.Typ.t -> Var.Map.t nat -> t -> Expr.Typ.t -> Prop :=
     | WTLetIn : forall Γ Δ Θ Γ0 Δ0 Δ1 Δ2 Θ1 Γ' Δ' Θ2 p P1 P2 τ0 τ',
       Pattern.WellTyped Γ0 Δ0 p τ0 ->
       WellTyped Γ Δ1 Θ1 P1 τ0 ->
@@ -312,7 +312,7 @@ Module Process.
     | WTUnit : forall Γ Δ Θ,
       Var.Map.Empty Δ ->
       Var.Map.Empty Θ ->
-      WellTyped Γ Δ Θ Unit Expr.UNIT
+      WellTyped Γ Δ Θ Unit Expr.Typ.Unit
 
     | WTPair : forall Δ1 Δ2 Θ1 Θ2 Γ Δ Θ C1 C2 τ1 τ2,
       WellTyped Γ Δ1 Θ1 C1 τ1 ->
@@ -321,25 +321,25 @@ Module Process.
       Var.Map.Partition Δ Δ1 Δ2 ->
       Var.Map.Partition Θ Θ1 Θ2 ->
 
-      WellTyped Γ Δ Θ (Pair C1 C2) (Expr.Tensor τ1 τ2)
+      WellTyped Γ Δ Θ (Pair C1 C2) (Expr.Typ.Tensor τ1 τ2)
 
     | WTSend : forall Γ Δ Θ e τ B,
-      Expr.WellTyped Γ Δ Θ e (Expr.BANG τ) ->
-      WellTyped Γ Δ Θ (Send e B) Expr.UNIT
+      Expr.WellTyped Γ Δ Θ e (Expr.Typ.BANG τ) ->
+      WellTyped Γ Δ Θ (Send e B) Expr.Typ.Unit
 
     | WTReceive : forall Γ Δ Θ B τ,
       Var.Map.Empty Δ ->
       Var.Map.Empty Θ ->
-      WellTyped Γ Δ Θ (Receive B) (Expr.BANG τ) (* ? *)
+      WellTyped Γ Δ Θ (Receive B) (Expr.Typ.BANG τ) (* ? *)
 
     | WTEPR : forall Γ Δ Θ B,
       Var.Map.Empty Δ ->
       Var.Map.Empty Θ ->
-      WellTyped Γ Δ Θ (EPR B) Expr.QUBIT
+      WellTyped Γ Δ Θ (EPR B) Expr.Typ.QUBIT
 
     | WTSendIf : forall Δ1 Δ2 Θ1 Θ2 Γ Δ Θ e tgts P1 P2 τ,
 
-      Expr.WellTyped Γ Δ1 Θ1 e Expr.BIT ->
+      Expr.WellTyped Γ Δ1 Θ1 e Expr.Typ.BIT ->
       WellTyped Γ Δ2 Θ2 P1 τ ->
       WellTyped Γ Δ2 Θ2 P2 τ ->
 

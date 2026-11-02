@@ -5,6 +5,7 @@ Import Config.Unitary.
 Import Expr.
 
 From Qoreo.Choreography Require Import Notation.
+From Qoreo.Choreography Require Typecheck.
 
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
@@ -27,16 +28,16 @@ Module ConditionalTest.
   Definition conditional_test (Alice Bob Charlie : Actor.t) : Qoreo (list Var.t) :=
   (*Definition conditional_test (Alice Bob Charlie : Actor.t) : Qoreo (Var.t * (Var.t * Var.t)) := *)
     do q ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do m ← Alice [- Meas q -] ;;
+    do m ← Alice [!- Meas q -] ;;
 
     do _ ← add_chor (
       Choreography.If Alice (Var m)
 
         (* Alice measures 0 *)
         (mk (
-          do a ← Alice [- Bit true -] ;;
-          do b ← Bob [- Bit true -] ;;
-          do c ← Charlie [- Bit true -];;
+          do a ← Alice [!- Bang (Bit true) -] ;;
+          do b ← Bob [- Bang (Bit true) -] ;;
+          do c ← Charlie [- Bang (Bit true) -];;
           do b_a ← send Bob b Alice ;;
           do c_a ← send Charlie c Alice ;;
           ret tt
@@ -44,9 +45,9 @@ Module ConditionalTest.
 
         (* Alice measures 1 *)
         (mk (
-          do a ← Alice [- Bit false -] ;;
-          do b ← Bob [- Bit false -] ;;
-          do c ← Charlie [- Bit false -];;
+          do a ← Alice [!- Bang (Bit false) -] ;;
+          do b ← Bob [- Bang (Bit false) -] ;;
+          do c ← Charlie [- Bang (Bit false) -];;
           do b_a ← send Bob b Alice ;;
           do c_a ← send Charlie c Alice ;;
           ret tt
@@ -69,6 +70,14 @@ Module ConditionalTest.
   Definition choreo : Choreography.t :=
     mk (do result ← conditional_test "alice" "bob" "charlie" ;;
     ret result).
+
+  
+  Lemma typecheck_conditional_test :
+      Typecheck.toplevel_typecheck ChorEnv.empty choreo
+      = Typecheck.success.
+  Proof.
+    reflexivity.
+  Qed.
 
   Definition parties : list Actor.t :=
     ["alice"; "bob"; "charlie"].

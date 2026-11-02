@@ -61,7 +61,7 @@ End Label.
 
 Module Typ.
   Inductive t :=
-  | Local : Actor.t -> Expr.typ -> t
+  | Local : Actor.t -> Expr.Typ.t -> t
   | Unit : t
   | Pair : t -> t -> t
   .
@@ -117,7 +117,7 @@ Module Pattern.
     
     (* Assume v is a value of the same type as p *)
 
-  Inductive WellTyped : ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> t -> Typ.t -> Prop :=
+  Inductive WellTyped : ChorEnv.t Expr.Typ.t -> ChorEnv.t Expr.Typ.t -> t -> Typ.t -> Prop :=
   | WTVar : forall G D A x tau,
 
     ChorEnv.Empty G ->
@@ -133,7 +133,7 @@ Module Pattern.
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) D ->
     Var.Map.Equal (D!A) (Var.Map.add x1 tau1 (Var.Map.singleton x2 tau2)) ->
 
-    WellTyped G D (VarPair A x1 x2) (Typ.Local A (Expr.Tensor tau1 tau2))
+    WellTyped G D (VarPair A x1 x2) (Typ.Local A (Expr.Typ.Tensor tau1 tau2))
 
   | WTUnit : forall G D,
     ChorEnv.Empty G ->
@@ -156,7 +156,7 @@ Module Pattern.
     Var.Map.Singleton x tau (G!A) ->
     ChorEnv.Empty D ->
 
-    WellTyped G D (Bang A x) (Typ.Local A (Expr.BANG tau))
+    WellTyped G D (Bang A x) (Typ.Local A (Expr.Typ.BANG tau))
   .
 
 
@@ -441,10 +441,10 @@ Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreograp
 
 (** Typing Relation *)
 Inductive WellTyped :
-  ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Typ.t -> Prop :=
+  ChorEnv.t Expr.Typ.t -> ChorEnv.t Expr.Typ.t -> ChorEnv.t nat -> Choreography.t -> Typ.t -> Prop :=
 
 (*
-| WTVar : forall G D T A x (tau : Expr.typ),
+| WTVar : forall G D T A x (tau : Expr.Typ.t),
   ~ Var.Map.In x (G!A) ->
   ChorEnv.Equal D (Actor.Map.singleton A (Var.Map.singleton x tau)) ->
   ChorEnv.Empty T ->
@@ -490,23 +490,23 @@ Inductive WellTyped :
 
 | WTSend : forall G D T A e B tau,
 
-    Expr.WellTyped (G!A) (D!A) (T!A) e (Expr.BANG tau) ->
+    Expr.WellTyped (G!A) (D!A) (T!A) e (Expr.Typ.BANG tau) ->
 
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) D ->
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) T ->
 
-    WellTyped G D T (Choreography.Send A e B) (Typ.Local B (Expr.BANG tau))
+    WellTyped G D T (Choreography.Send A e B) (Typ.Local B (Expr.Typ.BANG tau))
 
 | WTEPR : forall G D T A B,
 
     ChorEnv.Empty D ->
     ChorEnv.Empty T ->
 
-    WellTyped G D T (Choreography.EPR A B) (Typ.Pair (Typ.Local A Expr.QUBIT) (Typ.Local B Expr.QUBIT))
+    WellTyped G D T (Choreography.EPR A B) (Typ.Pair (Typ.Local A Expr.Typ.QUBIT) (Typ.Local B Expr.Typ.QUBIT))
 
 | WTIf : forall D' T' DeltaA ThetaA G D T A e C1 C2 tau,
 
-    Expr.WellTyped (G!A) DeltaA ThetaA e Expr.BIT ->
+    Expr.WellTyped (G!A) DeltaA ThetaA e Expr.Typ.BIT ->
     WellTyped G D' T' C1 tau ->
     WellTyped G D' T' C2 tau ->
 

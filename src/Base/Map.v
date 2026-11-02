@@ -38,6 +38,21 @@ Module FMap_fun (E : OrderedType.OrderedType) (M : FMapInterface.Sfun E) (FSet :
   Definition setminus {T} (S : FSet.t) (N : M.t T) : M.t T :=
     FSet.fold (fun x N' => M.remove x N') S N.
 
+  (* Assumes the lists are ordered *)
+  Fixpoint domain_eqb' {A} (m1 m2 : list (key * A)) : bool :=
+    match m1, m2 with
+    | [], [] => true
+    | (k1,a1)::m1', (k2,a2)::m2' =>
+      if E.eq_dec k1 k2
+      then domain_eqb' m1' m2'
+      else false
+    | _, _ => false
+    end.
+
+  Definition domain_eqb {A} (m1 m2 : M.t A) :=
+    domain_eqb' (M.elements m1) (M.elements m2).
+  
+
 
   Definition Partition {A} := @Properties.Partition A.
 

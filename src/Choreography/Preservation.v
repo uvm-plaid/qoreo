@@ -811,7 +811,7 @@ Lemma delay_inversion_IfDelay : forall A l
   (forall B, Actor.FSet.In B (Label.actors l) ->
       Var.Map.Empty (T0'!B)) ->
 
-  Expr.WellTyped (G!A) DeltaA ThetaA e Expr.BIT ->
+  Expr.WellTyped (G!A) DeltaA ThetaA e Expr.Typ.BIT ->
   WellTyped G D' T'0 C1 ->
   WellTyped G D' T'0 C2 ->
 
@@ -3772,9 +3772,9 @@ Admitted.
                     C
                     (Var.Map.add q2 idx2 (Var.Map.empty nat))
                     (ChorEnv.find B T)
-                    Expr.QUBIT
+                    Expr.Typ.QUBIT
                     G
-                    (ChorEnv.add A x Expr.QUBIT D)
+                    (ChorEnv.add A x Expr.Typ.QUBIT D)
                     (Actor.Map.add A (ChorEnv.find A T) T0)
                     B y
                     (Expr.QRef q2)
@@ -3802,7 +3802,7 @@ Admitted.
                     (Choreography.subst B y (Expr.QRef q2) C)
                     (Var.Map.add q1 idx1 (Var.Map.empty nat))
                     (ChorEnv.find A T)
-                    Expr.QUBIT
+                    Expr.Typ.QUBIT
                     G
                     D
                     T0
@@ -3859,9 +3859,9 @@ Admitted.
                     C
                     (Var.Map.add q2 idx1 (Var.Map.empty nat))
                     (ChorEnv.find B T)
-                    Expr.QUBIT
+                    Expr.Typ.QUBIT
                     G
-                    (ChorEnv.add A x Expr.QUBIT D)
+                    (ChorEnv.add A x Expr.Typ.QUBIT D)
                     (Actor.Map.add A (ChorEnv.find A T) T0)
                     B y
                     (Expr.QRef q2)
@@ -3889,7 +3889,7 @@ Admitted.
                     (Choreography.subst B y (Expr.QRef q2) C)
                     (Var.Map.add q1 idx2 (Var.Map.empty nat))
                     (ChorEnv.find A T)
-                    Expr.QUBIT
+                    Expr.Typ.QUBIT
                     G
                     D
                     T0
@@ -3913,7 +3913,7 @@ Admitted.
                  Actor.FSet.In A0 (Label.actors l) ->
                  Var.Map.Empty (ChorEnv.find A0 (ChorEnv.remove B y (ChorEnv.remove A x G))) /\
                    Var.Map.Empty (ChorEnv.find A0
-                                    (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)))) as Hih.
+                                    (ChorEnv.add B y Expr.Typ.QUBIT (ChorEnv.add A x Expr.Qubit D)))) as Hih.
       {
         intros A0 HA0inl.
         
@@ -3970,16 +3970,16 @@ Admitted.
       
       rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in H1.
       
-      assert (Var.Map.Empty (Var.Map.M.empty Expr.typ)) as Hee.
+      assert (Var.Map.Empty (Var.Map.M.empty Expr.Typ.t)) as Hee.
       Var.simplify.
       
-      pose proof (empty_partition (Var.Map.M.empty Expr.typ) DeltaA1 DeltaA2 Hee H1) as Hdp.
+      pose proof (empty_partition (Var.Map.M.empty Expr.Typ.t) DeltaA1 DeltaA2 Hee H1) as Hdp.
       rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H0.
       rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in H0.
       
 
       pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg1 e' TA' cfg2 H14
-                    ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H0 H2) as Hsi.
+                    ThetaA1 ThetaA2 (Expr.Typ.BANG tau) Hscoped H0 H2) as Hsi.
       
       destruct Hsi as [ThetaA1' Hsi].
       destruct Hsi as [HsiA HsiB].
@@ -4022,7 +4022,7 @@ Admitted.
       destruct (Hemptiness B HBinl) as [HBGempty HBDempty].
       
       rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A G) HAGempty) in H0.
-      destruct (bangty_inversion (Var.Map.empty Expr.typ) DeltaA1 ThetaA1 v tau H0)
+      destruct (bangty_inversion (Var.Map.empty Expr.Typ.t) DeltaA1 ThetaA1 v tau H0)
         as [HbangA [HbangB HbangC]].
       rewrite HbangB in *.
       rewrite HbangC in *.
@@ -4030,9 +4030,9 @@ Admitted.
       
       rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in H1.
       pose proof (@Var.Map.Properties.Partition_sym _
-                    (Var.Map.empty Expr.typ) (Var.Map.empty Expr.typ) DeltaA2 H1) as Hpart.
+                    (Var.Map.empty Expr.Typ.t) (Var.Map.empty Expr.Typ.t) DeltaA2 H1) as Hpart.
       pose proof (empty_partition
-                    (Var.Map.empty Expr.typ) DeltaA2 (Var.Map.empty Expr.typ)
+                    (Var.Map.empty Expr.Typ.t) DeltaA2 (Var.Map.empty Expr.Typ.t)
                     empty_map_empty Hpart) as Hep.
       eapply wt_subst_bang; eauto.
       
@@ -4096,8 +4096,8 @@ Admitted.
       
       assert (forall A0 : Actor.FSet.elt,
                  Actor.FSet.In A0 (Label.actors l) ->
-                 Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (ChorEnv.add B y tau G)) /\
-                   Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (Actor.Map.add A DeltaA2 D))) as Hih.
+                 Var.Map.Empty (elt:=Expr.Typ.t) (ChorEnv.find A0 (ChorEnv.add B y tau G)) /\
+                   Var.Map.Empty (elt:=Expr.Typ.t) (ChorEnv.find A0 (Actor.Map.add A DeltaA2 D))) as Hih.
       {
         intros A0 HA0inl.
 
@@ -4164,7 +4164,7 @@ Admitted.
       rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in *.    
       
       pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg1 e' TA' cfg2 H12 
-                    ThetaA1 ThetaA2 (Expr.BANG tau) Hscoped H H1) as Hsi.
+                    ThetaA1 ThetaA2 (Expr.Typ.BANG tau) Hscoped H H1) as Hsi.
       
       destruct Hsi as [ThetaA1' Hsi].
       destruct Hsi as [HsiA HsiB].
@@ -4199,16 +4199,16 @@ Admitted.
       
       rewrite H13 in *.
       
-      destruct (bangty_inversion (Var.Map.empty Expr.typ) DeltaA1 ThetaA1 e0 tau H)
+      destruct (bangty_inversion (Var.Map.empty Expr.Typ.t) DeltaA1 ThetaA1 e0 tau H)
         as [HbangA [HbangB HbangC]].
       rewrite HbangB in *.
       rewrite HbangC in *.
       
       rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in H0.
       pose proof (@Var.Map.Properties.Partition_sym _
-                    (Var.Map.empty Expr.typ) (Var.Map.empty Expr.typ) DeltaA2 H0) as Hpart.
+                    (Var.Map.empty Expr.Typ.t) (Var.Map.empty Expr.Typ.t) DeltaA2 H0) as Hpart.
       pose proof (empty_partition
-                    (Var.Map.empty Expr.typ) DeltaA2 (Var.Map.empty Expr.typ)
+                    (Var.Map.empty Expr.Typ.t) DeltaA2 (Var.Map.empty Expr.Typ.t)
                     empty_map_empty Hpart) as Hep.
       
       rewrite empty_to_empty in HWT; auto.
@@ -4273,8 +4273,8 @@ Admitted.
       
       assert (forall A0 : Actor.FSet.elt,
                  Actor.FSet.In A0 (Label.actors l) ->
-                 Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (ChorEnv.add A x tau G)) /\
-                   Var.Map.Empty (elt:=Expr.typ) (ChorEnv.find A0 (Actor.Map.add A DeltaA2 D))) as Hih.
+                 Var.Map.Empty (elt:=Expr.Typ.t) (ChorEnv.find A0 (ChorEnv.add A x tau G)) /\
+                   Var.Map.Empty (elt:=Expr.Typ.t) (ChorEnv.find A0 (Actor.Map.add A DeltaA2 D))) as Hih.
       {
         intros A0 HA0inl.
 
@@ -4505,7 +4505,7 @@ Admitted.
       rewrite (Var.Map.Proofs.empty_map_equal DeltaA1 Hdp) in *.    
       
       pose proof (Expr.step_inversion e (ChorEnv.find A T) cfg1 e' TA' cfg2 H16 
-                    ThetaA1 ThetaA2 (Expr.Tensor tau1 tau2) Hscoped H H1) as Hsi.
+                    ThetaA1 ThetaA2 (Expr.Typ.Tensor tau1 tau2) Hscoped H H1) as Hsi.
       
       destruct Hsi as [ThetaA1' Hsi].
       destruct Hsi as [HsiA HsiB].
@@ -4596,9 +4596,9 @@ Admitted.
       rewrite (Var.Map.Proofs.empty_map_equal (ChorEnv.find A D) HADempty) in Hwtslinx2; auto.
       
       assert (x2 <> x1) as Hx2nex1; auto.
-      assert (~ Var.Map.In x1 (Var.Map.empty Expr.typ)) as Hx1niemp.
+      assert (~ Var.Map.In x1 (Var.Map.empty Expr.Typ.t)) as Hx1niemp.
       Var.simplify.
-      assert (~ Var.Map.In x2 (Var.Map.empty Expr.typ)) as Hx2niemp.
+      assert (~ Var.Map.In x2 (Var.Map.empty Expr.Typ.t)) as Hx2niemp.
       Var.simplify.
       
       pose proof (nin_mapl (Var.Map.empty _) x2 x1 tau1 Hx2nex1 Hx2niemp).

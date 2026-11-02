@@ -8,7 +8,7 @@ Module HelperLemmas.
 
     (* START *)
 
-    Lemma extension : forall A G x (tau : Expr.typ),
+    Lemma extension : forall A G x (tau : Expr.Typ.t),
         ChorEnv.MapsTo A x tau G <-> Var.Map.MapsTo x tau (ChorEnv.find A G).
     Proof.
       intros A G x tau.
@@ -88,7 +88,7 @@ Module HelperLemmas.
       Var.simplify.
     Qed.
 
-    Lemma remove_dj : forall  (M1 : Var.Map.t Expr.typ) M2 x tau,
+    Lemma remove_dj : forall  (M1 : Var.Map.t Expr.Typ.t) M2 x tau,
         Var.Map.Properties.Disjoint (Var.Map.add x tau M1) M2 -> 
         Var.Map.Properties.Disjoint M1 M2.
     Proof.
@@ -96,7 +96,7 @@ Module HelperLemmas.
       Var.simplify.
     Qed.
 
-    Lemma remove_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x,
+    Lemma remove_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.Typ.t) A B x,
         Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) -> 
         Var.Map.Properties.Disjoint
           (ChorEnv.find A (ChorEnv.remove B x CE1))
@@ -123,7 +123,7 @@ Module HelperLemmas.
       apply (H D); auto.
     Qed.
 
-    Lemma remove_add_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.typ) A B x tau,
+    Lemma remove_add_dj_env : forall (CE1 CE2 : ChorEnv.t Expr.Typ.t) A B x tau,
         Var.Map.Properties.Disjoint (ChorEnv.find A CE1) (ChorEnv.find A CE2) ->
         Var.Map.Properties.Disjoint
           (ChorEnv.find A (ChorEnv.remove B x CE1))
@@ -140,7 +140,7 @@ Module HelperLemmas.
       }
     Qed.
 
-    Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.typ),
+    Lemma add_empty_delta : forall A x tau (D : ChorEnv.t Expr.Typ.t),
         ~ ChorEnv.Empty (ChorEnv.add A x tau D).
     Proof.
       intros. intros Hempty.
@@ -211,7 +211,7 @@ Module HelperLemmas.
       Actor.simplify.
     Qed.
 
-    Lemma empty_partition : forall (M M1 M2 : Var.Map.t Expr.typ),
+    Lemma empty_partition : forall (M M1 M2 : Var.Map.t Expr.Typ.t),
         Var.Map.Empty M ->
         Var.Map.Partition M M1 M2 ->
         Var.Map.Empty M1.
@@ -249,7 +249,7 @@ Module HelperLemmas.
       Actor.simplify.
     Qed.
 
-    Lemma find_add_map : forall A x tau (CE : ChorEnv.t Expr.typ),
+    Lemma find_add_map : forall A x tau (CE : ChorEnv.t Expr.Typ.t),
         Var.Map.Equal
           (ChorEnv.find A (ChorEnv.add A x tau CE))
           (Var.Map.add x tau (ChorEnv.find A CE)).
@@ -289,7 +289,7 @@ Module HelperLemmas.
     Qed.
 
     (*
-    Lemma find_nbeq : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+    Lemma find_nbeq : forall (CE : ChorEnv.t Expr.Typ.t) A x B y tau,
         Insn.bind_eqb (A, x) (B, y) = false -> 
         ~ Var.Map.In x (ChorEnv.find A CE) ->
         ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE)).
@@ -306,7 +306,7 @@ Module HelperLemmas.
     Qed.
     *)
 
-    Lemma add_find : forall (CE : ChorEnv.t Expr.typ) A x tau,
+    Lemma add_find : forall (CE : ChorEnv.t Expr.Typ.t) A x tau,
         (ChorEnv.find A (ChorEnv.add A x tau CE)) = (Var.Map.add x tau (ChorEnv.find A CE)).
     Proof.
       intros.
@@ -314,7 +314,7 @@ Module HelperLemmas.
       Actor.simplify.
     Qed.
 
-    Lemma remove_find : forall (CE : ChorEnv.t Expr.typ) A x,
+    Lemma remove_find : forall (CE : ChorEnv.t Expr.Typ.t) A x,
         (ChorEnv.find A (ChorEnv.remove A x CE)) = (Var.Map.remove x (ChorEnv.find A CE)).
     Proof.
       intros.
@@ -322,7 +322,7 @@ Module HelperLemmas.
       Actor.simplify.
     Qed.
 
-    Lemma add_remove : forall (CE : ChorEnv.t Expr.typ) M A x tau,
+    Lemma add_remove : forall (CE : ChorEnv.t Expr.Typ.t) M A x tau,
         Var.Map.MapsTo x tau M ->
         ChorEnv.Equal
           (ChorEnv.add A x tau (Actor.Map.add A (Var.Map.remove x M) CE))
@@ -337,7 +337,7 @@ Module HelperLemmas.
       Actor.simplify.
     Qed.
 
-    Lemma nin_remove : forall (M : Var.Map.t Expr.typ) x,
+    Lemma nin_remove : forall (M : Var.Map.t Expr.Typ.t) x,
         ~ (Var.Map.In x (Var.Map.remove x M)).
     Proof.
       intros.
@@ -345,7 +345,7 @@ Module HelperLemmas.
     Qed.
 
     (* This is needed for dealing with classical variable shadowing *)
-    Lemma nin_remove_ce : forall (CE : ChorEnv.t Expr.typ) A x B y,
+    Lemma nin_remove_ce : forall (CE : ChorEnv.t Expr.Typ.t) A x B y,
         ~ (Var.Map.In x (ChorEnv.find A CE)) ->
         ~ (Var.Map.In x (ChorEnv.find A (ChorEnv.remove B y CE))).
     Proof.
@@ -354,19 +354,19 @@ Module HelperLemmas.
       Var.simplify.
     Qed.
 
-    Lemma nin_partition : forall x (M M1 M2 : Var.Map.t Expr.typ),
+    Lemma nin_partition : forall x (M M1 M2 : Var.Map.t Expr.Typ.t),
         ~ Var.Map.In x M ->
         Var.Map.Partition M M1 M2 ->
         ~ Var.Map.In x M1.
     Proof.
       intros.
-      pose proof (Var.Map.Proofs.partition_not_in_inversion Expr.typ M M1 M2 x H0) as Hpni.
+      pose proof (Var.Map.Proofs.partition_not_in_inversion Expr.Typ.t M M1 M2 x H0) as Hpni.
       destruct Hpni as [Hpni _].
       destruct (Hpni H).
       auto.
     Qed.
 
-    Lemma partition_remove_all : forall (CE1 : ChorEnv.t Expr.typ) CE2 CE3 A B x,
+    Lemma partition_remove_all : forall (CE1 : ChorEnv.t Expr.Typ.t) CE2 CE3 A B x,
         Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
         Var.Map.Partition (ChorEnv.find A (ChorEnv.remove B x CE1))
           (ChorEnv.find A (ChorEnv.remove B x CE2))
@@ -378,7 +378,7 @@ Module HelperLemmas.
       Var.simplify.
     Qed.
       
-    Lemma partition_remove : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
+    Lemma partition_remove : forall (Delta : Var.Map.t Expr.Typ.t) Delta1 Delta2 x tau,
         Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
         ~ Var.Map.In x Delta ->
         ~ Var.Map.In x Delta1 ->
@@ -391,7 +391,7 @@ Module HelperLemmas.
       * auto.
     Qed.  
 
-    Lemma remove_add : forall x tau (Delta1 : Var.Map.t Expr.typ) Delta2,
+    Lemma remove_add : forall x tau (Delta1 : Var.Map.t Expr.Typ.t) Delta2,
         ~ Var.Map.In x Delta1 ->
         Var.Map.Equal Delta2 (Var.Map.add x tau Delta1) ->
         Var.Map.Equal (Var.Map.remove x Delta2) Delta1.
@@ -402,7 +402,7 @@ Module HelperLemmas.
     Qed.
 
 
-    Lemma addadd3 :  forall (CE : ChorEnv.t Expr.typ) A x tau B M,
+    Lemma addadd3 :  forall (CE : ChorEnv.t Expr.Typ.t) A x tau B M,
       A <> B -> 
       ChorEnv.Equal (Actor.Map.add B M (ChorEnv.add A x tau CE))
                     (ChorEnv.add A x tau (Actor.Map.add B M CE)).
@@ -425,7 +425,7 @@ Module HelperLemmas.
     Qed.
 
     (*
-    Lemma addadd5 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
+    Lemma addadd5 : forall (CE : ChorEnv.t Expr.Typ.t) A x taux B y tauy,
         Insn.bind_eqb (B, y) (A, x) = false ->
         ChorEnv.Equal (ChorEnv.add A x taux (ChorEnv.add B y tauy CE))
                       (ChorEnv.add B y tauy (ChorEnv.add A x taux CE)).
@@ -457,7 +457,7 @@ Module HelperLemmas.
       reflexivity.
     Qed.
 
-    Lemma addadd8 : forall (CE : ChorEnv.t Expr.typ) A x tau M, 
+    Lemma addadd8 : forall (CE : ChorEnv.t Expr.Typ.t) A x tau M, 
         ChorEnv.Equal
           (Actor.Map.add A (Var.Map.add x tau M) CE)
           (ChorEnv.add A x tau (Actor.Map.add A M CE)).
@@ -467,7 +467,7 @@ Module HelperLemmas.
       repeat (Var.simplify; Actor.simplify).
     Qed.
 
-    Lemma addadd9 : forall (CE : ChorEnv.t Expr.typ) A x taux y tauy,
+    Lemma addadd9 : forall (CE : ChorEnv.t Expr.Typ.t) A x taux y tauy,
         y <> x ->
         ChorEnv.Equal (ChorEnv.add A x taux (ChorEnv.add A y tauy CE))
                       (ChorEnv.add A y tauy (ChorEnv.add A x taux CE)).
@@ -487,7 +487,7 @@ Module HelperLemmas.
       intros z. Var.simplify.
     Qed.
 
-    Lemma overwrite : forall (CE : ChorEnv.t Expr.typ) A x tau1 tau2,
+    Lemma overwrite : forall (CE : ChorEnv.t Expr.Typ.t) A x tau1 tau2,
         ChorEnv.Equal
           (ChorEnv.add A x tau1 (ChorEnv.add A x tau2 CE))
           (ChorEnv.add A x tau1 CE).
@@ -497,7 +497,7 @@ Module HelperLemmas.
       repeat (Actor.simplify; Var.simplify).
     Qed.
 
-    Lemma remrem :  forall (CE : ChorEnv.t Expr.typ) A x y,
+    Lemma remrem :  forall (CE : ChorEnv.t Expr.Typ.t) A x y,
         ChorEnv.Equal
           (ChorEnv.remove A x (ChorEnv.remove A y CE))
           (ChorEnv.remove A y (ChorEnv.remove A x CE)).      
@@ -510,7 +510,7 @@ Module HelperLemmas.
       reflexivity.
     Qed.
 
-    Lemma rmadd1 : forall (CE : ChorEnv.t Expr.typ) A x tau,
+    Lemma rmadd1 : forall (CE : ChorEnv.t Expr.Typ.t) A x tau,
         ChorEnv.Equal
           (ChorEnv.remove A x (ChorEnv.add A x tau CE))
           (ChorEnv.remove A x CE).
@@ -521,7 +521,7 @@ Module HelperLemmas.
     Qed.
 
     (*
-    Lemma rmadd2 : forall (CE : ChorEnv.t Expr.typ) A B x y tau,
+    Lemma rmadd2 : forall (CE : ChorEnv.t Expr.Typ.t) A B x y tau,
         Insn.bind_eqb (A, x) (B, y) = false ->
         ChorEnv.Equal
           (ChorEnv.remove B y (ChorEnv.add A x tau CE))
@@ -539,7 +539,7 @@ Module HelperLemmas.
     Qed.
     *)
 
-    Lemma nin_mapl : forall (M : Var.Map.t Expr.typ)  x y tau,
+    Lemma nin_mapl : forall (M : Var.Map.t Expr.Typ.t)  x y tau,
         x <> y ->
         ~ Var.Map.In x M ->
         ~ Var.Map.In x (Var.Map.add y tau M).
@@ -548,7 +548,7 @@ Module HelperLemmas.
       Var.solve.
     Qed.
 
-    Lemma nin_mapr : forall (M : Var.Map.t Expr.typ)  x y tau,
+    Lemma nin_mapr : forall (M : Var.Map.t Expr.Typ.t)  x y tau,
         x <> y ->
         ~ Var.Map.In x (Var.Map.add y tau M) ->
         ~ Var.Map.In x M.
@@ -557,7 +557,7 @@ Module HelperLemmas.
       Var.solve.
     Qed.
 
-    Lemma nin_nxeq : forall (M : Var.Map.t Expr.typ)  x y tau,
+    Lemma nin_nxeq : forall (M : Var.Map.t Expr.Typ.t)  x y tau,
         ~ Var.Map.In x (Var.Map.add y tau M) -> x <> y.
     Proof.
       intros.
@@ -565,7 +565,7 @@ Module HelperLemmas.
     Qed.
 
     (* contrapositive of nin_mapl with mapsto rewrite *)
-    Lemma map_in : forall (M : Var.Map.t Expr.typ)  x tau,
+    Lemma map_in : forall (M : Var.Map.t Expr.Typ.t)  x tau,
         Var.Map.MapsTo x tau M ->
         Var.Map.In x M.
     Proof.
@@ -573,8 +573,9 @@ Module HelperLemmas.
       Var.solve.
     Qed.
           
-(*
-    Lemma nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
+
+    (*
+    Lemma nin_nbeq : forall (CE : ChorEnv.t Expr.Typ.t) A x tau B y,
         ~ Var.Map.In y (ChorEnv.find B (ChorEnv.add A x tau CE)) ->
         Insn.bind_eqb (A, x) (B, y) = false.
     Proof.
@@ -585,8 +586,9 @@ Module HelperLemmas.
     Qed.
     *)
           
-(*
-    Lemma  contra_nin_nbeq : forall (CE : ChorEnv.t Expr.typ) A x tau B y,
+
+    (*
+    Lemma  contra_nin_nbeq : forall (CE : ChorEnv.t Expr.Typ.t) A x tau B y,
         Insn.bind_eqb (A, x) (B, y) = true ->
         Var.Map.In y (ChorEnv.find B (ChorEnv.add A x tau CE)).
     Proof.
@@ -598,14 +600,14 @@ Module HelperLemmas.
     Qed.
     *)
 
-    Lemma in_add : forall (M : Var.Map.t Expr.typ)  x tau,
+    Lemma in_add : forall (M : Var.Map.t Expr.Typ.t)  x tau,
         Var.Map.In x (Var.Map.add x tau M).
     Proof.
       intros.
       Var.simplify.
     Qed.
         
-    Lemma in_beq : forall (CE : ChorEnv.t Expr.typ) A x tau,
+    Lemma in_beq : forall (CE : ChorEnv.t Expr.Typ.t) A x tau,
         Var.Map.In x (ChorEnv.find A (ChorEnv.add A x tau CE)).
     Proof.
       intros.
@@ -613,7 +615,7 @@ Module HelperLemmas.
     Qed.
 
     (*
-    Lemma nin_nbeq_add1 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+    Lemma nin_nbeq_add1 : forall (CE : ChorEnv.t Expr.Typ.t) A x B y tau,
         Insn.bind_eqb (A, x) (B, y) = false ->
         ~ Var.Map.In x (ChorEnv.find A CE) ->
           ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE)).
@@ -624,7 +626,7 @@ Module HelperLemmas.
       repeat (Var.simplify; Actor.simplify).
     Qed.
 
-    Lemma nin_nbeq_add2 : forall (CE : ChorEnv.t Expr.typ) A x B y tau,
+    Lemma nin_nbeq_add2 : forall (CE : ChorEnv.t Expr.Typ.t) A x B y tau,
         Insn.bind_eqb (A, x) (B, y) = false ->
         ~ Var.Map.In x (ChorEnv.find A (ChorEnv.add B y tau CE))->
         ~ Var.Map.In x (ChorEnv.find A CE).
@@ -635,7 +637,7 @@ Module HelperLemmas.
       repeat (Var.simplify; Actor.simplify).
     Qed.
 
-    Lemma nin_nbeq_add3 : forall (CE : ChorEnv.t Expr.typ) A x taux B y tauy,
+    Lemma nin_nbeq_add3 : forall (CE : ChorEnv.t Expr.Typ.t) A x taux B y tauy,
         Insn.bind_eqb (A, x) (B, y) = false ->
         ChorEnv.MapsTo A x taux CE ->
         ChorEnv.MapsTo A x taux (ChorEnv.add B y tauy CE).
@@ -650,7 +652,7 @@ Module HelperLemmas.
         *)
 
 
-    Lemma ini : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
+    Lemma ini : forall (Delta : Var.Map.t Expr.Typ.t) Delta1 Delta2 x tau,
         Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
         ~ (Var.Map.In x Delta1) ->
         (Var.Map.MapsTo x tau Delta2).
@@ -663,7 +665,7 @@ Module HelperLemmas.
       Var.solve.
     Qed.
 
-    Lemma inin : forall (Delta : Var.Map.t Expr.typ) Delta1 Delta2 x tau,
+    Lemma inin : forall (Delta : Var.Map.t Expr.Typ.t) Delta1 Delta2 x tau,
         Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
         (Var.Map.In x Delta1) ->
         (Var.Map.MapsTo x tau Delta1).
@@ -675,7 +677,7 @@ Module HelperLemmas.
       rewrite Hin in Heq. auto.
     Qed.
 
-    Lemma nin : forall (Delta : Var.Map.t Expr.typ) Delta1' Delta1 Delta2 x tau,
+    Lemma nin : forall (Delta : Var.Map.t Expr.Typ.t) Delta1' Delta1 Delta2 x tau,
         Var.Map.Equal (Var.Map.add x tau Delta1') Delta1 ->
         Var.Map.Partition (Var.Map.add x tau Delta) Delta1 Delta2 ->
         ~ (Var.Map.In x Delta) ->
@@ -726,7 +728,7 @@ Module HelperLemmas.
         rewrite (Var.Map.Proofs.concat_sym M0 M1); auto; try reflexivity.
     Qed.
 
-    Lemma map_partition_map : forall x tau (M : Var.Map.t Expr.typ) M1 M2,
+    Lemma map_partition_map : forall x tau (M : Var.Map.t Expr.Typ.t) M1 M2,
         Var.Map.MapsTo x tau M2 ->
         Var.Map.Partition M M1 M2 ->
         Var.Map.MapsTo x tau M.
@@ -741,7 +743,7 @@ Module HelperLemmas.
       }
     Qed.
 
-    Lemma readd_eq: forall A x tau (CE : ChorEnv.t Expr.typ),
+    Lemma readd_eq: forall A x tau (CE : ChorEnv.t Expr.Typ.t),
         Var.Map.MapsTo x tau (ChorEnv.find A CE) ->
         ChorEnv.Equal (ChorEnv.add A x tau CE) CE.
     Proof.
@@ -754,7 +756,7 @@ Module HelperLemmas.
       rewrite Hfind. Var.solve.
     Qed.
 
-    Lemma remove_add_partition : forall (CE1 CE2 CE3: ChorEnv.t Expr.typ) A B x tau,
+    Lemma remove_add_partition : forall (CE1 CE2 CE3: ChorEnv.t Expr.Typ.t) A B x tau,
         Var.Map.Partition (ChorEnv.find A CE1)
           (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
         Var.Map.MapsTo x tau (ChorEnv.find B CE1) ->
@@ -799,7 +801,7 @@ Module HelperLemmas.
     Qed.
 
       
-    Lemma map_subset_add' : forall A B y tau (CE1 : ChorEnv.t Expr.typ) CE2 CE3,
+    Lemma map_subset_add' : forall A B y tau (CE1 : ChorEnv.t Expr.Typ.t) CE2 CE3,
         ~ Var.Map.In y (ChorEnv.find B CE3) ->
         Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
         Var.Map.Partition
@@ -812,7 +814,7 @@ Module HelperLemmas.
       apply Var.Map.Proofs.partition_add_l; auto.
     Qed.
 
-    Lemma map_subset_add : forall A B y tau (CE1 : ChorEnv.t Expr.typ) CE2 CE3,
+    Lemma map_subset_add : forall A B y tau (CE1 : ChorEnv.t Expr.Typ.t) CE2 CE3,
         Var.Map.Partition (ChorEnv.find A CE1) (ChorEnv.find A CE2) (ChorEnv.find A CE3) ->
         Var.Map.Partition
           (ChorEnv.find A (ChorEnv.add B y tau CE1))
@@ -832,7 +834,7 @@ Module HelperLemmas.
         Var.solve.
     Qed.
 
-    Lemma add_mapsto : forall x (tau : Expr.typ) m,
+    Lemma add_mapsto : forall x (tau : Expr.Typ.t) m,
         Var.Map.MapsTo x tau m ->
         Var.Map.Equal (Var.Map.add x tau m) m.
     Proof.
@@ -943,9 +945,9 @@ End HelperLemmas.
 
 
 Lemma bangty_inversion : forall Gamma Delta Theta e tau,
-    Expr.WellTyped Gamma Delta Theta (Expr.Bang e) (Expr.BANG tau) ->
+    Expr.WellTyped Gamma Delta Theta (Expr.Bang e) (Expr.Typ.BANG tau) ->
     Expr.WellTyped Gamma Delta Theta e tau /\
-      Var.Map.Equal Delta (Var.Map.empty Expr.typ) /\
+      Var.Map.Equal Delta (Var.Map.empty Expr.Typ.t) /\
       Var.Map.Equal Theta (Var.Map.empty nat).
 Proof.
   intros. 
@@ -959,7 +961,7 @@ Qed.
 Lemma qref_ty : forall Gamma Delta Theta q idx,
     Var.Map.Empty Delta ->
     Var.Map.Singleton q idx Theta ->
-    Expr.WellTyped Gamma Delta Theta (Expr.QRef q) Expr.QUBIT.
+    Expr.WellTyped Gamma Delta Theta (Expr.QRef q) Expr.Typ.QUBIT.
 Proof.
   intros.
   eapply Expr.WTQRef; eauto.
