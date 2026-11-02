@@ -49,7 +49,7 @@ def Unitary(gate: str, value: Any) -> Any:
         gate_name, numerator, denominator = gate
         if denominator == 0:
             raise ValueError("Rotation denominator cannot be zero")
-        theta = (numerator / denominator) * np.pi
+        theta = (numerator / denominator)
 
         if gate_name == "RZ":
             qapi.operate(value, RZ(theta))
@@ -234,7 +234,7 @@ class Runtime:
             stored_qubit = self.node.qmemory.peek(position)[0]
             if stored_qubit is qubit:
                 self.node.qmemory.pop(positions=[position])
-            break
+                break
 
         return int(result)
 

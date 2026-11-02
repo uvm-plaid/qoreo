@@ -7,7 +7,7 @@ From Qoreo.Base Require Var.
 
 
 Definition pi : QArith_base.Q :=
-  QArith_base.Qmake 22%Z 7%positive.
+  QArith_base.Qmake 355%Z 113%positive.
 
 Definition inv_sqrt2 : QArith_base.Q :=
   QArith_base.Qmake 707107%Z 1000000%positive.
@@ -24,7 +24,7 @@ Import Unitary.
 
 (* Z-rotation by a rational multiple of pi *)
 Definition rz (a : QArith_base.Q) : Matrix 2 2 :=
-  let θ := (Q2R a * PI)%R in
+  let θ := (Q2R a )%R in
   fun x y =>
     match x, y with
     | 0, 0 => Cexp (- θ / 2)
