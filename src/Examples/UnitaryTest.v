@@ -69,7 +69,7 @@ Module UnitaryTest.
   (* RZ(pi/4) is equivalent to T up to global phase. *)
   Definition rz_t_test (Alice : Actor.t) : Qoreo Var.t :=
     do q ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do q ← Alice [- Unitary (RZ (1#4)) q -] ;;
+    do q ← Alice [- Unitary (RZ (pi/4)%Q) q -] ;; (*Pi/4%Q*)
     do q ← Alice [- Unitary Tdag q -] ;;
     do q ← Alice [- Unitary H q -] ;;
     do r ← Alice [- Meas q -] ;;
