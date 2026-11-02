@@ -3,6 +3,7 @@ From Stdlib Require Import String List QArith.
 From Qoreo.Base Require Import Config Var Actor.
 From Qoreo.Expr Require Import Expr.
 From Qoreo.Choreography Require Import Choreography.
+From Qoreo.Choreography Require Typecheck.
 From Qoreo.Network Require Import Network.
 From Qoreo.Choreography Require Import Notation.
 (*From QoreoExamples Require Import Notation.*)
@@ -53,16 +54,16 @@ Module DistributedGrover.
 
     (* Alice measures in X basis *)
     do a ← Alice [- Unitary H a -] ;;
-    do mA ← Alice [- Meas a -] ;;
+    do mA ← Alice [!- Meas a -] ;;
 
     (* Bob measures in Y basis *)
     do b ← Bob [- Unitary Sdag b -] ;;
     do b ← Bob [- Unitary H b -] ;;
-    do mB ← Bob [- Meas b -] ;;
+    do mB ← Bob [!- Meas b -] ;;
 
-    (* Exchange classical bits *)
-    do mA_bob ← send Alice mA Bob ;;
-    do mB_alice ← send Bob mB Alice ;;
+    (* Exchange measurement outcomes *)
+    do mA_bob ← send Alice (Bang mA) Bob ;;
+    do mB_alice ← send Bob (Bang mB) Alice ;;
 
     (* Alice applies corrections *)
     do qA ← Alice [- Unitary SGATE qA -] ;;
@@ -158,9 +159,8 @@ Module DistributedGrover.
     do qA ← Alice [- Unitary H qA -] ;;
     do qB ← Bob [- Unitary H qB -] ;;
 
-    (* Final measurements *)
-    do resultA ← Alice [- Meas qA -] ;;
-    do resultB ← Bob [- Meas qB -] ;;
+    do resultA ← Alice [!- Meas qA -] ;;
+    do resultB ← Bob [!- Meas qB -] ;;
 
     ret (resultA, resultB).
 
@@ -175,7 +175,8 @@ Module DistributedGrover.
       ret result
     ).
 
-   Definition parties : list Actor.t :=
+
+  Definition parties : list Actor.t :=
     ["alice"; "bob"].
 
   Definition apps : option (list AppFile.t) :=
@@ -191,6 +192,14 @@ Definition program : Qoreo (list Var.t) :=
 
 Definition choreo : Choreography.t :=
   mk program.
+
+
+Lemma typecheck_grover :
+      Typecheck.toplevel_typecheck ChorEnv.empty choreo
+      = Typecheck.success.
+Proof.
+  reflexivity.
+Qed.
 
 Definition parties : list Actor.t :=
   ["alice"; "bob"].

@@ -375,7 +375,7 @@ Proof.
     try (rewrite HΔ' in *; clear Δ' HΔ');
     try (inversion Hstep; auto; fail).
   * Var.simplify.
-    assert (~ Var.Map.In x (Var.Map.empty typ))
+    assert (~ Var.Map.In x (Var.Map.empty Typ.t))
       by (Var.simplify; auto).
     inversion Hstep; subst; clear Hstep.
     + (* e1 -> e1' *)  

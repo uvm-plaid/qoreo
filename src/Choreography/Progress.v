@@ -6,7 +6,7 @@ From Stdlib Require Import Program.Equality. (* dependent induction *)
 
 
 Lemma bangval_inversion : forall Gamma Delta Theta e tau,
-    Expr.WellTyped Gamma Delta Theta e (Expr.BANG tau) ->
+    Expr.WellTyped Gamma Delta Theta e (Expr.Typ.BANG tau) ->
     Expr.Val e ->
     exists e0, e = Expr.Bang e0.
 Proof.
@@ -17,7 +17,7 @@ Proof.
 Qed.
 
 Lemma tensorval_inversion : forall Gamma Delta Theta e tau1 tau2,
-    Expr.WellTyped Gamma Delta Theta e (Expr.Tensor tau1 tau2) ->
+    Expr.WellTyped Gamma Delta Theta e (Expr.Typ.Tensor tau1 tau2) ->
     Expr.Val e ->
     exists v1 v2, e = Expr.Pair v1 v2 /\ Expr.Val v1 /\ Expr.Val v2 .
 Proof.
@@ -117,7 +117,7 @@ Proof.
       pose proof (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H2) as Hpart.
       
       pose proof
-        (Expr.Progress.progress e (Expr.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H0 cfg1 Hpart) as Heprog.
+        (Expr.Progress.progress e (Expr.Typ.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H0 cfg1 Hpart) as Heprog.
 
       unfold ChorEnv.Empty in *.
       specialize (HGempty A);
@@ -192,7 +192,7 @@ Proof.
       pose proof (ChorEnv.ws_partition (ChorEnv.find A T) ThetaA1 ThetaA2 cfg1 Hscoped H1) as Hpart.
       
       pose proof
-        (Expr.Progress.progress e (Expr.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
+        (Expr.Progress.progress e (Expr.Typ.BANG tau) (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
 
       specialize (HGempty A).
       specialize (HDempty A).
@@ -336,7 +336,7 @@ Proof.
       
       pose proof
         (Expr.Progress.progress
-           e (Expr.Tensor tau1 tau2) (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
+           e (Expr.Typ.Tensor tau1 tau2) (ChorEnv.find A G) DeltaA1 ThetaA1 H cfg1 Hpart) as Heprog.
 
       
       specialize (HGempty A).

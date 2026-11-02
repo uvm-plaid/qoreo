@@ -578,7 +578,7 @@ Import List.ListNotations.
 (** Typing Relation *)
 
 Inductive WellTyped :
-  ChorEnv.t Expr.typ -> ChorEnv.t Expr.typ -> ChorEnv.t nat -> Choreography.t -> Prop :=
+  ChorEnv.t Expr.Typ.t -> ChorEnv.t Expr.Typ.t -> ChorEnv.t nat -> Choreography.t -> Prop :=
   
 | Nil : forall G D T, 
     ChorEnv.Empty D ->
@@ -588,7 +588,7 @@ Inductive WellTyped :
 | EPR : forall G D T A x B y C,
     A <> B ->
     WellTyped (ChorEnv.remove B y (ChorEnv.remove A x G))
-      (ChorEnv.add B y Expr.QUBIT (ChorEnv.add A x Expr.QUBIT D)) T C ->
+      (ChorEnv.add B y Expr.Typ.QUBIT (ChorEnv.add A x Expr.Typ.QUBIT D)) T C ->
 
     ~ Var.Map.In x (D!A) ->
     ~ Var.Map.In y (D!B) ->
@@ -597,7 +597,7 @@ Inductive WellTyped :
 
 | Send : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A e tau B y C,
     A <> B ->
-    Expr.WellTyped (G!A) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
+    Expr.WellTyped (G!A) DeltaA1 ThetaA1 e (Expr.Typ.BANG tau) ->
     WellTyped (ChorEnv.add B y tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (D!A) DeltaA1 DeltaA2 ->
@@ -607,7 +607,7 @@ Inductive WellTyped :
 
 | LetBang : forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x e tau C,
 
-    Expr.WellTyped (G!A) DeltaA1 ThetaA1 e (Expr.BANG tau) ->
+    Expr.WellTyped (G!A) DeltaA1 ThetaA1 e (Expr.Typ.BANG tau) ->
     WellTyped (ChorEnv.add A x tau G) (Actor.Map.add A DeltaA2 D) (Actor.Map.add A ThetaA2 T) C ->
 
     Var.Map.Partition (D!A) DeltaA1 DeltaA2 ->
@@ -628,7 +628,7 @@ Inductive WellTyped :
 
 | LetPair: forall DeltaA1 DeltaA2 ThetaA1 ThetaA2 G D T A x1 x2 tau1 tau2 e C,
 
-    Expr.WellTyped (G!A) DeltaA1 ThetaA1 e (Expr.Tensor tau1 tau2) ->
+    Expr.WellTyped (G!A) DeltaA1 ThetaA1 e (Expr.Typ.Tensor tau1 tau2) ->
     WellTyped (ChorEnv.remove A x1 (ChorEnv.remove A x2 G))
       (Actor.Map.add A (Var.Map.add x1 tau1 (Var.Map.add x2 tau2 DeltaA2)) D)
       (Actor.Map.add A ThetaA2 T) C ->
@@ -643,7 +643,7 @@ Inductive WellTyped :
 
 | If : forall DeltaA ThetaA D' T' D'' T'' G D T A e C1 C2 C',
 
-  Expr.WellTyped (G!A) DeltaA ThetaA e Expr.BIT ->
+  Expr.WellTyped (G!A) DeltaA ThetaA e Expr.Typ.BIT ->
 
   (* Γ; D'; T' ⊢ C1 *)
   (* Γ; D'; T' ⊢ C2 *)
@@ -672,7 +672,7 @@ Inductive WellTyped :
               G D T e C1 C2 C' A,
 
   (* Γ[A]; ΔA; ΘA ⊢ e : BIT *)
-  Expr.WellTyped (ChorEnv.find A G) DeltaA ThetaA e Expr.BIT ->
+  Expr.WellTyped (ChorEnv.find A G) DeltaA ThetaA e Expr.Typ.BIT ->
 
   (* Γ; D'; T' ⊢ C1 *)
   (* Γ; D'; T' ⊢ C2 *)
