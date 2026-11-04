@@ -7,17 +7,27 @@ PYTHON_GENERATION_EXAMPLES := \
 	ConditionalTest \
 	DistributedGrover
 
+PYTHON ?= python3
+
 ocaml_module = $(shell printf '%s' '$1' | awk '{ if ($$0 ~ /^[A-Z]+$$/) print substr($$0, 1, 1) tolower(substr($$0, 2)); else print }')
 
-.PHONY: all clean clean-generated $(PYTHON_GENERATION_EXAMPLES) examples
+.PHONY: all clean clean-generated $(PYTHON_GENERATION_EXAMPLES) examples test-examples
 
-all: CoqMakefile
-	$(MAKE) -f CoqMakefile
+all: proofs
+	$(MAKE) examples
 
 examples: $(PYTHON_GENERATION_EXAMPLES)
+	$(PYTHON) -m compileall -q $(addprefix generated/,$(PYTHON_GENERATION_EXAMPLES))
 
 proofs: CoqMakefile
 	$(MAKE) -f CoqMakefile
+
+test-examples: all
+	$(PYTHON) test_examples/test_b92.py
+	$(PYTHON) test_examples/test_dqft.py
+	$(PYTHON) test_examples/test_unitary.py
+	$(PYTHON) test_examples/test_conditional.py
+	$(PYTHON) test_examples/test_grovers.py
 
 CoqMakefile: _CoqProject
 	rocq makefile -f _CoqProject -o CoqMakefile
