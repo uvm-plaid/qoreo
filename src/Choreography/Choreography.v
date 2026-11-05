@@ -63,22 +63,31 @@ Module Typ.
   Inductive t :=
   | Local : Actor.t -> Expr.Typ.t -> t
   | Unit : t
-  | Pair : t -> t -> t
+  | Tensor : t -> t -> t
   .
+
+  Fixpoint eqb (tp1 tp2 : t) : bool :=
+    match tp1, tp2 with
+    | Local A1 tp1', Local A2 tp2' =>
+      if Actor.eq_dec A1 A2
+      then Expr.Typ.eqb tp1' tp2'
+      else false
+    | Unit, Unit => true
+    | Tensor tp11 tp12, Tensor tp21 tp22 =>
+      eqb tp11 tp21 && eqb tp12 tp22
+    | _, _ => false
+    end.
 
   Fixpoint actors (typ : t) : Actor.FSet.t :=
     match typ with
     | Local A _ => Actor.FSet.singleton A
     | Unit => Actor.FSet.empty
-    | Pair typ1 typ2 => Actor.FSet.union (actors typ1) (actors typ2)
+    | Tensor typ1 typ2 => Actor.FSet.union (actors typ1) (actors typ2)
     end.
 End Typ.
 
-(* TODO: move to ChorEnv module *)
-Notation "T '!' A" := (ChorEnv.find A T)
-  (no associativity, at level 60).
+Open Scope qoreo_scope.
 Import List.ListNotations.
-
 
 Module Pattern.
   Inductive t :=
@@ -113,16 +122,16 @@ Module Pattern.
       | Pattern.Unit => false
       | Pattern.Pair p1 p2 => in_pat A x p1 || in_pat A x p2
       end.
-
     
     (* Assume v is a value of the same type as p *)
+  Import ChorEnv.Notation.
 
   Inductive WellTyped : ChorEnv.t Expr.Typ.t -> ChorEnv.t Expr.Typ.t -> t -> Typ.t -> Prop :=
   | WTVar : forall G D A x tau,
 
     ChorEnv.Empty G ->
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) D ->
-    Var.Map.Singleton x tau (D!A) ->
+    Var.Map.Singleton x tau (D!!A) ->
 
     WellTyped G D (Var A x) (Typ.Local A tau)
 
@@ -131,7 +140,7 @@ Module Pattern.
     x1 <> x2 ->
     ChorEnv.Empty G ->
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) D ->
-    Var.Map.Equal (D!A) (Var.Map.add x1 tau1 (Var.Map.singleton x2 tau2)) ->
+    Var.Map.Equal (D!!A) (Var.Map.add x1 tau1 (Var.Map.singleton x2 tau2)) ->
 
     WellTyped G D (VarPair A x1 x2) (Typ.Local A (Expr.Typ.Tensor tau1 tau2))
 
@@ -148,12 +157,12 @@ Module Pattern.
     ChorEnv.Partition D D1 D2 ->
     ChorEnv.Partition G G1 G2 ->
 
-    WellTyped G D (Pair p1 p2) (Typ.Pair tau1 tau2)
+    WellTyped G D (Pair p1 p2) (Typ.Tensor tau1 tau2)
 
   | WTBang : forall G D A x tau,
 
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) G ->
-    Var.Map.Singleton x tau (G!A) ->
+    Var.Map.Singleton x tau (G!!A) ->
     ChorEnv.Empty D ->
 
     WellTyped G D (Bang A x) (Typ.Local A (Expr.Typ.BANG tau))
@@ -438,14 +447,14 @@ Inductive multi_step : Choreography.t -> ChorEnv.t nat -> Config.t -> Choreograp
   multi_step e2 Theta2 cfg2 e3 Theta3 cfg3 ->
   multi_step e1 Theta1 cfg1 e3 Theta3 cfg3.
 
-
+Import ChorEnv.Notation.
 (** Typing Relation *)
 Inductive WellTyped :
   ChorEnv.t Expr.Typ.t -> ChorEnv.t Expr.Typ.t -> ChorEnv.t nat -> Choreography.t -> Typ.t -> Prop :=
 
 (*
 | WTVar : forall G D T A x (tau : Expr.Typ.t),
-  ~ Var.Map.In x (G!A) ->
+  ~ Var.Map.In x (G!!!A) ->
   ChorEnv.Equal D (Actor.Map.singleton A (Var.Map.singleton x tau)) ->
   ChorEnv.Empty T ->
 
@@ -466,7 +475,7 @@ Inductive WellTyped :
 
 | WTLoc : forall G D T A e tau,
 
-  Expr.WellTyped (G!A) (D!A) (T!A) e tau ->
+  Expr.WellTyped (G!!A) (D!!A) (T!!A) e tau ->
 
   ChorEnv.EmptyExcept (Actor.FSet.singleton A) D ->
   ChorEnv.EmptyExcept (Actor.FSet.singleton A) T ->
@@ -486,11 +495,11 @@ Inductive WellTyped :
   ChorEnv.Partition D D1 D2 ->
   ChorEnv.Partition T T1 T2 ->
 
-  WellTyped G D T (Pair C1 C2) (Typ.Pair tau1 tau2)
+  WellTyped G D T (Pair C1 C2) (Typ.Tensor tau1 tau2)
 
 | WTSend : forall G D T A e B tau,
 
-    Expr.WellTyped (G!A) (D!A) (T!A) e (Expr.Typ.BANG tau) ->
+    Expr.WellTyped (G!!A) (D!!A) (T!!A) e (Expr.Typ.BANG tau) ->
 
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) D ->
     ChorEnv.EmptyExcept (Actor.FSet.singleton A) T ->
@@ -502,11 +511,11 @@ Inductive WellTyped :
     ChorEnv.Empty D ->
     ChorEnv.Empty T ->
 
-    WellTyped G D T (Choreography.EPR A B) (Typ.Pair (Typ.Local A Expr.Typ.QUBIT) (Typ.Local B Expr.Typ.QUBIT))
+    WellTyped G D T (Choreography.EPR A B) (Typ.Tensor (Typ.Local A Expr.Typ.QUBIT) (Typ.Local B Expr.Typ.QUBIT))
 
 | WTIf : forall D' T' DeltaA ThetaA G D T A e C1 C2 tau,
 
-    Expr.WellTyped (G!A) DeltaA ThetaA e Expr.Typ.BIT ->
+    Expr.WellTyped (G!!A) DeltaA ThetaA e Expr.Typ.BIT ->
     WellTyped G D' T' C1 tau ->
     WellTyped G D' T' C2 tau ->
 

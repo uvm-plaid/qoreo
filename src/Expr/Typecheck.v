@@ -101,7 +101,7 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
               if
                 Var.Map.domain_eqb ltp2.(Df) ltp3.(Df) &&
                   Var.Map.domain_eqb ltp2.(Tf) ltp3.(Tf) &&
-                  typ_eq_dec ltp2.(tf) ltp3.(tf)                                              
+                  Typ.eqb ltp2.(tf) ltp3.(tf)                                              
               then Some ltp2 else None
           end
       | _ => None
@@ -140,7 +140,7 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
       | Some {| Df := D1; Tf := T1; tf := Lolli t1 t2 |} =>
           match typecheck G D1 T1 e2 with
           | Some {| Df := D2; Tf := T2; tf := t1' |} => 
-              if (typ_eq_dec t1 t1') then Some {| Df := D2; Tf := T2; tf := t2 |}
+              if (Typ.eqb t1 t1') then Some {| Df := D2; Tf := T2; tf := t2 |}
               else None
           | None => None
           end
@@ -167,7 +167,7 @@ Fixpoint typecheck (G D : Var.Map.t Typ.t) (T : Var.Map.t nat) (e : Expr.t) : op
             if
               Var.Map.domain_eqb D' D &&
                 Var.Map.domain_eqb T' T &&
-                typ_eq_dec t2' t2                                              
+                Typ.eqb t2' t2                                              
             then sltp else None
         end
   end.

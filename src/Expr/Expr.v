@@ -36,14 +36,13 @@ Module Typ.
   | _ => QUBIT
   end.
 
-
-  Fixpoint typ_eq_dec (t1 t2 : t) : bool :=
+  Fixpoint eqb (t1 t2 : t) : bool :=
     match t1,t2 with
     | BIT, BIT | QUBIT, QUBIT | Unit, Unit => true
-    | BANG t, BANG t' => typ_eq_dec t t'
+    | BANG t, BANG t' => eqb t t'
     | Tensor t1 t2, Tensor t1' t2'
     | Lolli t1 t2, Lolli t1' t2' =>
-        typ_eq_dec t1 t1' && typ_eq_dec t2 t2'
+        eqb t1 t1' && eqb t2 t2'
     | _,_ => false
     end.
 End Typ.

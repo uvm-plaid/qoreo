@@ -5,7 +5,7 @@ Import Expr.
 From Qoreo.Choreography Require Import Notation.
 From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
-(*From Qoreo.Choreography Require Typecheck.*)
+From Qoreo.Choreography Require Typecheck.
 
 Import List.ListNotations.
 Open Scope list_scope.
@@ -66,7 +66,7 @@ Module B92.
      and ai is her prepared bit.  Bob packages ((m1,~b1),(m2,~b2),(m3,~b3))
      where mi is his measurement result and ~bi is his inferred key bit.
      In each conclusive round (ri=1) the key bits agree: ai = ~bi. *)
-  Definition choreo  :=
+  Definition choreo :=
     LET (ad1 @ "alice", bd1@ "bob") ← b92_round "alice" "bob" ;;
     LET (ad2 @ "alice", bd2@ "bob") ← b92_round "alice" "bob" ;;
     LET (ad3 @ "alice", bd3@ "bob") ← b92_round "alice" "bob" ;;
@@ -74,14 +74,15 @@ Module B92.
         ("alice" [- Pair (Pair ad1 ad2) ad3 -])
         ("bob" [- Pair (Pair bd1 bd2) bd3 -]).
 
-  (*
+  
   Lemma b92_typecheck :
-    Typecheck.toplevel_typecheck ChorEnv.empty (mk choreo)
+    Typecheck.toplevel_typecheck ChorEnv.empty (run choreo)
     = Typecheck.success.
   Proof.
-    reflexivity.
-  Qed.
-  *)
+    compute.
+    (*reflexivity.*)
+  Abort.
+  
 
   Definition apps : option (list AppFile.t) :=
     Notation.render_Qoreo

@@ -71,7 +71,7 @@ Declare Scope example_scope.
       do x ← fresh A ;;
       ret (Choreography.Pattern.Var A x)
     | Choreography.Typ.Unit => ret (Choreography.Pattern.Unit)
-    | Choreography.Typ.Pair τ1 τ2 =>
+    | Choreography.Typ.Tensor τ1 τ2 =>
       do p1 ← freshC τ1 ;;
       do p2 ← freshC τ2 ;;
       ret (Choreography.Pattern.Pair p1 p2)

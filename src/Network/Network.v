@@ -51,7 +51,7 @@ Module Typ.
     | Choreography.Typ.Local B τ' =>
       if Actor.eq_dec A B then τ' else Expr.Typ.Unit
     | Choreography.Typ.Unit => Expr.Typ.Unit
-    | Choreography.Typ.Pair τ1 τ2 =>
+    | Choreography.Typ.Tensor τ1 τ2 =>
       Expr.Typ.Tensor (epp A τ1) (epp A τ2)
     end.
 
