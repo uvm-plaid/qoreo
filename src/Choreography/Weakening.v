@@ -3,6 +3,7 @@ From Qoreo.Expr Require Expr BaseProofs Weakening Preservation.
 From Qoreo.Choreography Require Import Choreography BaseProofs Lemmas.
 Import HelperLemmas.
 
+Import ChorEnv.Notation.
 
 
 (** * Proofs about well-typedness *)
@@ -14,9 +15,9 @@ Proof.
   induction HWT; ChorEnv.simplify.
   * ChorEnv.specialize_partition A.
     Var.Map.Tactics.reflect_partition.
-    Var.Map.Tactics.rewrite_map (D ! A).
-    Var.Map.Tactics.rewrite_map (D' ! A).
-    Var.Map.Tactics.rewrite_map (G' ! A).
+    Var.Map.Tactics.rewrite_map (D !! A).
+    Var.Map.Tactics.rewrite_map (D' !! A).
+    Var.Map.Tactics.rewrite_map (G' !! A).
     Var.simplify.
   * Actor.Map.Tactics.compare A A0.
     { (* A = A0 *)
@@ -25,17 +26,17 @@ Proof.
     { (* A <> A0 *)
       ChorEnv.specialize_with A.
       Actor.simplify.
-      assert (HD : Var.Map.Empty (D!A)) by auto.
+      assert (HD : Var.Map.Empty (D!!A)) by auto.
       apply Var.Map.Proofs.empty_map_equal in HD.
       rewrite HD.
       Var.simplify.
     }
   * ChorEnv.specialize_with A.
-    Var.Map.Tactics.rewrite_map (D!A).
+    Var.Map.Tactics.rewrite_map (D!!A).
     Var.simplify.
   * ChorEnv.specialize_partition A.
     Var.Map.Tactics.reflect_partition.
-    Var.Map.Tactics.rewrite_map (D ! A).
+    Var.Map.Tactics.rewrite_map (D!!A).
     Var.simplify.
   * Actor.Map.Tactics.compare A A0.
     { (* A = A0 *)
@@ -44,21 +45,21 @@ Proof.
     { (* A <> A0 *)
       ChorEnv.specialize_with A.
       Actor.simplify.
-      assert (HD : Var.Map.Empty (D!A)) by auto.
+      assert (HD : Var.Map.Empty (D!!A)) by auto.
       apply Var.Map.Proofs.empty_map_equal in HD.
       rewrite HD.
       Var.simplify.
     }
 
   * ChorEnv.specialize_with A.
-    Var.Map.Tactics.rewrite_map (D!A).
+    Var.Map.Tactics.rewrite_map (D!!A).
     Var.simplify.
   * Actor.Map.Tactics.compare A A0.
     { (* A = A0 *)
       ChorEnv.specialize_with A.
       ChorEnv.simplify.
       Var.Map.Tactics.reflect_partition.
-      Var.Map.Tactics.rewrite_map (D!A).
+      Var.Map.Tactics.rewrite_map (D!!A).
       Var.simplify.
       split; auto. 
 
@@ -67,7 +68,7 @@ Proof.
     { (* A <> A0 *)
       ChorEnv.specialize_with A.
       ChorEnv.simplify.
-      Var.Map.Tactics.rewrite_map (D!A).
+      Var.Map.Tactics.rewrite_map (D!!A).
       auto.
     }
 Qed.
@@ -275,7 +276,7 @@ Lemma weakening_gen : forall C G D T tau,
         ChorEnv.specialize_partition A.
         autorewrite with var_db in *.
         Var.Map.Tactics.reflect_partition.
-        Var.Map.Tactics.rewrite_map (D ! A).
+        Var.Map.Tactics.rewrite_map (D!!A).
         Var.simplify.
         
       + eapply IHHWT1.
@@ -285,7 +286,7 @@ Lemma weakening_gen : forall C G D T tau,
 
         (* Want: G0!A0 ⊥ D'!A0
           Know:
-            G0!A0 ⊥ D!A0
+            G0!A0 ⊥ D!!A0
             D = (A ↦ DeltaA) ++ D' ++ D''
           So:
             G0!A0 ⊥ D'!A0
@@ -295,7 +296,7 @@ Lemma weakening_gen : forall C G D T tau,
         ChorEnv.specialize_partition A0.
         Var.Map.Tactics.reflect_partition.
 
-        Var.Map.Tactics.rewrite_map (D!A0).
+        Var.Map.Tactics.rewrite_map (D!!A0).
         Var.Map.Tactics.rewrite_map (M0!A0).
         Var.simplify.
 
@@ -306,7 +307,7 @@ Lemma weakening_gen : forall C G D T tau,
 
         (* Want: G0!A0 ⊥ D'!A0
           Know:
-            G0!A0 ⊥ D!A0
+            G0!A0 ⊥ D!!A0
             D = (A ↦ DeltaA) ++ D' ++ D''
           So:
             G0!A0 ⊥ D'!A0
@@ -316,7 +317,7 @@ Lemma weakening_gen : forall C G D T tau,
         ChorEnv.specialize_partition A0.
         Var.Map.Tactics.reflect_partition.
 
-        Var.Map.Tactics.rewrite_map (D!A0).
+        Var.Map.Tactics.rewrite_map (D!!A0).
         Var.Map.Tactics.rewrite_map (M0!A0).
         Var.simplify.
 
@@ -327,7 +328,7 @@ Lemma weakening_gen : forall C G D T tau,
 
         (* Want: G0!A0 ⊥ D''!A0
           Know:
-            G0!A0 ⊥ D!A0
+            G0!A0 ⊥ D!!A0
             D = (A ↦ DeltaA) ++ D' ++ D''
           So:
             G0!A0 ⊥ D'!A0
@@ -337,7 +338,7 @@ Lemma weakening_gen : forall C G D T tau,
         ChorEnv.specialize_partition A0.
         Var.Map.Tactics.reflect_partition.
 
-        Var.Map.Tactics.rewrite_map (D!A0).
+        Var.Map.Tactics.rewrite_map (D!!A0).
         Var.Map.Tactics.rewrite_map (M0!A0).
         Var.simplify.
         *)

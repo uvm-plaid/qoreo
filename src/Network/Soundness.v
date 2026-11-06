@@ -14,7 +14,7 @@ Require Import Stdlib.Program.Equality.
 From Qoreo.Base Require Var Config ChorEnv.
 From Qoreo.Expr Require Expr.
 From Qoreo.Choreography Require Choreography.
-From Qoreo.Network Require Import Network.
+From Qoreo.Network Require Import Network Proofs.
 From Stdlib Require Import Morphisms (* for Proper *).
 
 Module Label := Choreography.Label.
@@ -27,9 +27,8 @@ Require Import Stdlib.Structures.Equalities.
 Import Actor.Map.Tactics.
 Import Choreography.
 
-
-Notation "T '!' A" := (ChorEnv.find A T)
-  (no associativity, at level 60).
+Import ChorEnv.Notation.
+Open Scope qoreo_scope.
 
 Lemma epp_in_pat : forall p x A,
     Pattern.in_pat x (Pattern.epp A p) 
@@ -37,6 +36,9 @@ Lemma epp_in_pat : forall p x A,
 Proof.
     induction p; intros x A; simpl; auto.
     * Actor.Map.Tactics.reduce_eq_dec; subst; auto.
+    * Actor.Map.Tactics.reduce_eq_dec; subst; simpl;
+        auto.
+      Var.Map.Tactics.reduce_eq_dec; subst; auto.
     * rewrite IHp1, IHp2; auto.
     * Actor.Map.Tactics.reduce_eq_dec; subst; auto.
 Qed.
@@ -100,7 +102,7 @@ Qed.
 
 Lemma soundness_local : forall C A refs cfg C' refs' cfg',
     Choreography.step C refs cfg (Label.Loc A) C' refs' cfg' ->
-    Process.step (epp A C) (Label.Internal (refs!A) cfg (refs'!A) cfg') (epp A C').
+    Process.step (epp A C) (Label.Internal (refs!!A) cfg (refs'!!A) cfg') (epp A C').
 Proof.
     intros ? ? ? ? ? ? ? Hstep.
     dependent induction Hstep; simpl.
@@ -130,11 +132,47 @@ Proof.
       ChorEnv.simplify.
       constructor; auto.
 Admitted.
-      
-    
 
+Lemma soundness_send : forall C A e B refs cfg C' refs' cfg',
+    Choreography.step C refs cfg (Choreography.Label.Send A e B) C' refs' cfg' ->
+    Process.step (epp A C) (Network.Label.Send e B) (epp A C').
+Proof.
+  intros ? ? ? ? ? ? ? ? ? Hstep.
+  dependent induction Hstep; simpl.
+  * apply Process.LetInC; auto.
+  * admit (* delay rule *).
+  * apply Process.PairC1; auto.
+  * apply Process.PairC2; auto.
+    apply epp_val; auto.
+  * Actor.Map.Tactics.reduce_eq_dec. 
+    Actor.Map.Tactics.reduce_eq_dec.
+    + (* self-send... *) admit.
+    + apply Process.SendB; auto.
+Admitted.
 
-Theorem soundness : forall C C' refs cfg refs' cfg' l,
+Lemma soundness_receive : forall C A e B refs cfg C' refs' cfg',
+    Choreography.step C refs cfg (Choreography.Label.Send A e B) C' refs' cfg' ->
+    Process.step (epp B C) (Network.Label.Receive A e) (epp B C').
+Proof.
+  intros ? ? ? ? ? ? ? ? ? Hstep.
+  dependent induction Hstep; simpl.
+  * apply Process.LetInC; auto.
+  * admit (* delay rule *).
+  * apply Process.PairC1; auto.
+  * apply Process.PairC2; auto.
+    apply epp_val; auto.
+  * Actor.simplify. 
+    + (* self-send... *) admit.
+    + apply Process.ReceiveB; auto.
+Admitted.  
+
+Lemma epp_not_in_eq : forall C refs cfg l C' refs' cfg' A,
+  Choreography.step C refs cfg l C' refs' cfg' ->
+  ~ Actor.FSet.In A (Choreography.Label.actors l) ->
+  epp A C' = epp A C.
+Admitted.
+
+Theorem soundness : forall l C C' refs cfg refs' cfg',
     Choreography.step C refs cfg l C' refs' cfg' ->
     forall N,
       (forall D, Actor.FSet.In D (Choreography.Label.actors l) -> Actor.Map.In D N) ->
@@ -142,4 +180,24 @@ Theorem soundness : forall C C' refs cfg refs' cfg' l,
     exists N', Network.step N refs cfg l N' refs' cfg'
               /\ EPP_N C'  N'.
 Proof.
+  destruct l as [A e B | | | | ]; intros.
+  * (* Send *)
+    exists (Actor.Map.add A (epp A C') (Actor.Map.add B (epp B C') N)).
+    split.
+    2:{
+      apply Network.Proofs.EPP_N_spec.
+      intros D PD HD.
+      Actor.simplify.
+      destruct HD as [[? ?] | HD]; subst; auto.
+      destruct HD as [? [[? ?] | [? HD]]]; subst; auto.
+      erewrite epp_not_in_eq; eauto.
+      2:{ simpl. Actor.simplify. }
+      rewrite Network.Proofs.EPP_N_spec in H1.
+      apply H1; auto.
+    }
+    eapply Network.Send.
+    4:{ eapply soundness_send; eauto. }
+    4:{ eapply soundness_receive; eauto. }
+    4:{ reflexivity. }
+
 Admitted.

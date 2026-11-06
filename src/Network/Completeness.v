@@ -27,10 +27,7 @@ Require Import Stdlib.Structures.Equalities.
 Import Actor.Map.Tactics.
 From Qoreo.Network Require Import Proofs.
 
-
-
-Notation "T '!' A" := (ChorEnv.find A T)
-  (no associativity, at level 60).
+Import ChorEnv.Notation.
 
 From Qoreo.Network Require Import Soundness.
 
@@ -38,7 +35,7 @@ Lemma step_epp_eq : forall C T ρ l C' T' ρ',
     Choreography.step C T ρ l C' T' ρ' ->
     forall A,
     ~ Actor.FSet.In A (Label.actors l) ->
-    epp A C' = epp A C (* /\ Var.Map.Equal (T'!A) (T!A).*).
+    epp A C' = epp A C (* /\ Var.Map.Equal (T'!!A) (T!!A).*).
 Proof.
     intros ? ? ? ? ? ? ? Hstep.
     induction Hstep; intros A0 HA0;
@@ -81,7 +78,7 @@ Lemma completeness_local : forall G D T C tau,
     Choreography.WellTyped G D T C tau ->
     forall Θ ρ Θ' ρ' P' A,
     Process.step (epp A C) (Label.Internal Θ ρ Θ' ρ') P' ->
-    Var.Map.Equal (T ! A) Θ ->
+    Var.Map.Equal (T !! A) Θ ->
     ChorEnv.WellScoped T ρ ->
 
     (* one of two options: *)

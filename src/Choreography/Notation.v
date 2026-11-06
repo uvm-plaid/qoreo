@@ -162,6 +162,10 @@ Declare Scope example_scope.
   Definition send A (e : Expr.t) B : Qoreo Choreography.t :=
     ret (Choreography.Send A e B).
 
+  Definition cif A e (C1 C2 : Qoreo Choreography.t) : Qoreo Choreography.t :=
+    do c1 ← C1 ;;
+    do c2 ← C2 ;;
+    ret (Choreography.If A e c1 c2).
 
   (*
   (** Conditionally apply X gate based on classical bit [e]. *)
