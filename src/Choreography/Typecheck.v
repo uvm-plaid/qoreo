@@ -23,12 +23,6 @@ Module Env.
     else None.
 
 
-  Definition addGf (A : Actor.t) (x : Var.t) (tp : Expr.Typ.t) (g : ltap) :=
-    {|
-      Df := Df g;
-      Tf := Tf g;
-      tf := tf g
-    |}.
   Definition addDf (A : Actor.t) (x : Var.t) (tp : Expr.Typ.t) (g : ltap) :=
     {|
       Df := ChorEnv.add A x tp (Df g);
@@ -70,9 +64,12 @@ Module Pattern.
     | Pattern.VarPair A x1 x2,
       Typ.Local A' (Expr.Typ.Tensor tp1 tp2) =>
       if Actor.eq_dec A A'
-      then Some (ChorEnv.empty, ChorEnv.add A x2 tp2
-                               (ChorEnv.add A x1 tp1
-                               ChorEnv.empty))
+      then if Var.eq_dec x1 x2
+      then None
+      else Some (ChorEnv.empty,
+                  ChorEnv.add A x2 tp2
+                  (ChorEnv.add A x1 tp1
+                  ChorEnv.empty))
       else None
     | Pattern.Unit, Typ.Unit =>
       Some (ChorEnv.empty, ChorEnv.empty)
@@ -149,7 +146,7 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
                Expr.Typecheck.tf := t|} =>
         Some {| Df := Actor.Map.add A Delta D;
                 Tf := Actor.Map.add A Theta T;
-                tf := Typ.Local B t
+                tf := Typ.Local B (Expr.Typ.BANG t)
             |}
       | None => None
     end

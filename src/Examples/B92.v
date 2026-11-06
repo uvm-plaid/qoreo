@@ -79,9 +79,8 @@ Module B92.
     Typecheck.toplevel_typecheck ChorEnv.empty (run choreo)
     = Typecheck.success.
   Proof.
-    compute.
-    (*reflexivity.*)
-  Abort.
+    reflexivity.
+  Qed.
   
 
   Definition apps : option (list AppFile.t) :=
