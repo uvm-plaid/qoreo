@@ -24,11 +24,10 @@ Declare Scope example_scope.
 
 (** [state] tracks variable ownership and the choreography being constructed.
     - [vars]: Maps variables to their owning actors
-    - [chor]: List of choreography instructions *)
+*)
   Record state :=
   {
     vars : Var.Map.t Actor.t;
-    chor : Choreography.t
   }.
 
   (** Expressions of type Qoreo A construct a choreography under the hood *)
@@ -40,113 +39,146 @@ Declare Scope example_scope.
       let (s', a) := m s in
       f a s'.
 
-  (** Notation for monadic sequencing (similar to Haskell's do-notation). *)
-  Notation "'do' x '←' m ';;' e" := (bind m (fun x => e))
-      (right associativity, at level 90) : example_scope.
-  Notation "'do' ( x , y ) '←' m ';;' e" := (bind m (fun z => let (x,y) := z in e))
-      (right associativity, at level 90) : example_scope.
 
   Definition empty_state : state :=
   {|
-    vars := Var.Map.empty _;
-    chor := Choreography.Empty
+    vars := Var.Map.empty _
   |}.
 
   (** Extract the underlying choreography from a monadic computation. *)
-  Definition mk {T} (m : Qoreo T) : Choreography.t :=
-    let (st, _) := m empty_state in 
-    chor st.
+  Definition run {T} (m : Qoreo T) : T :=
+    let (st, v) := m empty_state in 
+    v.
 
   (** Allocate a fresh variable and map it to the actor [A] in the underlying state. *)
   Definition fresh A : Qoreo Var.t :=
     fun s =>
       let x := Var.fresh (vars s) in
-      let s' := {|
-        vars := Var.Map.add x A (vars s);
-        chor := chor s
-      |} in
+      let s' := {| vars := Var.Map.add x A (vars s); |} in
       (s', x).
 
-  (* TODO: move to Choreography module *)
-  Definition snoc C I :=
-    Choreography.seq C (Choreography.Do I Choreography.Empty).
-
-  (** Append instruction [I] to the choreography in the current state *)
-  Definition add_insn (I : Choreography.Insn.t) : Qoreo unit :=
-    fun s =>
-      let s' := {|
-        vars := vars s;
-        chor := snoc (chor s) I
-      |} in
-      (s', tt).
-
+    
+  (** Notation for monadic sequencing (similar to Haskell's do-notation). *)
+  Notation "'do' x '←' m ';;' e" := (bind m (fun x => e))
+      (right associativity, at level 90) : example_scope.
+  Notation "'do' ( x , y ) '←' m ';;' e" := (bind m (fun z => let (x,y) := z in e))
+      (right associativity, at level 90) : example_scope.
   Open Scope example_scope.
+
+  Fixpoint freshC (τ : Choreography.Typ.t) : Qoreo Choreography.Pattern.t :=
+    match τ with
+    | Choreography.Typ.Local A _ =>
+      do x ← fresh A ;;
+      ret (Choreography.Pattern.Var A x)
+    | Choreography.Typ.Unit => ret (Choreography.Pattern.Unit)
+    | Choreography.Typ.Tensor τ1 τ2 =>
+      do p1 ← freshC τ1 ;;
+      do p2 ← freshC τ2 ;;
+      ret (Choreography.Pattern.Pair p1 p2)
+    end.
+
+  Definition letin (A : Actor.t)
+                   (m : Qoreo Choreography.t)
+                   (f : Var.t -> Qoreo Choreography.t)
+                   : Qoreo Choreography.t :=
+    do C ← m ;;
+    do x ← fresh A ;;
+    do C' ← f x ;;
+    ret (Choreography.LetIn (Choreography.Pattern.Var A x) C C').
+
+  Definition letbang (A : Actor.t)
+                   (m : Qoreo Choreography.t)
+                   (f : Var.t -> Qoreo Choreography.t)
+                   : Qoreo Choreography.t :=
+    do C ← m ;;
+    do x ← fresh A ;;
+    do C' ← f x ;;
+    ret (Choreography.LetIn (Choreography.Pattern.Bang A x) C C').
+
+  Definition letpair (A1 A2 : Actor.t)
+                   (m : Qoreo Choreography.t)
+                   (f : Var.t -> Var.t -> Qoreo Choreography.t)
+                   : Qoreo Choreography.t :=
+    do C ← m ;;
+    do x1 ← fresh A1 ;;
+    do x2 ← fresh A2 ;;
+    do C' ← f x1 x2 ;;
+    let p := Choreography.Pattern.Pair
+                (Choreography.Pattern.Var A1 x1)
+                (Choreography.Pattern.Var A2 x2) in
+    ret (Choreography.LetIn p C C').
+  Definition letlocpair (A : Actor.t)
+                   (m : Qoreo Choreography.t)
+                   (f : Var.t -> Var.t -> Qoreo Choreography.t)
+                   : Qoreo Choreography.t :=
+    do C ← m ;;
+    do x1 ← fresh A ;;
+    do x2 ← fresh A ;;
+    do C' ← f x1 x2 ;;
+    let p := Choreography.Pattern.VarPair A x1 x2 in
+    ret (Choreography.LetIn p C C').
+
+  (** Notation for monadic sequencing (similar to Haskell's do-notation). *)
+  Notation "'LET' x '@' A '←' m ';;' e" := (letin A m (fun x => e))
+      (right associativity, at level 90) : example_scope.
+  Notation "'LET!' x '@' A '←' m ';;' e" := (letbang A m (fun x => e))
+      (right associativity, at level 90) : example_scope.
+  (* TODO: support this operation?? *)
+  Notation "'LET' '(' x '@' A ',' y '@' B ')' '←' m ';;' e" := (letpair A B m (fun x y => e))
+      (right associativity, at level 90) : example_scope.
+    
+  Notation "'LET@' '(' x ',' y ')' '@' A '←' m ';;' e" := (letlocpair A m (fun x y => e))
+      (right associativity, at level 90) : example_scope.
+
 
   (** ** Quantum Operations: constructs common quantum protocol operations. *)
 
   (** Create an entangled pair (EPR pair) between actors [A] and [B]. *)
-  Definition get_entangled_pair (A B : Actor.t) : Qoreo (Var.t * Var.t) :=
-    do xA ← fresh A ;;
-    do xB ← fresh B ;;
-    do _  ← add_insn (Choreography.Insn.EPR A xA B xB) ;;
-    ret (xA, xB).
+  Definition get_entangled_pair (A B : Actor.t) : Qoreo Choreography.t :=
+    ret (Choreography.EPR A B).
+
+  (** Bind the expression [e] to a fresh variable [x] at [A], and return [x]. *)
+  Definition local A e : Qoreo Choreography.t :=
+    ret (Choreography.Loc A e).
 
   (** Create a new qubit initialized to |0⟩ owned by [A]. *)
-  Definition new (A : Actor.t) : Qoreo Var.t :=
-    do q ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.Let A q (New (Bit false))) ;;
-    ret q.
+  Definition new (A : Actor.t) : Qoreo Choreography.t :=
+    local A (New (Bit false)).
   
   Coercion Var : Var.t >-> Expr.t.
 
-  (** Bind the expression [e] to a fresh variable [x] at [A], and return [x]. *)
-  Definition local A e : Qoreo Var.t :=
-    do q ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.Let A q e);;
-    ret q.
-
-   (** Bind the expression [e] to the tuple [(x1,x2)] of fresh variables at [A], and return [(x1,x2)]. *)
-  Definition localPair A e : Qoreo (Var.t * Var.t) :=
-    do x1 ← fresh A ;;
-    do x2 ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.LetPair A x1 x2 e);;
-    ret (x1, x2).
-
-
-  (** Bind the expression [e] to !x , and return x *)
-  Definition localBang A e : Qoreo Var.t :=
-    do x ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.LetBang A x e);;
-    ret x.
-
   (** Measure qubit [q] owned by [A] in the computational basis. *)
-  Definition meas (A : Actor.t) (q : Var.t) : Qoreo Var.t :=
-    do x ← fresh A ;;
-    do _ ← add_insn (Choreography.Insn.Let A x (Meas (Var q)));;
-    ret x.
+  Definition meas (A : Actor.t) (q : Expr.t) : Qoreo Choreography.t :=
+    local A (Meas q).
+
+  Open Scope example_scope.
+
+  Definition pair A1 A2 (C1 : Qoreo Choreography.t) (C2 : Qoreo Choreography.t) : Qoreo Choreography.t :=
+    LET x1 @ A1 ← C1 ;;
+    LET x2 @ A2 ← C2 ;;
+    ret (Choreography.Pair (Choreography.Loc A1 x1) (Choreography.Loc A2 x2)).
 
   (** Send quantum data from actor [A] to actor [B]. *)
-  Definition send A (e : Expr.t) B : Qoreo Var.t :=
-    do x ← fresh B;;
-    do _ ← add_insn (Choreography.Insn.Send A e B x);;
-    ret x.
+  Definition send A (e : Expr.t) B : Qoreo Choreography.t :=
+    ret (Choreography.Send A e B).
 
+  Definition cif A e (C1 C2 : Qoreo Choreography.t) : Qoreo Choreography.t :=
+    do c1 ← C1 ;;
+    do c2 ← C2 ;;
+    ret (Choreography.If A e c1 c2).
+
+  (*
   (** Conditionally apply X gate based on classical bit [e]. *)
   Definition if_X A (e : Expr.t) (q : Var.t) : Qoreo unit :=
     add_insn (Choreography.Insn.Let A q (Expr.If e (Unitary X q) q)).
   (** Conditionally apply Z gate based on classical bit [e]. *)
   Definition if_Z A (e : Expr.t) (q : Var.t) : Qoreo unit :=
     add_insn (Choreography.Insn.Let A q (Expr.If e (Unitary Z q) q)).
+  *)
 
   (** Convenient notations for local quantum operations. *)
   Notation "A '[-' e '-]'" :=
     (local A e)
-    (no associativity, at level 50) : example_scope.
-  Notation "A '[--' e '-]'" :=
-    (localPair A e)
-    (no associativity, at level 50) : example_scope.
-  Notation "A '[!-' e '-]'" :=
-    (localBang A e)
     (no associativity, at level 50) : example_scope.
 
 
@@ -154,11 +186,10 @@ Declare Scope example_scope.
 
 
 Import Actor.Map.
-Require Import Lia.
 
 
 Definition singleton {T} x (tau : T) := Var.Map.add x tau (Var.Map.empty T).
-Lemma wtqvar : forall x (τ : Typ.t),
+Lemma wtqvar : forall x (τ : Expr.Typ.t),
   Expr.WellTyped (Var.Map.empty _) (Var.Map.add x τ (Var.Map.empty _)) (Var.Map.empty _) (Expr.Var x) τ.
 Proof.
   intros. econstructor; eauto; Var.simplify.
@@ -206,29 +237,20 @@ Ltac right_associate A :=
 
 
   (** Send a qubit from Alice to Bob via teleportation. *)
-  Definition teleport (Alice Bob : Actor.t) (q : Var.t) : Qoreo Var.t :=
-    do (a, b) ← get_entangled_pair Alice Bob ;;
-    do (q, a) ← Alice [-- Unitary CNOT (Pair q a) -] ;;
-    do q      ← Alice [- Unitary H q -] ;;
-    do z      ← Alice [- Meas q -] ;;
-    do x      ← Alice [- Meas a -] ;;
-    do z      ← send Alice z Bob ;;
-    do x      ← send Alice x Bob ;;
-    do b      ← Bob [- Expr.If z (Unitary Z b) b -] ;;
-    do b      ← Bob [- Expr.If x (Unitary X b) b -] ;;
-    ret b.
+  Definition teleport (Alice Bob : Actor.t) (q : Var.t) : Qoreo Choreography.t :=
+    LET (a @ Alice, b @ Bob)   ← get_entangled_pair Alice Bob ;;
+    LET@ (q, a) @Alice ← Alice [- Unitary CNOT (Pair q a) -] ;;
+    LET  q @ Alice ← Alice [- Unitary H q -] ;;
+    LET! z @ Alice ← Alice [- Meas q -] ;;
+    LET! x @ Alice ← Alice [- Meas a -] ;;
+    LET! z @ Bob   ← send Alice (Expr.Bang z) Bob ;;
+    LET! x @ Bob   ← send Alice (Expr.Bang x) Bob ;;
+    LET  b @ Bob   ← Bob [- Expr.If z (Unitary Z b) b -] ;;
+    Bob [- Expr.If x (Unitary X b) b -].
 
 
-Definition render_Qoreo (b : Backend) (ps : list Actor.t)
-                        (M : Qoreo (list Var.t)) 
+Definition render_Qoreo (b : Backend)
+                        (M : Qoreo Choreography.t) 
   : option (list AppFile.t) :=
-  let (st, xs) := M empty_state in
-  let f := fun (env : Actor.Map.t (list Var.t)) (p : Actor.t) =>
-    Actor.Map.add p (epp_vars p (vars st) xs) env
-  in
-  let env_map : Actor.Map.t (list Var.t) :=
-      List.fold_left f ps (Actor.Map.empty _)
-  in
-  NetQasm.render_parties b (chor st)
-          ps
-          env_map.
+  let C := run M in
+  NetQasm.render_parties b C (Actor.FSet.elements (Choreography.actors C)).

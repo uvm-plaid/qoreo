@@ -1,5 +1,5 @@
 From Qoreo.Base Require Import Map.
-From Stdlib Require Import PeanoNat.
+From Stdlib Require Import ZArith.
 From Stdlib Require Import Lia. (* lia *)
 
 
@@ -145,20 +145,20 @@ Create HintDb var_db.
 
   Lemma fresh_add : forall T (m : Var.Map.t T) x v,
     ~ Var.Map.In x m ->
-    Var.fresh (Var.Map.add x v m) = max (x+1) (Var.fresh m).
+    Var.fresh (Var.Map.add x v m) = Nat.max (x+1)%nat (Var.fresh m).
   Proof.
     intros.
     unfold Var.fresh.
     rewrite Var.Map.Properties.fold_add; auto.
     
     + fold (Var.fresh m).
-      destruct (PeanoNat.Nat.leb (Var.fresh m) x) eqn:Hleb.
-      - apply PeanoNat.Nat.leb_le in Hleb.
-        rewrite max_l; auto.
+      destruct (Nat.leb (Var.fresh m) x) eqn:Hleb.
+      - apply Nat.leb_le in Hleb.
+        rewrite Nat.max_l; auto.
         lia.
 
-      - rewrite PeanoNat.Nat.leb_nle in Hleb.
-        rewrite max_r; auto.
+      - rewrite Nat.leb_nle in Hleb.
+        rewrite Nat.max_r; auto.
         lia.
 
     + clear m x v H.
@@ -166,16 +166,16 @@ Create HintDb var_db.
     + clear m x v H.
       intros z1 z2 v1 v2 w Hneq.
       repeat match goal with
-      | [ H : context[PeanoNat.Nat.leb ?x ?y] |- _ ] =>
+      | [ H : context[Nat.leb ?x ?y] |- _ ] =>
         let H := fresh "H" in
-        destruct (PeanoNat.Nat.leb x y) eqn:H;
-        try rewrite PeanoNat.Nat.leb_le in *;
-        try rewrite PeanoNat.Nat.leb_nle in *
-      | [ |- context[PeanoNat.Nat.leb ?x ?y] ] =>
+        destruct (Nat.leb x y) eqn:H;
+        try rewrite Nat.leb_le in *;
+        try rewrite Nat.leb_nle in *
+      | [ |- context[Nat.leb ?x ?y] ] =>
         let H := fresh "H" in
-        destruct (PeanoNat.Nat.leb x y) eqn:H;
-        try rewrite PeanoNat.Nat.leb_le in *;
-        try rewrite PeanoNat.Nat.leb_nle in *
+        destruct (Nat.leb x y) eqn:H;
+        try rewrite Nat.leb_le in *;
+        try rewrite Nat.leb_nle in *
       end;
       try lia.
   Qed.

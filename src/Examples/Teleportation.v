@@ -13,14 +13,13 @@ Open Scope example_scope.
 Definition fresh_in_teleport q := q = 10%nat.
 
 About teleport.
-Definition teleport_measure : Qoreo unit :=
-  do q ← "alice" [- New (Bit false) -] ;;
-  do q ← teleport "alice" "bob" q ;;
-  do _ ← "bob" [!- Meas q -] ;;
-  ret tt.
+Definition teleport_measure : Qoreo Choreography.t :=
+  LET q @ "alice" ← "alice" [- New (Bit false) -] ;;
+  LET q @ "bob" ← teleport "alice" "bob" q ;;
+  "bob" [- Meas q -].
 
 Lemma typecheck_teleport_measure :
-    Typecheck.toplevel_typecheck ChorEnv.empty (mk teleport_measure)
+    Typecheck.toplevel_typecheck ChorEnv.empty (run teleport_measure)
     = Typecheck.success.
 Proof.
   reflexivity.
@@ -195,39 +194,6 @@ Qed.
 
 Import List.ListNotations.
 
-Definition choreo : Qoreo (list Var.t) :=
-    do q ← "alice" [- Unitary H (New (Bit false))-] ;;
-    do q ← teleport "alice" "bob" q ;;
-    ret [q].
-
-
-Eval compute in (mk choreo).
-
-Eval compute in (Network.epp "alice" (mk choreo)).
-(*
-  do q ← Unitary H (New (Bit false)) ;;
-  do a ← establish_entanglement Bob ;;
-  do (q,a) ← Unitary CNOT (q,a) ;;
-  do q ← unitary H q ;;
-  do x ← Meas q ;;
-  do z ← Meas a ;;
-  do _ ← Send Bob x ;;
-  Send Bob z
-*)
-
-
-Eval compute in (Network.epp "bob" (mk choreo)).
-(*
-  do b ← establish_entanglement Alice ;;
-  do x ← Receive Alice ;;
-  do z ← Receive Alice ;;
-  do b ← If z (Unitary Z b) b ;;
-  If x (Unitary X b) b
-*)
-
-
-Eval compute in (Network.epp "bob" (mk choreo)).
-
 Import List.ListNotations.
 Definition parties : list Actor.t :=
   ["alice"; "bob"].
@@ -237,7 +203,7 @@ From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
 
 Definition apps : option (list AppFile.t) :=
-    Notation.render_Qoreo NetQASM parties choreo.
+    Notation.render_Qoreo NetQASM teleport_measure.
 
 Extraction Language OCaml.
 Set Extraction Output Directory "extracted".

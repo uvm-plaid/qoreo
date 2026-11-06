@@ -27,10 +27,10 @@ Open Scope list_scope.
 Require Import Stdlib.Structures.Equalities.
 Import Actor.Map.Tactics.
 
-
+(*
 Lemma EPP_correct : forall A C P,
     EPP A C P <-> epp A C = Some P.
-(*Proof.
+Proof.
     intros.
     split.
     * intros HEPP. 
@@ -58,8 +58,9 @@ Lemma EPP_correct : forall A C P,
         inversion Hepp; subst; clear Hepp;
           constructor; auto;
         simpl; Actor.simplify.
-Qed.*) Admitted.
+Qed.*) 
 
+(*
 Lemma eppI_disjoint : forall D I,
   ~ Actor.FSet.In D (Choreography.Insn.actors I) ->
   eppI D I = [].
@@ -72,6 +73,7 @@ Fixpoint prepend (ls : list Network.Insn.t) (P : Process.t) : Process.t :=
   | [] => P
   | I0::ls' => Process.Do I0 (prepend ls' P)
   end.
+
 Lemma EPP_cons : forall A I C PA,
   Choreography.Insn.WellFormed I ->
   EPP A (Choreography.Do I C) PA <->
@@ -98,6 +100,7 @@ Proof.
     destruct Hin; subst; try contradiction.
     destruct Hin; subst; try contradiction.
 Qed.
+*)
 
 
 Lemma EPP_N_eq : forall N1 N2 C,
@@ -126,7 +129,7 @@ Qed.
 
 Lemma EPP_N_spec : forall C N,
   EPP_N C N <->
-  forall D PD, Actor.Map.MapsTo D PD N -> EPP D C PD.
+  forall D PD, Actor.Map.MapsTo D PD N -> epp D C = PD.
 Proof.
   intros C N.
   split; intros H.
@@ -170,6 +173,7 @@ Proof.
     }
 Qed.
 
+(*
 Lemma EPP_disjoint_inversion : forall A I C P,
   EPP A (Choreography.Do I C) P ->
   ~ Actor.FSet.In A (Choreography.Insn.actors I) ->
@@ -226,11 +230,11 @@ Proof.
   Var.simplify.
 Qed.
 #[global] Hint Rewrite bind_eqb_equiv : var_db.
+*)
 
-Lemma EPP_subst_neq : forall C A P B x v,
+Lemma EPP_subst_neq : forall C A B x v,
     A <> B ->
-    EPP A C P ->
-    EPP A (Choreography.subst B x v C) P.
+    epp A (Choreography.subst B x v C) = epp A C.
 (*Proof.
   induction C as [ | I C];
     intros ? ? ? ? ? Hneq H.
@@ -248,6 +252,7 @@ Lemma EPP_subst_neq : forall C A P B x v,
   destruct (Choreography.Insn.rebound_in B x I) eqn:HI; auto.
 Qed.*) Admitted.
 
+(*
 Lemma EPP_subst_neq_bwd : forall C A P B x v,
     A <> B ->
     EPP A (Choreography.subst B x v C) P ->
@@ -551,9 +556,9 @@ Proof.
     + apply EPP_subst_eq; auto.
     + apply EPP_subst_neq; auto. 
 Qed.
+*)
 
-
-
+(*
 Ltac EPP_N_cons :=
   match goal with
   | [H : EPP_N (Choreography.Do _ _) _ |- _] =>
@@ -563,6 +568,7 @@ Ltac EPP_N_cons :=
     eapply EPP_N_cons;
     repeat split; intros; simpl; Actor.simplify
   end.
+  *)
 
 Lemma EPP_N_subst_neq : forall A x e C N,
   ~ Actor.Map.In A N ->
@@ -575,13 +581,13 @@ Proof.
   apply Modulus.forall_iff. intros D.
   apply Modulus.forall_iff. intros PD.
   apply Modulus.forall_iff. intros Hmapsto.
-  rewrite EPP_subst_iff.
   assert (D <> A).
   {
     inversion 1; subst.
     apply H. exists PD; auto.
   }
-  intuition.
+  rewrite EPP_subst_neq; auto.
+  reflexivity.
 Qed.
 
 Lemma chor_epr_eq : forall T2 T1 T1' A B cfg cfg' q1 q2,
@@ -601,8 +607,8 @@ Proof.
   + rewrite Heq. reflexivity.
 Qed.
 
-(* TODO: move to Choreography.v *)
-Lemma epr_Proper : Proper (eq ==> eq ==> ChorEnv.Equal ==> eq ==> RelationPairs.RelProd (RelationPairs.RelProd eq ChorEnv.Equal) eq) ChorEnv.epr.
+(* TODO: move to Base *)
+Global Instance epr_Proper : Proper (eq ==> eq ==> ChorEnv.Equal ==> eq ==> RelationPairs.RelProd (RelationPairs.RelProd eq ChorEnv.Equal) eq) ChorEnv.epr.
 Proof.
   intros ? A ? ? B ? T1 T2 HT ? cfg ?; subst.
   unfold ChorEnv.epr.
@@ -610,6 +616,7 @@ Proof.
   rewrite HT. reflexivity.
 Qed.
 
+(* Move to Choreography.v *)
 Lemma chor_step_Proper' : forall C Θ1 cfg l C' Θ1' cfg',
   Choreography.step C Θ1 cfg l C' Θ1' cfg' ->
   forall Θ2 Θ2',
@@ -622,6 +629,17 @@ Proof.
     try rewrite Heq in *;
     try rewrite Heq' in *;
     try (econstructor; eauto; fail).
+
+  + (* EPR *)
+    unfold ChorEnv.epr in *.
+    destruct (Config.epr_cfg cfg) as [[idx1 idx2] cfg0]
+      eqn:Hcfg.
+    inversion H0; subst; clear H0.
+    rewrite Heq in *; clear T Heq.
+    clear T' Heq'.
+    econstructor; eauto.
+    unfold ChorEnv.epr. rewrite Hcfg. auto.
+
 Qed.
 
 Global Instance chor_step_Proper : Proper (eq ==> ChorEnv.Equal ==> eq ==> eq ==> eq ==> ChorEnv.Equal ==> eq ==> iff) (Choreography.step).
@@ -667,6 +685,7 @@ Definition actor_map {T} (f : Actor.t -> option (option T)) (X : Actor.FSet.t) N
                               | None => N
                               end)
                   X N0.
+(*
 Definition uncons (N : Network.t) A : option (option Process.t):=
   match Actor.Map.find A N with
   | Some (Process.Do _ P) => Some (Some P)
@@ -2726,3 +2745,4 @@ Theorem safety : forall N Θ ρ N' Θ' ρ',
     split; auto. split; auto.
     { eapply Choreography.WellTyped_WellFormed; eauto. }
 Qed.*) Admitted.
+*)

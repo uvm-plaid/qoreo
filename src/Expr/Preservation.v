@@ -145,6 +145,25 @@ Proof.
     + eauto.
     + Var.simplify.
 
+  * (* LetUnitC *)
+    Var.simplify.
+
+    (* refs = refs1 + refs2 = Θ1 + Θ2 + refs2 *)
+    (* e1 / refs -> e1' / refs' *)
+    (* Θ1 |- e1 : τ0 *)
+    (* IH: e1 / Θ1 -> e1' / Θ1'  and refs' = Θ1' + Θ2 + refs2 *)
+    edestruct (IHHstep Θ1 (Var.Map.concat Θ2 refs2))
+      as [Θ1' [IH Hpart']]; eauto; Var.simplify.
+    (* By weakening:
+       e1 / refs1 -> e1' / refs1'  where refs1' = Θ1' + Θ2
+    *)
+    exists (Var.Map.concat Θ1' Θ2).
+    reflect_partition.
+    split; Var.simplify.
+    eapply cfg_weakening_1.
+    { apply LetUnitC; eauto. }
+    all:Var.simplify.
+
   * (* PairC1 *)
     Var.simplify.
 
@@ -424,6 +443,18 @@ Proof.
       Var.simplify.
       destruct b; auto.
 
+  * (* LetUnit *)
+    Var.simplify.
+    inversion Hstep; subst; clear Hstep.
+    + cfg_weakening_tac.
+      econstructor; eauto with var_db.
+      reflect_partition; Var.simplify.
+      eapply IHHWT1; eauto with var_db.      
+
+    + inversion HWT1; subst; clear HWT1.
+      rewrite H2; clear Θ' H2.
+      Var.simplify.
+
   * (* Pair *)
     Var.simplify.
     inversion Hstep; subst; clear Hstep.
@@ -580,7 +611,8 @@ Lemma WellScoped_preservation : forall e Θ ρ e' Θ' ρ',
   Config.WellScoped Θ' ρ'.
 Proof.
   intros ? ? ? ? ? ? Hstep.
-  induction Hstep; intros HWS; auto; Var.simplify.
+  induction Hstep; intros HWS; auto; Var.simplify;
+    subst; auto.
   * (* new *)
     inversion H; subst; clear H.
     destruct HWS.

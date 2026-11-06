@@ -25,6 +25,7 @@ Module Typ.
 
   Inductive t :=
   | BIT | QUBIT
+  | Unit : t
   | Tensor : t -> t -> t
   | Lolli : t -> t -> t
   | BANG : t -> t.
@@ -35,14 +36,13 @@ Module Typ.
   | _ => QUBIT
   end.
 
-
-  Fixpoint typ_eq_dec (t1 t2 : t) : bool :=
+  Fixpoint eqb (t1 t2 : t) : bool :=
     match t1,t2 with
-    | BIT, BIT | QUBIT, QUBIT => true
-    | BANG t, BANG t' => typ_eq_dec t t'
+    | BIT, BIT | QUBIT, QUBIT | Unit, Unit => true
+    | BANG t, BANG t' => eqb t t'
     | Tensor t1 t2, Tensor t1' t2'
     | Lolli t1 t2, Lolli t1' t2' =>
-        typ_eq_dec t1 t1' && typ_eq_dec t2 t2'
+        eqb t1 t1' && eqb t2 t2'
     | _,_ => false
     end.
 End Typ.
@@ -57,6 +57,8 @@ Inductive t :=
 | LetBang : Var.t -> t -> t -> t
 | Bit : bool -> t
 | If : t -> t -> t -> t
+| Unit : t
+| LetUnit : t -> t -> t
 | Pair : t -> t -> t
 | LetPair : Var.t -> Var.t -> t -> t -> t
 | Meas : t -> t
@@ -77,6 +79,7 @@ Inductive Val : t -> Prop :=
   Val (Bang e)
 | BitVal  : forall b,
   Val (Bit b)
+| UnitVal : Val Unit
 | PairVal : forall v1 v2,
   Val v1 -> Val v2 ->
   Val (Pair v1 v2)
@@ -96,10 +99,10 @@ Fixpoint vars (e : t) : Var.FSet.t :=
   | LetIn x e1 e2 | LetBang x e1 e2 =>
     Var.FSet.add x (Var.FSet.union (vars e1) (vars e2))
 
-  | Bit _ => Var.FSet.empty
+  | Bit _ | Unit => Var.FSet.empty
   | Bang e | Meas e | New e | Unitary _ e =>
     vars e
-  | Pair e1 e2 | App e1 e2 =>
+  | Pair e1 e2 | App e1 e2 | LetUnit e1 e2 =>
     Var.FSet.union (vars e1) (vars e2)
   | If e0 e1 e2 =>
     Var.FSet.union (vars e0) (Var.FSet.union (vars e1) (vars e2))
@@ -134,6 +137,10 @@ Inductive Fresh x : Expr.t -> Prop :=
 | FIf : forall e e1 e2,
   Fresh x e -> Fresh x e1 -> Fresh x e2 ->
   Fresh x (If e e1 e2)
+| FUnit : Fresh x Unit
+| FLetUnit : forall e1 e2,
+  Fresh x e1 -> Fresh x e2 ->
+  Fresh x (LetUnit e1 e2)
 | FPair : forall e1 e2,
   Fresh x e1 -> Fresh x e2 ->
   Fresh x (Pair e1 e2)
@@ -172,6 +179,8 @@ Fixpoint subst x v e :=
     LetBang y (subst x v e1) (if Var.eq_dec x y then e2 else subst x v e2)
   | Bit b => Bit b
   | If e e1 e2 => If (subst x v e) (subst x v e1) (subst x v e2)
+  | Unit => Unit
+  | LetUnit e1 e2 => LetUnit (subst x v e1) (subst x v e2)
   | Pair e1 e2 => Pair (subst x v e1) (subst x v e2)
   | LetPair y1 y2 e1 e2 =>
     LetPair y1 y2 (subst x v e1)
@@ -243,6 +252,17 @@ Inductive step : Expr.t -> Var.Map.t nat -> Config.t -> Expr.t -> Var.Map.t nat 
   
   step (If (Bit b) e2 e3) refs cfg
        e' refs' cfg
+
+(* Unit *)
+| LetUnitC : forall e1 e2 refs cfg refs' cfg' e1',
+  step e1 refs cfg e1' refs' cfg' ->
+  step (LetUnit e1 e2) refs cfg (LetUnit e1' e2) refs' cfg'
+
+| LetUnitB : forall e refs cfg refs' cfg' e',
+  Var.Map.Equal refs' refs ->
+  cfg' = cfg ->
+  e' = e ->
+  step (LetUnit Unit e) refs cfg e' refs' cfg'
 
 (* Pair *)
 | PairC1 : forall e1 e2 refs cfg e1' refs' cfg',
@@ -427,6 +447,22 @@ Inductive WellTyped : Var.Map.t Typ.t -> Var.Map.t Typ.t -> Var.Map.t nat -> Exp
   Var.Map.Partition Θ Θ1 Θ2 ->
 
   WellTyped Γ Δ Θ (If e eT eF) τ
+
+| WTUnit : forall Γ Δ Θ,
+  Var.Map.Empty Δ ->
+  Var.Map.Empty Θ ->
+  WellTyped Γ Δ Θ Unit Typ.Unit
+
+
+| WTLetUnit : forall Δ1 Δ2 Θ1 Θ2 Γ Δ Θ e1 e2 τ,
+  WellTyped Γ Δ1 Θ1 e1 Typ.Unit ->
+  WellTyped Γ Δ2 Θ2 e2 τ ->
+
+  Var.Map.Partition Δ Δ1 Δ2 ->
+  Var.Map.Partition Θ Θ1 Θ2 ->
+
+  WellTyped Γ Δ Θ (LetUnit e1 e2) τ
+
 
 | WTPair : forall Δ1 Δ2 Θ1 Θ2 Γ Δ Θ e1 e2 τ1 τ2,
   WellTyped Γ Δ1 Θ1 e1 τ1 ->

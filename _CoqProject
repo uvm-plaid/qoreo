@@ -27,9 +27,10 @@ src/Choreography/Weakening.v
 src/Choreography/Typecheck.v
 
 src/Choreography/Notation.v
-src/Choreography/OldNotation.v
 
 src/Network/Network.v
+src/Network/Soundness.v
+src/Network/Completeness.v
 src/Network/Proofs.v
 
 src/NetQasm.v

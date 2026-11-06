@@ -55,14 +55,16 @@ Proof.
   * (* If *)
     econstructor; eauto;
       reflect_partition; Var.simplify.
+  * (* Unit *)
+    econstructor; eauto;
+      reflect_partition; Var.simplify.
   * (* Pair *)
     econstructor; eauto;
       reflect_partition; Var.simplify.
   * (* LetPair *)
     econstructor; eauto;
       reflect_partition; Var.simplify.
-    eapply IHHWT2; auto;
-      Var.simplify.
+    apply IHHWT2; auto; Var.simplify.
     
   * (* Lambda *)
     econstructor; auto.

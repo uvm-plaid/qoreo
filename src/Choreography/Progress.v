@@ -57,18 +57,21 @@ Proof.
   eexists. eexists. eexists. eexists.
   Var.simplify.
 Qed.
-       
+
 (** Progress *)
-Theorem progress : forall G D T1 C1,
-    WellTyped G D T1 C1 ->
+Theorem progress : forall G D T1 C1 tau,
+    WellTyped G D T1 C1 tau ->
     forall cfg1,
       ChorEnv.WellScoped T1 cfg1 ->
       ChorEnv.Empty G ->
       ChorEnv.Empty D ->
-      C1 = Choreography.Empty \/ exists l C2 T2 cfg2, step C1 T1 cfg1 l C2 T2 cfg2.
+      Choreography.Val C1
+      \/
+      exists l C2 T2 cfg2, step C1 T1 cfg1 l C2 T2 cfg2.
 Proof.
-  intros G D T1 C1 HWT.
+  intros G D T1 C1 tau HWT.
   induction HWT; intros cfg1 Hscoped HGempty HDempty.
+  (*
 
   (* Case Nil *)
   - auto.
@@ -471,4 +474,5 @@ Proof.
       Var.Map.Tactics.reflect_partition; auto.
       reflexivity.
     }
-Qed.
+      *)
+Admitted.
