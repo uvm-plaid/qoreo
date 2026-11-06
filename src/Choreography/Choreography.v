@@ -314,6 +314,21 @@ Import Choreography.
            Label.Epsilon
            (LetIn p1 v1 (LetIn p2 v2 C)) T' cfg'
 
+    | LetInVarPairB : forall x1 x2 v1 v2 C T cfg T' cfg' C' A,
+
+      Expr.Val v1 ->
+      Expr.Val v2 ->
+
+      C' = subst A x1 v1 (subst A x2 v2 C) ->
+      ChorEnv.Equal T' T ->
+      cfg' = cfg ->
+
+      step (LetIn (Pattern.VarPair A x1 x2)
+                  (Loc A (Expr.Pair v1 v2))
+                  C) T cfg
+          (Label.Loc A)
+          C' T' cfg'
+
     | LetInUnitB : forall C T cfg T' cfg',
 
       ChorEnv.Equal T' T ->
@@ -326,7 +341,7 @@ Import Choreography.
     | LetInDelay : forall (p : Pattern.t) C1 C2 T cfg l C2' T' cfg',
 
       step C2 T cfg l C2' T' cfg' ->
-      Actor.FSet.Empty (Actor.FSet.inter (Label.actors l) (Pattern.actors p)) ->
+      Actor.FSet.Empty (Actor.FSet.inter (Label.actors l) (Actor.FSet.union (Pattern.actors p) (actors C1))) ->
 
       step (LetIn p C1 C2) T cfg
            l

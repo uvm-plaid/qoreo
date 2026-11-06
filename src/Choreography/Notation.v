@@ -243,8 +243,8 @@ Ltac right_associate A :=
     LET  q @ Alice ← Alice [- Unitary H q -] ;;
     LET! z @ Alice ← Alice [- Meas q -] ;;
     LET! x @ Alice ← Alice [- Meas a -] ;;
-    LET! z @ Bob   ← send Alice z Bob ;;
-    LET! x @ Bob   ← send Alice x Bob ;;
+    LET! z @ Bob   ← send Alice (Expr.Bang z) Bob ;;
+    LET! x @ Bob   ← send Alice (Expr.Bang x) Bob ;;
     LET  b @ Bob   ← Bob [- Expr.If z (Unitary Z b) b -] ;;
     Bob [- Expr.If x (Unitary X b) b -].
 

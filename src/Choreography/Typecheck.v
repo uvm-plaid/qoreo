@@ -108,7 +108,16 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
       | Some (G'', D'') =>
         match ceMerge D' D'' with
         | Some D''' =>
-          typecheck (ChorEnv.concat G G'') D''' T' C2
+           if ChorEnv.disjoint G G''
+           then
+             match typecheck (ChorEnv.concat G G'') D''' T' C2 with
+             | Some result =>
+               if ChorEnv.disjoint D'' result.(Df)
+               then Some result
+               else None
+             | None => None
+             end
+           else None
         | _ => None
         end
       | _ => None
@@ -143,12 +152,13 @@ Fixpoint typecheck (G D : ChorEnv.t Expr.Typ.t) (T : ChorEnv.t nat ) (C : Choreo
     match Expr.Typecheck.typecheck (ChorEnv.find A G) (ChorEnv.find A D) (ChorEnv.find A T) e with
       | Some {| Expr.Typecheck.Df := Delta;
                Expr.Typecheck.Tf := Theta;
-               Expr.Typecheck.tf := t|} =>
+               Expr.Typecheck.tf := Expr.Typ.BANG t
+              |} =>
         Some {| Df := Actor.Map.add A Delta D;
                 Tf := Actor.Map.add A Theta T;
                 tf := Typ.Local B (Expr.Typ.BANG t)
             |}
-      | None => None
+      | _ => None
     end
   | Choreography.EPR A B => 
     Some {| Df := D; Tf := T;

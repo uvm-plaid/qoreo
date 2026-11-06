@@ -119,14 +119,17 @@ Definition render_gate (u : Unitary.t) : string :=
   | _ => name
   end.
 
+(* TODO: we currently don't render expressions with let statements inside them correctly. *)
 Fixpoint render_expr (e : Expr.t) : string :=
   match e with
   | Expr.Var x => var_name x
   | Expr.Bang e1 => render_expr e1
   | Expr.Bit b => bool_literal b
+  | Expr.Unit => "()"
+  | Expr.LetUnit e1 e2 => render_expr e1 +:+ ";"
   | Expr.If e0 e1 e2 =>
       "(" +:+ render_expr e1 +:+ " if " +:+ render_expr e0 +:+ " else " +:+ render_expr e2 +:+ ")"
-  | Expr.Pair e1 e2 => "(" +:+ render_expr e1 +:+ ", " +:+ render_expr e2 +:+ ")"
+  | Expr.Pair e1 e2 => unsupported
   | Expr.LetBang x e1 e2 =>
       match e1 with
       | Expr.Var y =>
@@ -281,7 +284,10 @@ Module ProcessBody.
   Fixpoint bLet p (b1 b2 : pbody) : pbody :=
     match b1 with
     | bRet e1 => bLetIn p e1 b2
-    | bLetIn p1 e1 b1' => bLetIn p1 e1 (bLet p b1' b2)
+    | bLetIn p1 e1 b1' =>
+      (* NOTE: if the variable in p1 also occur in p, there could be captured substitution here.
+      If all variables are fresh (as in the Qoreo monad) we should be okay. *)
+      bLetIn p1 e1 (bLet p b1' b2)
     | bIf e1 b11 b12   =>
       bIf e1 (bLet p b11 b2) (bLet p b12 b2)
     end.

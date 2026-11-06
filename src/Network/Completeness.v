@@ -49,6 +49,7 @@ Proof.
       rewrite epp_subst.
       Actor.simplify. 
       admit (* not equal, but equivalent up to letunit *).
+    * (* LetPairVar *) admit.
     * (* LetPair *)
       admit (* not equal, but equivalent *).
     * (* LetUnit *) admit (* again *).
@@ -186,8 +187,6 @@ Proof.
       { inversion Hstep. }
 
     * (* EPR *)
-      (* Hstep can never step via an Internal step *)
-      exfalso.
       Actor.Map.Tactics.compare A0 A;
       Actor.Map.Tactics.compare A0 B;
       subst;
@@ -195,6 +194,9 @@ Proof.
       | [ Hstep : Process.step _ _ _ |- _] =>
         inversion Hstep; subst; clear Hstep
       end.
+
+      (* self-EPR *)
+      admit.
 
     * Actor.Map.Tactics.compare A0 A.
       {
@@ -210,8 +212,8 @@ Proof.
         simpl. Actor.simplify.
       }
       destruct (Actor.Map.FSetProofs.in_dec A0
-                  (Actor.FSet.union (Choreography.actors C1)
-                                    (Choreography.actors C2)))
+                  (Actor.FSet.remove A (Actor.FSet.union (Choreography.actors C1)
+                                    (Choreography.actors C2))))
             as [Hin | Hin].
       { inversion Hstep. }
       {
@@ -273,13 +275,13 @@ Proof.
       inversion HstepB.
       inversion HstepA.
       destruct (Actor.Map.FSetProofs.in_dec A
-                  (Actor.FSet.union (Choreography.actors C1)
-                                    (Choreography.actors C2)))
+                  (Actor.FSet.remove t (Actor.FSet.union (Choreography.actors C1)
+                                    (Choreography.actors C2))))
         as [Hin | Hin].
       { inversion HstepA. }
       destruct (Actor.Map.FSetProofs.in_dec B
-                  (Actor.FSet.union (Choreography.actors C1)
-                                    (Choreography.actors C2)))
+                  (Actor.FSet.remove t (Actor.FSet.union (Choreography.actors C1)
+                                    (Choreography.actors C2))))
         as [Hin' | Hin'].
       inversion HstepB.
       edestruct IHC1 with (T := T) (ρ := ρ) (A := A) (B := B); eauto.

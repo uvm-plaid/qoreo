@@ -279,6 +279,8 @@ Module Process.
       | Pattern.Unit, Unit => P
       | Pattern.Pair p1 p2, Pair v1 v2 =>
         subst_pat p1 v1 (subst_pat p2 v2 P)
+      | Pattern.Pair p1 p2, Ret (Expr.Pair v1 v2) =>
+        subst_pat p1 (Ret v1) (subst_pat p2 (Ret v2) P)
 
       | _, _ => P
       end.
@@ -536,6 +538,8 @@ Module Network.
 
     | EPR : forall refs0 PA PA' PB PB' qA qB N refs cfg A B N' refs' cfg',
       
+      A <> B -> 
+
       Actor.Map.MapsTo A PA N ->
       Actor.Map.MapsTo B PB N ->
 
@@ -550,7 +554,6 @@ Module Network.
       ChorEnv.Equal refs' refs0 ->
 
       step N refs cfg (Choreography.Label.EPR A B) N' refs' cfg'
-
 
     | If : forall PA PA' N refs refs' cfg cfg' A b Bs N',
 
@@ -621,9 +624,9 @@ Module Network.
       unfold ChorEnv.epr in *.
       destruct (Config.epr_cfg cfg) as [[q1 q2] cfg0']
           eqn:Hcfg.
-        inversion H1; subst; clear H1.
+        inversion H2; subst; clear H2.
       econstructor;
-        [eauto | eauto | | eauto | eauto | eauto | ].
+        [auto | eauto | eauto | | eauto | eauto | eauto | ].
       {
         unfold ChorEnv.epr in *.
         rewrite Hcfg.
@@ -679,7 +682,6 @@ Fixpoint epp_pat (A : Actor.t) (pat : Choreography.Pattern.t) : Pattern.t :=
   end.
   *)
 
-
 Fixpoint epp (A : Actor.t) (c : Choreography.t) : Process.t :=
   match c with
 
@@ -707,18 +709,21 @@ Fixpoint epp (A : Actor.t) (c : Choreography.t) : Process.t :=
   | Choreography.EPR B1 B2 =>
     if Actor.eq_dec A B1
     then if Actor.eq_dec A B2
-    then Process.Pair (Process.EPR A) (Process.EPR A)
+    then Process.Ret
+          (Expr.Unitary Config.Unitary.CNOT
+            (Expr.Pair (Expr.Unitary Config.Unitary.H (Expr.New (Expr.Bit false)))
+                  (Expr.New (Expr.Bit false))))
     else Process.Pair (Process.EPR B2) Process.Unit
     else if Actor.eq_dec A B2
     then Process.Pair Process.Unit (Process.EPR B1)
     else Process.Pair Process.Unit Process.Unit
 
   | Choreography.If B e C1 C2 =>
-    let tgts := Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2) in
+    let tgts := Actor.FSet.remove B (Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2)) in
     if Actor.eq_dec A B
     then Process.SendIf e tgts (epp A C1) (epp A C2)
     else if Actor.Map.FSetProofs.in_dec A tgts
-    then Process.ReceiveIf A (epp A C1) (epp A C2)
+    then Process.ReceiveIf B (epp A C1) (epp A C2)
     else (*Process.Unit*) (* depends on structure of the return type of C1/C2 *)
       epp A C1
 
@@ -814,7 +819,7 @@ Proof.
     }
   * Actor.Map.Tactics.compare A0 A;
     Actor.Map.Tactics.compare A0 B; subst;
-    eapply Process.WTPair
+    try eapply Process.WTPair
         with (Δ2 := Var.Map.empty _) 
              (Δ1 := Var.Map.empty _)
              (Θ2 := Var.Map.empty _)
@@ -826,6 +831,29 @@ Proof.
         |- Var.Map.Partition (ChorEnv.find ?X ?M) _ _ ] =>
         rewrite (H X); auto with var_db
       end.
+
+    (* self-EPR *)
+    econstructor; auto.
+    apply Expr.WTPair
+      with (Δ1 := Var.Map.empty _)
+           (Δ2 := Var.Map.empty _)
+           (Θ1 := Var.Map.empty _)
+           (Θ2 := Var.Map.empty _).
+    3:{ specialize (H B). rewrite H.
+        auto with var_db.
+    }
+    3:{
+      specialize (H0 B). rewrite H0.
+      auto with var_db.
+    }
+    2:{
+      constructor. constructor; auto with var_db.
+    }
+    {
+      constructor; auto.
+      constructor; auto.
+      constructor; auto with var_db.
+    }
 
   * (* IF *)
     ChorEnv.specialize_partition A0.
@@ -839,7 +867,7 @@ Proof.
     ChorEnv.simplify.
     Var.Map.Tactics.rewrite_map (ChorEnv.find A0 D).
     Var.Map.Tactics.rewrite_map (ChorEnv.find A0 T).
-    destruct (Actor.Map.FSetProofs.in_dec A0 (Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2)))
+    destruct (Actor.Map.FSetProofs.in_dec A0 (Actor.FSet.remove A (Actor.FSet.union (Choreography.actors C1) (Choreography.actors C2))))
       as [Hin | Hin].
     { (* in *)
       econstructor; eauto.

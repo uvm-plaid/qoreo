@@ -114,7 +114,13 @@ Proof.
     * rewrite epp_subst. Actor.simplify. 
       apply Process.LetInB; simpl; auto.
       repeat constructor.
+    * repeat rewrite epp_subst.
+      Actor.simplify. 
+      apply Process.LetInB; simpl; auto.
+      repeat constructor; auto.
+      
     * (* DELAY *)
+      Actor.simplify.
       (* A ∉ actors p  ==> Pattern.epp A p = unit-ish *)
       (* Doesn't actually step to the thing, but is equivalent to the thing. *)
       admit.
@@ -135,9 +141,10 @@ Admitted.
 
 Lemma soundness_send : forall C A e B refs cfg C' refs' cfg',
     Choreography.step C refs cfg (Choreography.Label.Send A e B) C' refs' cfg' ->
+    A <> B ->
     Process.step (epp A C) (Network.Label.Send e B) (epp A C').
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Hstep.
+  intros ? ? ? ? ? ? ? ? ? Hstep ?.
   dependent induction Hstep; simpl.
   * apply Process.LetInC; auto.
   * admit (* delay rule *).
@@ -146,15 +153,15 @@ Proof.
     apply epp_val; auto.
   * Actor.Map.Tactics.reduce_eq_dec. 
     Actor.Map.Tactics.reduce_eq_dec.
-    + (* self-send... *) admit.
-    + apply Process.SendB; auto.
+    apply Process.SendB; auto.
 Admitted.
 
 Lemma soundness_receive : forall C A e B refs cfg C' refs' cfg',
+    A <> B ->
     Choreography.step C refs cfg (Choreography.Label.Send A e B) C' refs' cfg' ->
     Process.step (epp B C) (Network.Label.Receive A e) (epp B C').
 Proof.
-  intros ? ? ? ? ? ? ? ? ? Hstep.
+  intros ? ? ? ? ? ? ? ? ? ? Hstep.
   dependent induction Hstep; simpl.
   * apply Process.LetInC; auto.
   * admit (* delay rule *).
@@ -162,10 +169,11 @@ Proof.
   * apply Process.PairC2; auto.
     apply epp_val; auto.
   * Actor.simplify. 
-    + (* self-send... *) admit.
-    + apply Process.ReceiveB; auto.
+    apply Process.ReceiveB; auto.
 Admitted.  
 
+(* 
+LetIn Pattern.Unit Unit Unit takes an Epsilon step to Unit, but its projection changes from Process.LetIn to Process.Unit at every actor. Since Epsilon has no actors, this admitted equality equates distinct constructors and allows deriving False. Replace it with equivalence modulo administrative reductions and update its consumers; the same false equality appears in src/Network/Completeness.v.*)
 Lemma epp_not_in_eq : forall C refs cfg l C' refs' cfg' A,
   Choreography.step C refs cfg l C' refs' cfg' ->
   ~ Actor.FSet.In A (Choreography.Label.actors l) ->
@@ -182,6 +190,8 @@ Theorem soundness : forall l C C' refs cfg refs' cfg',
 Proof.
   destruct l as [A e B | | | | ]; intros.
   * (* Send *)
+    Actor.Map.Tactics.compare A B.
+    { (* self-send *) admit. }
     exists (Actor.Map.add A (epp A C') (Actor.Map.add B (epp B C') N)).
     split.
     2:{
