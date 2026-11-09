@@ -12,6 +12,7 @@ From Qoreo.Base Require Var Actor Config.
         | None => Var.Map.empty _
         end.
 
+
     Definition empty {T} : ChorEnv.t T := Actor.Map.empty _.
 
     (* equivalence of ChorEnv.t *)
@@ -26,13 +27,40 @@ From Qoreo.Base Require Var Actor Config.
         let D := find A G in
         Actor.Map.add A (Var.Map.add x tau D) G.
 
-
     Definition remove {T} (A : Actor.t) (x : Var.t) (CE : t T) :  t T :=
         (Actor.Map.add A (Var.Map.remove x (find A CE)) CE).
 
     Definition MapsTo {T} (A : Actor.t) (x : Var.t) (tau : T) (G : t T) : Prop :=
       Var.Map.MapsTo x tau (find A G).
 
+
+  Module Notation.
+    Declare Scope qoreo_scope.
+    #[global] Notation "T '!!' A" := (ChorEnv.find A T)
+      (at level 20, A at next level)
+  : qoreo_scope.
+    (*Import Notation.*)
+    Open Scope qoreo_scope.
+    Delimit Scope qoreo_scope with qoreo.
+  End Notation.
+  Import Notation.
+
+    Definition concat {T} (CE1 CE2 : t T) : t T :=
+      let dom := Actor.FSet.union (Actor.Map.domain CE1) (Actor.Map.domain CE2) in
+      Actor.FSet.fold
+        (fun A acc =>
+          Actor.Map.add A (Var.Map.concat (CE1!!A) (CE2!!A)) acc)
+        dom ChorEnv.empty.
+
+    Definition disjoint {T} (CE1 CE2 : t T) : bool :=
+      Actor.FSet.for_all
+        (fun A =>
+          Var.FSet.is_empty
+            (Var.FSet.inter
+              (Var.Map.domain (CE1!!A))
+              (Var.Map.domain (CE2!!A)))) 
+        (Actor.Map.domain CE1).
+      
 
     Definition Partition {T} (M1 M2 M3 : ChorEnv.t T) :=
       forall A, Var.Map.Partition (ChorEnv.find A M1) (ChorEnv.find A M2) (ChorEnv.find A M3).
@@ -180,6 +208,16 @@ From Qoreo.Base Require Var Actor Config.
     Var.simplify. Actor.simplify.
   Qed.
   #[global] Hint Rewrite @find_singleton : var_db.
+
+  Lemma find_singleton' : forall {T} (m : Var.Map.t T) A B,
+    Var.Map.Equal
+      (ChorEnv.find A (Actor.Map.singleton B m))
+      (if Actor.eq_dec A B then m else Var.Map.empty _).
+  Proof.
+    intros. unfold Actor.Map.singleton.
+    Var.simplify.
+  Qed.
+  #[global] Hint Rewrite @find_singleton' : var_db.
 
 
   (* Empty_except *)
@@ -466,6 +504,15 @@ From Qoreo.Base Require Var Actor Config.
       inversion H; subst; clear H
     | [ H : ChorEnv.Partition _ _ _ |- _ ] =>
       specialize (H A)
+    end.
+  Ltac specialize_with A :=
+    repeat match goal with
+    | [ H : ChorEnv.PartitionList _ _ |- _ ] =>
+      inversion H; subst; clear H
+    | [ H : ChorEnv.Partition _ _ _ |- _ ] =>
+      specialize (H A)
+    | [ H : ChorEnv.EmptyExcept _ _ |- _ ] => specialize (H A)
+    | [ H : ChorEnv.Empty _ |- _ ] => specialize (H A)
     end.
 
   (** Properties of epr *)

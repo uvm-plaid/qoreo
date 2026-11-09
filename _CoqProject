@@ -14,6 +14,7 @@ src/Expr/Preservation.v
 src/Expr/Progress.v
 src/Expr/Safety.v
 src/Expr/Proofs.v
+src/Expr/Typecheck.v
 
 src/Choreography/Choreography.v
 src/Choreography/BaseProofs.v
@@ -23,11 +24,13 @@ src/Choreography/Progress.v
 src/Choreography/Proofs.v
 src/Choreography/Substitution.v
 src/Choreography/Weakening.v
+src/Choreography/Typecheck.v
 
 src/Choreography/Notation.v
-src/Choreography/OldNotation.v
 
 src/Network/Network.v
+src/Network/Soundness.v
+src/Network/Completeness.v
 src/Network/Proofs.v
 
 src/NetQasm.v
@@ -41,4 +44,4 @@ src/Examples/UnitaryTest.v
 src/Examples/ConditionalTest.v
 src/Examples/DistributedGrover.v
 src/Examples/Simple_Routing.v
-
+src/Examples/TypecheckTest.v

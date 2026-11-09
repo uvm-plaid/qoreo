@@ -1,7 +1,7 @@
 From Stdlib Require Import String.
-From Qoreo Require Import Base.Config Expr.Expr Expr.Weakening Choreography.Choreography Choreography.Weakening Network.Network NetQasm.
+From Qoreo Require Import Base.Config Expr.Expr (* Expr.Weakening Choreography.Choreography Choreography.Weakening *) Network.Network NetQasm.
 Import Config.Unitary.
-From Qoreo.Choreography Require Import Notation.
+From Qoreo.Choreography Require Import Notation Typecheck.
 From Stdlib Require Import Lia.
 
 
@@ -10,9 +10,28 @@ Open Scope list_scope.
 Open Scope example_scope.
 
 
-Definition fresh_in_teleport q := q = 10.
+Definition fresh_in_teleport q := q = 10%nat.
+
+About teleport.
+Definition teleport_measure : Qoreo Choreography.t :=
+  LET q @ "alice" ← "alice" [- New (Bit false) -] ;;
+  LET q @ "bob" ← teleport "alice" "bob" q ;;
+  "bob" [- Meas q -].
+
+Lemma typecheck_teleport_measure :
+    Typecheck.toplevel_typecheck ChorEnv.empty (run teleport_measure)
+    = Typecheck.success.
+Proof.
+  reflexivity.
+Qed.
+  
+(* This more involved proof runs into a failure to evaluate
+    the notation. For now, we will only support
+    type-checking for concrete choreographies.
+*)
 
 (* TODO: improve tactics for typechecking! *)
+(*
 Lemma WellTyped_teleport : forall Alice Bob q C,
   Alice <> Bob ->
   fresh_in_teleport q (* ensure q is fresh in teleport *) ->
@@ -52,7 +71,7 @@ Proof.
   { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 3 QUBIT (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 3 Typ.QUBIT (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
   }
   2:{
@@ -66,7 +85,7 @@ Proof.
   { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 3 QUBIT (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 3 QUBIT (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
   }
   2:{ ChorEnv.simplify. auto with var_db. }
@@ -78,7 +97,7 @@ Proof.
   { repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 5 (BANG BIT) (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 5 (BANG BIT) (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
     rewrite Var.Map.Proofs.add_neq_sym; auto.
     reflexivity.
@@ -92,7 +111,7 @@ Proof.
   { ChorEnv.simplify. repeat (solve_wt; ChorEnv.simplify). }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.add 6 (BANG BIT) (Var.Map.empty typ))).
+    instantiate (1 := (Var.Map.add 6 (BANG BIT) (Var.Map.empty Typ.t))).
     repeat (solve_wt; ChorEnv.simplify).
     Var.solve.
   }
@@ -105,7 +124,7 @@ Proof.
   }
   2:{
     ChorEnv.simplify.
-    instantiate (1 := (Var.Map.empty typ)).
+    instantiate (1 := (Var.Map.empty Typ.t)).
     repeat (solve_wt; ChorEnv.simplify).
   }
   2:{ ChorEnv.simplify. auto with var_db. }
@@ -157,55 +176,23 @@ Proof.
 
   unfold ChorEnv.remove. ChorEnv.simplify.
 
-  eapply Choreography.Weakening.weakening_gen with (G := Actor.Map.empty (Var.Map.t typ)) (G0 := ChorEnv.add Bob 8 BIT (ChorEnv.add Bob 7 BIT (Actor.Map.empty _))).
+  eapply Choreography.Weakening.weakening_gen with (G := Actor.Map.empty (Var.Map.t Typ.t)) (G0 := ChorEnv.add Bob 8 BIT (ChorEnv.add Bob 7 BIT (Actor.Map.empty _))).
   2:{
     intros B. split. ChorEnv.simplify; auto with var_db.
     ChorEnv.simplify. repeat solve_wt; auto with var_db; lia.
   }
 
   ChorEnv.simplify.
-  assert (Heq' :ChorEnv.Equal (Actor.Map.remove Alice (Actor.Map.empty (Var.Map.t typ)))
-                (Actor.Map.empty (Var.Map.t typ))).
+  assert (Heq' :ChorEnv.Equal (Actor.Map.remove Alice (Actor.Map.empty (Var.Map.t Typ.t)))
+                (Actor.Map.empty (Var.Map.t Typ.t))).
   { ChorEnv.solve. }
   rewrite Heq'; clear Heq'.
 
   auto.
 Qed.
+*)
 
 Import List.ListNotations.
-
-Definition choreo : Qoreo (list Var.t) :=
-    do q ← "alice" [- Unitary H (New (Bit false))-] ;;
-    do q ← teleport "alice" "bob" q ;;
-    ret [q].
-
-
-Eval compute in (mk choreo).
-
-Eval compute in (Network.epp "alice" (mk choreo)).
-(*
-  do q ← Unitary H (New (Bit false)) ;;
-  do a ← establish_entanglement Bob ;;
-  do (q,a) ← Unitary CNOT (q,a) ;;
-  do q ← unitary H q ;;
-  do x ← Meas q ;;
-  do z ← Meas a ;;
-  do _ ← Send Bob x ;;
-  Send Bob z
-*)
-
-
-Eval compute in (Network.epp "bob" (mk choreo)).
-(*
-  do b ← establish_entanglement Alice ;;
-  do x ← Receive Alice ;;
-  do z ← Receive Alice ;;
-  do b ← If z (Unitary Z b) b ;;
-  If x (Unitary X b) b
-*)
-
-
-Eval compute in (Network.epp "bob" (mk choreo)).
 
 Import List.ListNotations.
 Definition parties : list Actor.t :=
@@ -216,7 +203,7 @@ From Stdlib Require Import extraction.ExtrOcamlNativeString.
 From Qoreo Require Import NetQasm.
 
 Definition apps : option (list AppFile.t) :=
-    Notation.render_Qoreo NetQASM parties choreo.
+    Notation.render_Qoreo NetQASM teleport_measure.
 
 Extraction Language OCaml.
 Set Extraction Output Directory "extracted".

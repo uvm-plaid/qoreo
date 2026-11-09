@@ -102,6 +102,24 @@ Proof.
       eapply Preservation.cfg_weakening_1; eauto;
         ws_step_tac.
 
+  * (* LetUnit *) 
+    ws_partition_tac.
+    edestruct IHHwt1 as [Hv1 | [e1' [Θ1' [cfg' Hstep1]]]];
+      eauto with var_db.
+    2:{ (* e1 can take a step *)
+      right. eexists. eexists. eexists.
+      apply LetUnitC; eauto.
+      eapply Preservation.cfg_weakening_1; eauto;
+        ws_step_tac.
+    }
+    (* e1 is a value *)
+    inversion Hv1; subst; clear Hv1;
+      inversion Hwt1; subst; clear Hwt1.
+    right.
+    exists e2. exists Θ. exists cfg.
+    apply LetUnitB; auto.
+    reflexivity.
+
   * (* Pair *)
     ws_partition_tac.
     edestruct IHHwt1 as [Hv1 | [e1' [Θ1' [cfg' Hstep1]]]];

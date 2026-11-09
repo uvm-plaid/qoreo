@@ -124,11 +124,9 @@ Lemma step_dim_monotonic : forall e Θ ρ e' Θ' ρ',
   Config.dim ρ <= Config.dim ρ'.
 Proof.
   intros.
-  induction H; auto.
+  induction H; subst; auto.
   * inversion H; subst; simpl; auto.
   * inversion H0; subst; simpl; auto.
-  * subst; simpl; auto.
-  * subst; simpl; auto.
 Qed.
 
 (************************************************)
@@ -161,6 +159,10 @@ Proof.
   * destruct HΔ as [HΔ1 | HΔ2].
     { apply (IHHWT1 z); auto. }
     { apply (IHHWT2 z); auto. }
+  * (* LetUnit *)
+    destruct HΔ as [HΔ1 | HΔ2].
+    { apply (IHHWT1 z); auto. }
+    apply (IHHWT2 z); auto.
   * destruct HΔ as [HΔ1 | HΔ2].
     { apply (IHHWT1 z); auto. }
     compare x1 z.

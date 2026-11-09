@@ -6,7 +6,7 @@ From Qoreo.Choreography Require Import Choreography.
 From Stdlib Require Export Lia List.
 Export List.ListNotations.
 
-
+(*
 (* Helpful Lemmas about binding equality based on Insn.beq *)
 Lemma beq : forall A B x y,
     Insn.bind_eqb (A, x) (B, y) = true <-> (A = B /\ x = y).
@@ -53,9 +53,9 @@ Proof.
   destruct H0.
   auto.
 Qed.  
+*)
 
-
-
+(*
 Lemma stepC_wf_label : forall I Theta ρ l I' Theta' ρ',
   Insn.stepC I Theta ρ l I' Theta' ρ' ->
   Insn.WellFormed I ->
@@ -96,3 +96,4 @@ Proof.
     try constructor;
     try (apply IHHstep; auto; fail).
 Qed.
+*)
