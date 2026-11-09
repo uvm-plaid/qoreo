@@ -40,3 +40,5 @@ src/Examples/DQFT.v
 src/Examples/UnitaryTest.v
 src/Examples/ConditionalTest.v
 src/Examples/DistributedGrover.v
+src/Examples/Simple_Routing.v
+

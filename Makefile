@@ -5,7 +5,8 @@ PYTHON_GENERATION_EXAMPLES := \
 	UnitaryTest \
 	Teleportation \
 	ConditionalTest \
-	DistributedGrover
+	DistributedGrover \
+	Simple_Routing
 
 ocaml_module = $(shell printf '%s' '$1' | awk '{ if ($$0 ~ /^[A-Z]+$$/) print substr($$0, 1, 1) tolower(substr($$0, 2)); else print }')
 
