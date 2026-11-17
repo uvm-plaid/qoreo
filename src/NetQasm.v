@@ -129,7 +129,7 @@ Fixpoint render_expr (e : Expr.t) : string :=
   | Expr.LetUnit e1 e2 => render_expr e1 +:+ ";"
   | Expr.If e0 e1 e2 =>
       "(" +:+ render_expr e1 +:+ " if " +:+ render_expr e0 +:+ " else " +:+ render_expr e2 +:+ ")"
-  | Expr.Pair e1 e2 => unsupported
+  | Expr.Pair e1 e2 => "(" +:+ render_expr e1 +:+"," +:+ render_expr e2 +:+ ")"
   | Expr.LetBang x e1 e2 =>
       match e1 with
       | Expr.Var y =>

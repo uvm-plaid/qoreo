@@ -13,126 +13,126 @@ Open Scope example_scope.
 
 Module UnitaryTest.
 
-  Definition tdag_test (Alice : Actor.t) : Qoreo Var.t :=
-    do q ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do q ← Alice [- Unitary TGATE q -] ;;
-    do q ← Alice [- Unitary Tdag q -] ;;
-    do q ← Alice [- Unitary H q -] ;;
-    do r ← Alice [- Meas q -] ;;
-    ret r.
+  Definition tdag_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET q @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET q @ Alice ← Alice [- Unitary TGATE q -] ;;
+    LET q @ Alice ← Alice [- Unitary Tdag q -] ;;
+    LET q @ Alice ← Alice [- Unitary H q -] ;;
+    Alice [- Meas q -].
 
-  Definition sdag_test (Alice : Actor.t) : Qoreo Var.t :=
-    do q ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do q ← Alice [- Unitary SGATE q -] ;;
-    do q ← Alice [- Unitary Sdag q -] ;;
-    do q ← Alice [- Unitary H q -] ;;
-    do r ← Alice [- Meas q -] ;;
-    ret r.
-
-  Definition cs_test (Alice : Actor.t) : Qoreo Var.t :=
+  Definition sdag_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET q @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET q @ Alice ← Alice [- Unitary SGATE q -] ;;
+    LET q @ Alice ← Alice [- Unitary Sdag q -] ;;
+    LET q @ Alice ← Alice [- Unitary H q -] ;;
+    Alice [- Meas q -].
+  (*Definition cs_test (Alice : Actor.t) : Qoreo Var.t :=
     do control ← Alice [- New (Bit true) -] ;;
     do target ← Alice [- Unitary H (New (Bit false)) -] ;;
     do (control, target) ← Alice [-- Unitary CS (Pair control target) -] ;;
     do (control, target) ← Alice [-- Unitary CS (Pair control target) -] ;;
     do target ← Alice [- Unitary H target -] ;;
     do r ← Alice [- Meas target -] ;;
-    ret r.
+    ret r.*)
+  Definition cs_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET control @ Alice ← Alice [- New (Bit true) -] ;;
+    LET target @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CS (Pair control target) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CS (Pair control target) -] ;;
+    LET q @ Alice ← Alice [- Unitary H target -] ;;
+    Alice [- Meas target -].
 
-  Definition ct_test (Alice : Actor.t) : Qoreo Var.t :=
-    do control ← Alice [- New (Bit true) -] ;;
-    do target ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do (control, target) ← Alice [-- Unitary CT (Pair control target) -] ;;
-    do (control, target) ← Alice [-- Unitary CTdag (Pair control target) -] ;;
-    do target ← Alice [- Unitary H target -] ;;
-    do r ← Alice [- Meas target -] ;;
-    ret r.
+  Definition ct_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET control @ Alice ← Alice [- New (Bit true) -] ;;
+    LET target @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CT (Pair control target) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CTdag (Pair control target) -] ;;
+    LET target @ Alice ← Alice [- Unitary H target -] ;;
+    Alice [- Meas target -].
 
-  Definition csdag_test (Alice : Actor.t) : Qoreo Var.t :=
-    do control ← Alice [- New (Bit true) -] ;;
-    do target ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do (control, target) ← Alice [-- Unitary CS (Pair control target) -] ;;
-    do (control, target) ← Alice [-- Unitary CSdag (Pair control target) -] ;;
-    do target ← Alice [- Unitary H target -] ;;
-    do r ← Alice [- Meas target -] ;;
-    ret r.
+  Definition csdag_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET control @ Alice ← Alice [- New (Bit true) -] ;;
+    LET target @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CS (Pair control target) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CSdag (Pair control target) -] ;;
+    LET target @ Alice ← Alice [- Unitary H target -] ;;
+    Alice [- Meas target -].
 
-  Definition ctdag_test (Alice : Actor.t) : Qoreo Var.t :=
-    do control ← Alice [- New (Bit true) -] ;;
-    do target ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do (control, target) ← Alice [-- Unitary CTdag (Pair control target) -] ;;
-    do (control, target) ← Alice [-- Unitary CT (Pair control target) -] ;;
-    do target ← Alice [- Unitary H target -] ;;
-    do r ← Alice [- Meas target -] ;;
-    ret r.
+  Definition ctdag_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET control @ Alice ← Alice [- New (Bit true) -] ;;
+    LET target @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CTdag (Pair control target) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary CT (Pair control target) -] ;;
+    LET target @ Alice ← Alice [- Unitary H target -] ;;
+    Alice [- Meas target -].
 
 
   (* RZ(pi/4) is equivalent to T up to global phase. *)
-  Definition rz_t_test (Alice : Actor.t) : Qoreo Var.t :=
-    do q ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do q ← Alice [- Unitary (RZ (pi/4)%Q) q -] ;; (*Pi/4%Q*)
-    do q ← Alice [- Unitary Tdag q -] ;;
-    do q ← Alice [- Unitary H q -] ;;
-    do r ← Alice [- Meas q -] ;;
-    ret r.
+  Definition rz_t_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET q @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET q @ Alice ← Alice [- Unitary (RZ (pi/4)%Q) q -] ;; (*Pi/4%Q*)
+    LET q @ Alice ← Alice [- Unitary Tdag q -] ;;
+    LET q @ Alice ← Alice [- Unitary H q -] ;;
+    Alice [- Meas q -].
 
   (* RZ(3*pi/7) followed by its inverse is identity. *)
-  Definition rz_arbitrary_test (Alice : Actor.t) : Qoreo Var.t :=
-    do q ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do q ← Alice [- Unitary (RZ (3#7)) q -] ;;
-    do q ← Alice [- Unitary (RZ (-3#7)) q -] ;;
-    do q ← Alice [- Unitary H q -] ;;
-    do r ← Alice [- Meas q -] ;;
-    ret r.
+  Definition rz_arbitrary_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET q @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET q @ Alice ← Alice [- Unitary (RZ (3#7)) q -] ;;
+    LET q @ Alice ← Alice [- Unitary (RZ (-3#7)) q -] ;;
+    LET q @ Alice ← Alice [- Unitary H q -] ;;
+    Alice [- Meas q -].
 
   (* Expected P(1) = sin^2(3*pi/14). *)
-  Definition rz_probability_test (Alice : Actor.t) : Qoreo Var.t :=
-    do q ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do q ← Alice [- Unitary (RZ (3#7)) q -] ;;
-    do q ← Alice [- Unitary H q -] ;;
-    do r ← Alice [- Meas q -] ;;
-    ret r.
+  Definition rz_probability_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET q @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET q @ Alice ← Alice [- Unitary (RZ (3#7)) q -] ;;
+    LET q @ Alice ← Alice [- Unitary H q -] ;;
+    Alice [- Meas q -].
 
   (* CRZ(pi/4) followed by CRZ(-pi/4) is identity. *)
-  Definition crz_inverse_test (Alice : Actor.t) : Qoreo Var.t :=
-    do control ← Alice [- New (Bit true) -] ;;
-    do target ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do (control, target) ← Alice [-- Unitary (CRZ (1#4)) (Pair control target) -] ;;
-    do (control, target) ← Alice [-- Unitary (CRZ (-1#4)) (Pair control target) -] ;;
-    do target ← Alice [- Unitary H target -] ;;
-    do r ← Alice [- Meas target -] ;;
-    ret r.
+  Definition crz_inverse_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET control @ Alice ← Alice [- New (Bit true) -] ;;
+    LET target @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary (CRZ (1#4)) (Pair control target) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary (CRZ (-1#4)) (Pair control target) -] ;;
+    LET target @ Alice ← Alice [- Unitary H target -] ;;
+    Alice [- Meas target -].
 
   (* Control = 1 activates CRZ(3*pi/7). *)
   (* Expected P(1) = sin^2(3*pi/14). *)
-  Definition crz_probability_test (Alice : Actor.t) : Qoreo Var.t :=
-    do control ← Alice [- New (Bit true) -] ;;
-    do target ← Alice [- Unitary H (New (Bit false)) -] ;;
-    do (control, target) ← Alice [-- Unitary (CRZ (3#7)) (Pair control target) -] ;;
-    do target ← Alice [- Unitary H target -] ;;
-    do r ← Alice [- Meas target -] ;;
-    ret r.
+  Definition crz_probability_test (Alice : Actor.t) : Qoreo Choreography.t :=
+    LET control @ Alice ← Alice [- New (Bit true) -] ;;
+    LET target @ Alice ← Alice [- Unitary H (New (Bit false)) -] ;;
+    LET@ (control, target) @ Alice ← Alice [- Unitary (CRZ (3#7)) (Pair control target) -] ;;
+    LET target @ Alice ← Alice [- Unitary H target -] ;;
+    Alice [- Meas target -].
 
-   Definition choreo : Qoreo (list Var.t) :=
-      do t_result     ← tdag_test "alice" ;;
-      do s_result     ← sdag_test "alice" ;;
-      do cs_result    ← cs_test "alice" ;;
-      do ct_result    ← ct_test "alice" ;;
-      do csdag_result ← csdag_test "alice" ;;
-      do ctdag_result ← ctdag_test "alice" ;;
+   Definition choreo : Qoreo Choreography.t :=
+      LET! t_result @ "alice" ← tdag_test "alice" ;;
+      LET! s_result @ "alice" ← sdag_test "alice" ;;
+      LET! cs_result @ "alice" ← cs_test "alice" ;;
+      LET! ct_result @ "alice" ← ct_test "alice" ;;
+      LET! csdag_result @ "alice" ← csdag_test "alice" ;;
+      LET! ctdag_result @ "alice" ← ctdag_test "alice" ;;
 
-      do rz_t_result     ← rz_t_test "alice" ;;
-      do rz_arb_result   ← rz_arbitrary_test "alice" ;;
-      do rz_prob_result  ← rz_probability_test "alice" ;;
-      do crz_inv_result  ← crz_inverse_test "alice" ;;
-      do crz_prob_result ← crz_probability_test "alice" ;;
-
-      ret [ t_result; s_result;
-            cs_result; ct_result; 
-            csdag_result; ctdag_result;
-            rz_t_result; rz_arb_result;
-            rz_prob_result;
-            crz_inv_result; crz_prob_result
-            ].
+      LET! rz_t_result @ "alice" ← rz_t_test "alice" ;;
+      LET! rz_arb_result @ "alice" ← rz_arbitrary_test "alice" ;;
+      LET! rz_prob_result @ "alice" ← rz_probability_test "alice" ;;
+      LET! crz_inv_result @ "alice" ← crz_inverse_test "alice" ;;
+      LET! crz_prob_result @ "alice" ← crz_probability_test "alice" ;;
+      "alice" [-
+        Pair
+      (Pair
+        (Pair (Bang t_result) (Bang s_result))
+        (Pair (Bang cs_result) (Bang ct_result)))
+      (Pair
+        (Pair (Bang csdag_result) (Bang ctdag_result))
+        (Pair
+          (Pair (Bang rz_t_result) (Bang rz_arb_result))
+          (Pair
+            (Bang rz_prob_result)
+            (Pair (Bang crz_inv_result) (Bang crz_prob_result)))))-].
       (*"alice" [- Pair
                     (Pair
                       (Pair (Var t_result) (Var s_result))
@@ -140,10 +140,10 @@ Module UnitaryTest.
                     (Pair (Var csdag_result) (Var ctdag_result))
               -]*)
 
-  Definition parties : list Actor.t := ["alice"].
+  (*Definition parties : list Actor.t := ["alice"].*)
 
   Definition apps : option (list AppFile.t) :=
-    Notation.render_Qoreo NetSquid parties choreo.
+    Notation.render_Qoreo NetSquid choreo.
 
 End UnitaryTest.
 

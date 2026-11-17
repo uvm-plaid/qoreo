@@ -16,6 +16,44 @@ Open Scope string_scope.
 Open Scope example_scope.
 
 Module ConditionalTest.
+  (*Takes in 3 actors and returns the Choreography.
+  I simplified the earlier redundancy by calling Let! to have Bob and Charlie just have Alice's bit b.*)
+
+  Definition conditional_test (Alice Bob Charlie : Actor.t)
+    : Qoreo Choreography.t :=
+  LET q @ Alice ← Alice [- Expr.Unitary H (Expr.New (Expr.Bit false)) -] ;;
+  LET! a @ Alice ← Alice [- Expr.Meas (Expr.Var q) -] ;;
+  let branch (bit : bool) : Qoreo Choreography.t :=
+    LET! b @ Alice ← send Bob (Expr.Bang (Expr.Bit bit)) Alice ;;
+    LET! c @ Alice ← send Charlie (Expr.Bang (Expr.Bit bit)) Alice ;;
+    Alice [-Expr.Pair
+        (Expr.Pair (Expr.Var a) (Expr.Var b))
+        (Expr.Var c)-]
+  in
+  cif Alice (Expr.Var a) (branch true) (branch false).
+  Definition choreo : Choreography.t :=
+    Notation.run (conditional_test "alice" "bob" "charlie").
+
+  Lemma typecheck_conditional_test :
+    Typecheck.toplevel_typecheck ChorEnv.empty choreo = Typecheck.success.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Definition apps : option (list AppFile.t) :=
+    Notation.render_Qoreo NetSquid
+      (conditional_test "alice" "bob" "charlie").
+
+End ConditionalTest.
+
+Extraction Language OCaml.
+Set Extraction Output Directory "extracted".
+
+Definition example_apps := ConditionalTest.apps.
+
+Extraction "ConditionalTest.ml" example_apps.
+(*
+Module ConditionalTest.
 
   (* This helper function solves the type mismatch issue *)
   Definition add_chor (C : Choreography.t) : Qoreo unit :=
@@ -92,7 +130,7 @@ Set Extraction Output Directory "extracted".
 Definition example_apps := ConditionalTest.apps.
 Extraction "ConditionalTest.ml" example_apps.
 
-
+*)
 (*The error version
 
 From Stdlib Require Import String.

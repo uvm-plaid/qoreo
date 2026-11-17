@@ -45,3 +45,4 @@ src/Examples/ConditionalTest.v
 src/Examples/DistributedGrover.v
 src/Examples/Simple_Routing.v
 src/Examples/TypecheckTest.v
+src/Examples/Simple_Routing_General.v
