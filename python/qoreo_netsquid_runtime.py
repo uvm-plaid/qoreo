@@ -86,14 +86,24 @@ class Receiver(NodeProtocol):
         super().__init__(node)
         self.port = port
         self.queue = queue
+    #Run has changed
+    def run(self):
+        while True:
+            message = self.port.rx_input()
+            while message is not None:
+                for item in message.items:
+                    self.queue.put(item)
+                message = self.port.rx_input()
 
+            yield self.await_port_input(self.port)
+    '''
     def run(self):
         while True:
             yield self.await_port_input(self.port)
             message = self.port.rx_input()
             # Use queues so classical input matches generated variables.
             self.queue.put(message.items[0])
-
+    '''
 
 _ACTIVE_NETWORK = None
 

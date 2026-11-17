@@ -68,5 +68,6 @@ if __name__ == "__main__":
 
     print("\nCONDITIONAL TEST RESULTS:")
     for result, count in sorted(counts.items()):
-        alice, bob, charlie = result
-        print(f"Alice: {alice}, Bob: {bob}, Charlie: {charlie} — {count}")
+        alice_result, _, _ = result
+        (a, b), c = alice_result
+        print(f"Alice {a}, "f"Bob {b}, Charlie {c}" f" — {count} shots")
